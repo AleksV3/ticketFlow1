@@ -1,0 +1,32 @@
+# OS
+.DS_Store
+
+# Private notes — never commit
+docs/01-first-day-context-and-agent-instructions.md
+
+# Scratch drop folder for generated images — canonical copy lives in docs/mockups/
+/images/
+
+# IDE
+.idea/
+.vscode/
+*.iml
+
+# Java / Maven / Gradle (backend, once it exists)
+backend/target/
+backend/build/
+backend/.gradle/
+
+# Node / Next.js (frontend, once it exists)
+frontend/node_modules/
+frontend/.next/
+frontend/out/
+
+# Env
+.env
+.env.local
+
+# Claude Code local credentials/state (skills themselves are tracked)
+.claude/settings.local.json
+.claude/.credentials.json
+CLAUDE.md
