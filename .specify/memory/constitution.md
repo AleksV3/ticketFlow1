@@ -96,8 +96,9 @@ requires and stop there — do not rebuild Jira's full workflow engine. Three
 similar lines of code beat a premature abstraction.
 
 ### VII. Teach, Don't Just Deliver
-This project's purpose is dual: ship a working ticketing tool AND make Gregor a
-stronger backend developer. For every non-trivial change, explain what changed,
+This project's purpose is dual: ship a working ticketing tool AND make Gregor
+and Aleks stronger backend developers. For every non-trivial change, explain
+what changed,
 why, how to run and test it, and the underlying Spring/JPA/SQL concept involved
 (layering, entity relationships, DTOs, validation, transactions, state
 machines, migrations, security filters). Code should never just "appear" —
