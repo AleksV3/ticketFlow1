@@ -339,9 +339,10 @@ ticket of that type; confirm `OPEN → CLOSED` is rejected (undefined) while
   checks MUST test permissions and MUST NOT branch on role names. A disallowed
   action MUST be rejected even if invoked directly, not just hidden from the UI.
 - **FR-008**: System MUST provide a **fixed permission catalog** defined in
-  code (e.g. `TICKET_READ`, `TICKET_CREATE`, `TICKET_TRANSITION`,
-  `PROPOSAL_APPROVE`, `COMMENT_PUBLIC_WRITE`, `COMMENT_INTERNAL_WRITE`,
-  `USER_MANAGE`, `ROLE_MANAGE`, `TYPE_MANAGE`, `WORKFLOW_MANAGE`). New
+  code (e.g. `TICKET_READ`, `TICKET_CREATE`, `TICKET_UPDATE`,
+  `TICKET_TRANSITION`, `PROPOSAL_APPROVE`, `COMMENT_PUBLIC_WRITE`,
+  `COMMENT_INTERNAL_WRITE`, `USER_MANAGE`, `ROLE_MANAGE`, `TYPE_MANAGE`,
+  `WORKFLOW_MANAGE`). New
   permission keys are added only in code; they cannot be invented at runtime.
 - **FR-009**: System MUST support **roles as configurable bundles of
   permissions**. It MUST be seeded with default role templates `ADMIN`,

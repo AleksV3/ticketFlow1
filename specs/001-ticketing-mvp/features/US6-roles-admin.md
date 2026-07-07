@@ -42,7 +42,7 @@ partitioned by client.
 
 Access is enforced by **permission**, not by role name. The permission
 catalog is fixed in code (e.g. `TICKET_READ`, `TICKET_CREATE`,
-`TICKET_TRANSITION`, `PROPOSAL_APPROVE`, `COMMENT_PUBLIC_WRITE`,
+`TICKET_UPDATE`, `TICKET_TRANSITION`, `PROPOSAL_APPROVE`, `COMMENT_PUBLIC_WRITE`,
 `COMMENT_INTERNAL_WRITE`, `USER_MANAGE`, `ROLE_MANAGE`, `TYPE_MANAGE`,
 `WORKFLOW_MANAGE`). Roles are configurable **bundles of permissions**, seeded
 from default templates: `ADMIN`, `CLIENT_USER`, `CLIENT_APPROVER`,
@@ -84,17 +84,17 @@ for the shared convention (cross-org access returns `404`, not `403`).
 ## Tasks
 
 - Phase 1 (Backend Foundation — dedicated to this story's admin surface):
-  T011, T012
+  T012, T013
 - Phase 7 (Frontend — admin users page): T064
 
 Full task text: [tasks.md](../tasks.md). Like US4, most of this story's
 actual enforcement work is threaded through every other phase (every
 endpoint's permission/org check), not concentrated in one phase —
-T011/T012/T064 are just the admin-management *screens*, not the whole story.
+T012/T013/T064 are just the admin-management *screens*, not the whole story.
 
 Verify gate: none dedicated — permission enforcement is checked throughout
 (e.g. T034 asserts an actor lacking the required permission gets `409`/`403`);
-org isolation is specifically verified in T025 (Phase 2) and T069 (Phase 8,
+org isolation is specifically verified in T027 (Phase 2) and T070 (Phase 8,
 full two-Organization check against SC-008).
 
 ## Success criteria

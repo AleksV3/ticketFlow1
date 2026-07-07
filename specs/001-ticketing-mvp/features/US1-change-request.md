@@ -97,13 +97,13 @@ FR-001, FR-002, FR-003, FR-006, FR-007, FR-011, FR-018 — full text in
 
 ## Tasks
 
-- Phase 2 (Ticket Core): T021, T022
-- Phase 3 (Workflow/Transitions): T026, T027, T028, T029
-- Phase 5 (Change Proposals — dedicated to this story): T043–T049
+- Phase 2 (Ticket Core): T023, T024
+- Phase 3 (Workflow/Transitions): T028, T029, T030
+- Phase 5 (Change Proposals — dedicated to this story): T044–T050
 - Phase 7 (Frontend): T062, T063
 
-Full task text: [tasks.md](../tasks.md). Verify gates for this feature: T025
-(ticket core), T034 (transitions), **T049** (full CR flow end-to-end,
+Full task text: [tasks.md](../tasks.md). Verify gates for this feature: T027
+(ticket core), T035 (transitions), **T050** (full CR flow end-to-end,
 including one rejection-and-resubmission cycle — the definitive check for
 this story).
 

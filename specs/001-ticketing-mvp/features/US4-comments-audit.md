@@ -63,17 +63,17 @@ append-only with no update/delete operations exposed anywhere in the API.
 
 ## Tasks
 
-- Phase 3 (Workflow/Transitions — audit/history read endpoints): T030, T031
-- Phase 4 (Comments & Attachments — dedicated to this story): T035–T042
+- Phase 3 (Workflow/Transitions — audit/history read endpoints): T031, T032
+- Phase 4 (Comments & Attachments — dedicated to this story): T036–T043
 - Phase 7 (Frontend): T063
 
 Full task text: [tasks.md](../tasks.md). Note `AuditLog`/`StatusHistory`
-*entities* are actually introduced earlier, in Phase 2 (T018, T019) — every
+*entities* are actually introduced earlier, in Phase 2 (T020, T021) — every
 service writes to them from the moment tickets can be created, per
 constitution Principle II ("Audit Everything"). This story's own phase
 (4) is specifically about comments/attachments and their audit entries.
 
-Verify gate: **T042** — post one `INTERNAL` and one `PUBLIC` comment as a
+Verify gate: **T043** — post one `INTERNAL` and one `PUBLIC` comment as a
 TicketFlow1 user, confirm a client user's `GET .../comments` only returns the
 public one; post an attachment and confirm it appears.
 

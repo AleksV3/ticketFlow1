@@ -99,10 +99,10 @@ history).
 
 ## Tasks
 
-- Phase 2 (Ticket Core): T021, T022, T023 (`slaStatus` filter stubbed here,
+- Phase 2 (Ticket Core): T023, T024, T025 (`slaStatus` filter stubbed here,
   wired in Phase 6)
-- Phase 3 (Workflow/Transitions): T026, T027, T028, T029
-- Phase 6 (Defect SLA — dedicated to this story): T050–T056
+- Phase 3 (Workflow/Transitions): T028, T029, T030
+- Phase 6 (Defect SLA — dedicated to this story): T051–T056
 - Phase 7 (Frontend): T062, T063
 
 Full task text: [tasks.md](../tasks.md). Verify gate: **T056** — create a
