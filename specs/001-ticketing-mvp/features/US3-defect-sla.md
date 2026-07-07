@@ -12,28 +12,31 @@ confirms resolution before the ticket closes.
 
 **Why P1**: SLA tracking on defects is doc 02's other standout
 business-specific feature (§4) and directly reflects the mentor's Incident
-Management SLA table — equal priority to the Change Request flow (US1).
+Management SLA table — equal priority to the Change Request flow (US1). It
+runs on the seeded default **Defect** type and its default workflow.
 
-## Lifecycle
+## Lifecycle (seeded default Defect workflow)
 
 ```mermaid
 stateDiagram-v2
-    [*] --> REPORTED: report defect (CLIENT_USER/CLIENT_APPROVER)
-    REPORTED --> ANALYSIS: triage (DINIT_USER/DINIT_MANAGER)
-    REPORTED --> CANCELLED: not reproducible/duplicate (DINIT_MANAGER/ADMIN)
-    ANALYSIS --> FIX_IN_PROGRESS: root cause confirmed (DINIT_USER/DINIT_MANAGER)
-    ANALYSIS --> CANCELLED: not reproducible/duplicate (DINIT_MANAGER/ADMIN)
-    FIX_IN_PROGRESS --> CLIENT_CONFIRMATION: fix deployed (DINIT_USER/DINIT_MANAGER)
-    CLIENT_CONFIRMATION --> CLOSED: confirm resolved (CLIENT_USER/CLIENT_APPROVER)
-    CLIENT_CONFIRMATION --> FIX_IN_PROGRESS: reject fix, reopen (CLIENT_USER/CLIENT_APPROVER)
+    [*] --> REPORTED: report defect (TICKET_CREATE)
+    REPORTED --> ANALYSIS: triage (TICKET_TRANSITION)
+    REPORTED --> CANCELLED: not reproducible/duplicate (TICKET_TRANSITION)
+    ANALYSIS --> FIX_IN_PROGRESS: root cause confirmed (TICKET_TRANSITION)
+    ANALYSIS --> CANCELLED: not reproducible/duplicate (TICKET_TRANSITION)
+    FIX_IN_PROGRESS --> CLIENT_CONFIRMATION: fix deployed (TICKET_TRANSITION)
+    CLIENT_CONFIRMATION --> CLOSED: confirm resolved (TICKET_TRANSITION, CLIENT party)
+    CLIENT_CONFIRMATION --> FIX_IN_PROGRESS: reject fix, reopen (TICKET_TRANSITION, CLIENT party)
     CANCELLED --> [*]
     CLOSED --> [*]
 ```
 
-Severity is set at creation or during `ANALYSIS` and drives the SLA deadline
-fields; it does not gate any transition directly. `currentResponsibility` is
-`DINIT` through `FIX_IN_PROGRESS`, flips to `CLIENT` on entering
-`CLIENT_CONFIRMATION`.
+Every transition requires the `TICKET_TRANSITION` permission; the two client
+confirmation moves are additionally restricted to CLIENT party. Severity is a
+**fixed** set (`SEV_1`–`SEV_4`) — it drives the SLA deadline fields and is set
+at creation or during `ANALYSIS`; it does not gate any transition directly.
+`currentResponsibility` is `TICKETFLOW1` through `FIX_IN_PROGRESS`, flips to
+`CLIENT` on entering `CLIENT_CONFIRMATION`.
 
 ## SLA formulas (doc 02 §4, simplified for MVP)
 
@@ -64,7 +67,8 @@ for why. Full field definitions: [data-model.md § Ticket](../data-model.md#tick
    client does not confirm, the ticket stays in `CLIENT_CONFIRMATION`.
 5. **Given** a `TASK` or `CHANGE_REQUEST` ticket, **when** its SLA fields
    are inspected, **then** they are absent/`NOT_APPLICABLE` — SLA tracking
-   only applies to `DEFECT` tickets.
+   applies only to `DEFECT` tickets. Severity is a fixed set because the SLA
+   formulas are keyed to it.
 
 **Edge case** (see [spec.md § Edge Cases](../spec.md#edge-cases)): a
 `SEV_1` defect downgraded to `SEV_3` recomputes SLA deadlines from the
@@ -74,7 +78,7 @@ deadlines.
 
 ## Requirements
 
-FR-001, FR-004, FR-005, FR-006, FR-011 — full text in
+FR-001, FR-004, FR-005, FR-006, FR-007 — full text in
 [spec.md § Functional Requirements](../spec.md#functional-requirements).
 
 ## API

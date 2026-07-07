@@ -1,10 +1,10 @@
-# Dinit Ticketing Tool — Product Requirements & Build Brief
+# TicketFlow1 Ticketing Tool — Product Requirements & Build Brief
 
 ## Purpose of this document
 
-This document gives a second AI/coding agent the product and technical brief for Gregor's Dinit summer project.
+This document gives a second AI/coding agent the product and technical brief for Gregor's TicketFlow1 summer project.
 
-The project should be treated as a simplified internal ticketing system inspired by Jira, but tailored to the mentor's presentation about Dinit's Change Management and Defect Management processes.
+The project should be treated as a simplified internal ticketing system inspired by Jira, but tailored to the mentor's presentation about TicketFlow1's Change Management and Defect Management processes.
 
 The best positioning is:
 
@@ -76,7 +76,7 @@ This means there is an important business distinction:
 From the mentor slides:
 
 ```text
-REQUEST FORM SUBMITTED TO DINIT
+REQUEST FORM SUBMITTED TO TICKETFLOW1
 → ANALYSIS
 → PROPOSAL
 → client approves/rejects
@@ -88,7 +88,7 @@ REQUEST FORM SUBMITTED TO DINIT
 → TICKET CLOSED
 ```
 
-Recommended enum:
+Recommended status set:
 
 ```text
 SUBMITTED
@@ -118,7 +118,7 @@ Important behavior:
 From the mentor slides:
 
 ```text
-REQUEST FORM SUBMITTED TO DINIT
+REQUEST FORM SUBMITTED TO TICKETFLOW1
 → ANALYSIS
 → DEVELOPMENT / ACTION
 → FIRST OCCURRENCE TESTING
@@ -127,7 +127,7 @@ REQUEST FORM SUBMITTED TO DINIT
 → IN PRODUCTION
 ```
 
-Recommended enum reuse with type-specific allowed transitions:
+Recommended shared status set with type-specific allowed transitions:
 
 ```text
 SUBMITTED
@@ -152,9 +152,9 @@ From the mentor slides:
 | Role | Description |
 |------|-------------|
 | Business owner | Client-side person who opened a new request |
-| Ticket lead | Dinit-side person responsible for the request throughout its lifecycle |
-| MCE team | Dinit team responsible for monitoring ticket lifecycle, preparing offers, and serving as main contact for status updates and delivery dates |
-| Contributors group | Client users with permission to submit requests to Dinit |
+| Ticket lead | TicketFlow1-side person responsible for the request throughout its lifecycle |
+| MCE team | TicketFlow1 team responsible for monitoring ticket lifecycle, preparing offers, and serving as main contact for status updates and delivery dates |
+| Contributors group | Client users with permission to submit requests to TicketFlow1 |
 | Approvers group | Client users with authority to approve/reject proposals |
 
 Recommended application roles:
@@ -163,9 +163,9 @@ Recommended application roles:
 ADMIN
 CLIENT_CONTRIBUTOR
 CLIENT_APPROVER
-DINIT_TICKET_LEAD
-DINIT_MCE
-DINIT_SERVICE_DESK
+TICKETFLOW1_TICKET_LEAD
+TICKETFLOW1_MCE
+TICKETFLOW1_SERVICE_DESK
 VIEWER
 ```
 
@@ -175,8 +175,8 @@ For MVP, these can be simplified to:
 ADMIN
 CLIENT_USER
 CLIENT_APPROVER
-DINIT_USER
-DINIT_MANAGER
+TICKETFLOW1_USER
+TICKETFLOW1_MANAGER
 ```
 
 But do not reduce everything to only ADMIN/USER if avoidable. The roles are part of the business value.
@@ -205,7 +205,7 @@ From mentor slides:
 | Severity Level 3 | Non-critical application and/or business process partly disturbed; workaround exists |
 | Severity Level 4 | Business process not affected; response time on proper malfunction report next business day |
 
-Recommended enum:
+Recommended severity set:
 
 ```text
 SEV_1
@@ -251,13 +251,13 @@ From mentor slides:
 | Role | Description |
 |------|-------------|
 | Business owner | Client-side person who opened a new defect |
-| Ticket lead | Dinit-side person responsible for the defect throughout its lifecycle |
-| Service Desk team | Dinit team responsible for monitoring the ticket lifecycle |
+| Ticket lead | TicketFlow1-side person responsible for the defect throughout its lifecycle |
+| Service Desk team | TicketFlow1 team responsible for monitoring the ticket lifecycle |
 
 Recommended permissions:
 
 - Client user can report defect and comment.
-- Dinit Service Desk/Ticket Lead can triage and transition.
+- TicketFlow1 Service Desk/Ticket Lead can triage and transition.
 - Client confirms resolution before close.
 - Admin can manage everything.
 
@@ -381,7 +381,7 @@ businessOwnerId
 createdById
 ticketLeadId nullable
 assignedTeam nullable
-currentResponsibility: CLIENT | DINIT
+currentResponsibility: CLIENT | TICKETFLOW1
 createdAt
 updatedAt
 closedAt nullable
@@ -547,7 +547,7 @@ Recommended pages:
 - title/description
 - ticket type
 - current status
-- current responsibility: CLIENT or DINIT
+- current responsibility: CLIENT or TICKETFLOW1
 - business owner
 - ticket lead
 - severity/SLA if defect
@@ -671,7 +671,7 @@ If time gets tight, prioritize these over fancy features:
 
 1. Different ticket types
 2. Different lifecycles
-3. Client vs Dinit responsibility
+3. Client vs TicketFlow1 responsibility
 4. Role-based actions
 5. Comments/communication in one place
 6. Audit/history
@@ -703,12 +703,12 @@ Use this as the final presentation/demo flow:
 
 1. Login as a client contributor.
 2. Submit a Change Request.
-3. Login as Dinit ticket lead.
+3. Login as TicketFlow1 ticket lead.
 4. Move it to Analysis.
 5. Create a Proposal.
 6. Login as client approver.
 7. Approve the Proposal.
-8. Dinit moves it through Development/FOT/UAT/Ready for Production.
+8. TicketFlow1 moves it through Development/FOT/UAT/Ready for Production.
 9. Show audit trail and comments.
 10. Create a Severity 1 Defect.
 11. Show SLA deadlines and dashboard alert.

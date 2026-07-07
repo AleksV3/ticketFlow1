@@ -4,9 +4,9 @@
 
 ## Story
 
-Any ticket participant adds comments (internal notes visible only to Dinit,
-or public notes visible to the client) directly on a ticket. Every status
-change, field change, comment, and proposal decision is recorded in an
+Any ticket participant adds comments (internal notes visible only to
+TicketFlow1, or public notes visible to the client) directly on a ticket. Every
+status change, field change, comment, and proposal decision is recorded in an
 audit log and a status-history timeline visible on the ticket.
 
 **Why P2**: Doc 02's stated purpose is to "store all documentation and
@@ -17,18 +17,27 @@ lifecycle diagram of its own.
 
 ## Acceptance scenarios
 
-1. **Given** a Dinit user adds a comment marked `INTERNAL`, **when** a
-   client user views the ticket, **then** that comment is not visible to
-   them.
+1. **Given** a user with `COMMENT_INTERNAL_WRITE` adds a comment marked
+   `INTERNAL`, **when** a client user views the ticket, **then** that comment
+   is not visible to them — reading `INTERNAL` comments requires a matching
+   permission that client-side default roles do not hold.
 2. **Given** any transition, field change, or proposal decision on a
    ticket, **when** the ticket's history is viewed, **then** every such
    event appears in the audit log with actor, action, old/new value, and
    timestamp.
 
+## Comment visibility (fixed)
+
+Comment visibility is a fixed set — `INTERNAL` or `PUBLIC`. Writing an
+`INTERNAL` comment requires `COMMENT_INTERNAL_WRITE`; reading one requires the
+corresponding internal-read permission. Writing a `PUBLIC` comment requires
+`COMMENT_PUBLIC_WRITE`. The seeded client-side role templates hold neither
+internal permission, so `INTERNAL` comments never surface to the client.
+
 ## Requirements
 
-FR-009 (comment visibility split), FR-010 (audit log on every action),
-FR-011 (status-history timeline) — full text in
+FR-012 (comment visibility split, permission-gated), FR-013 (audit log on
+every action), FR-014 (status-history timeline) — full text in
 [spec.md § Functional Requirements](../spec.md#functional-requirements).
 
 ## API
@@ -65,7 +74,7 @@ constitution Principle II ("Audit Everything"). This story's own phase
 (4) is specifically about comments/attachments and their audit entries.
 
 Verify gate: **T042** — post one `INTERNAL` and one `PUBLIC` comment as a
-Dinit user, confirm a client user's `GET .../comments` only returns the
+TicketFlow1 user, confirm a client user's `GET .../comments` only returns the
 public one; post an attachment and confirm it appears.
 
 ## Success criteria
