@@ -4,7 +4,7 @@
 
 ## Story
 
-A Dinit manager or ticket lead opens a dashboard showing active vs. closed
+A TicketFlow1 manager or ticket lead opens a dashboard showing active vs. closed
 ticket counts, tickets by type/status, defects by severity, SLA-breached and
 due-soon defects, tickets waiting on client approval or confirmation, and
 tickets assigned to them.
@@ -21,7 +21,7 @@ to aggregate — practically, build it last among the backend-facing stories.
    loads, **then** it is listed under an "SLA breached" card.
 2. **Given** tickets in `PROPOSAL` status, **when** the dashboard loads,
    **then** they appear under "waiting for client approval".
-3. **Given** a logged-in Dinit user, **when** they view "my assigned
+3. **Given** a logged-in TicketFlow1 user, **when** they view "my assigned
    tickets", **then** only tickets where they are the ticket lead appear.
 
 **Edge case** (see [spec.md § Edge Cases](../spec.md#edge-cases)): with zero
@@ -29,7 +29,7 @@ tickets (fresh install), all cards show zero/empty states, no errors.
 
 ## Requirements
 
-FR-012 (ticket list filters), FR-013 (dashboard cards, full list) — full
+FR-015 (ticket list filters), FR-016 (dashboard cards, full list) — full
 text in [spec.md § Functional Requirements](../spec.md#functional-requirements).
 
 ## API
@@ -52,7 +52,7 @@ Read-only aggregation over `Ticket` — no new entity of its own.
 
 ## Tasks
 
-- Phase 2 (Ticket Core — list/filter endpoint): T023
+- Phase 2 (Ticket Core — list/filter endpoint): T025
 - Phase 7 (Frontend — dashboard page): T060
 
 Full task text: [tasks.md](../tasks.md). This story has the fewest
@@ -60,13 +60,13 @@ dedicated tasks because it's an aggregation view over data every other
 story already produces — most of the "work" for US5 is making sure US1/US3/US6
 write correct, queryable data, not net-new dashboard logic.
 
-Verify gate: none dedicated — covered by T065 (Phase 7 frontend verify,
-log in as each role and confirm dashboard renders) and the org-isolation
-check in T069 (Phase 8, confirms a Dinit manager sees both orgs' tickets in
-one dashboard view).
+Verify gate: none dedicated — covered by T066 (Phase 7 frontend verify,
+log in as different users and confirm dashboard renders) and the
+org-isolation check in T070 (Phase 8, confirms a TicketFlow1 manager sees both
+orgs' tickets in one dashboard view).
 
 ## Success criteria
 
-SC-004: a Dinit manager can identify every SLA-breached and due-soon defect
+SC-004: a TicketFlow1 manager can identify every SLA-breached and due-soon defect
 from a single dashboard view, without opening individual tickets —
 [spec.md § Success Criteria](../spec.md#success-criteria).

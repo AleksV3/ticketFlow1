@@ -1,53 +1,68 @@
-# US6 — Role-aware access control
+# US6 — Permission-based access control
 
-**Priority**: P3 · **Source**: [spec.md § User Story 6](../spec.md#user-scenarios--testing-mandatory)
+**Priority**: P1 · **Source**: [spec.md § User Story 6](../spec.md#user-scenarios--testing-mandatory)
 
 ## Story
 
 An admin manages user accounts and role assignments. Every ticket action —
-creating, transitioning, commenting, approving — is gated by the acting
-user's role, enforced by the system, not just hidden in the interface.
+creating, transitioning, commenting, approving, configuring — is gated by the
+acting user's **permissions**, enforced by the system server-side, not just
+hidden in the interface. A user's permissions come from the role assigned to
+them; the system never branches on a role's name.
 
-**Why P3 (last, but not least-important)**: Roles are called out as core
-business value in the constitution and doc 02 §2/§3, but as a cross-cutting
-concern this story is exercised implicitly by Stories 1–5 — every acceptance
-scenario in those stories already tests a role boundary. This story
-specifically covers the admin-facing user/organization management surface
-that the other stories don't touch.
+**Why P1**: Permission-based enforcement is the backbone that makes
+configurable roles safe and makes every other story's access rules real
+rather than cosmetic (constitution Principle III). It is exercised implicitly
+by Stories 1–5 — every acceptance scenario in those stories tests a
+permission boundary — and this page additionally covers the admin-facing
+user/organization management surface that the other stories don't touch.
 
 ## Acceptance scenarios
 
-1. **Given** an admin creates a new user with role `DINIT_USER`, **when**
-   that user logs in, **then** they can view and transition tickets
-   assigned to Dinit but cannot approve proposals or manage other users.
-2. **Given** a `CLIENT_USER`, **when** they attempt an admin-only action
-   (e.g. creating another user), **then** the system rejects it regardless
-   of whether a UI control was available to trigger it.
-3. **Given** a `CLIENT_USER` belonging to Organization A, **when** they
-   list tickets or view the dashboard, **then** they only see tickets
-   belonging to Organization A — tickets from Organization B are neither
-   listed nor directly accessible by ID.
-4. **Given** a `DINIT_MANAGER`, **when** they view the dashboard, **then**
-   counts and lists aggregate across all Organizations, not just one.
+1. **Given** a user whose role grants `TICKET_TRANSITION` but not
+   `PROPOSAL_APPROVE` or `USER_MANAGE`, **when** they log in, **then** they can
+   transition tickets but cannot approve proposals or manage users.
+2. **Given** a user without `USER_MANAGE`, **when** they attempt to create
+   another user, **then** the system rejects it regardless of whether a UI
+   control was available to trigger it.
+3. **Given** a client user belonging to Organization A, **when** they list
+   tickets or view the dashboard, **then** they only see tickets belonging to
+   Organization A — tickets from Organization B are neither listed nor
+   directly accessible by ID.
+4. **Given** a TicketFlow1-side user (party = TICKETFLOW1), **when** they view the
+   dashboard, **then** counts and lists aggregate across all Organizations,
+   not just one.
 
-**Edge case** (see [spec.md § Edge Cases](../spec.md#edge-cases)): a Dinit
-ticket lead assigned to a ticket from an Organization they haven't worked
-with before is not restricted — Dinit staff are not partitioned by client.
+**Edge case** (see [spec.md § Edge Cases](../spec.md#edge-cases)): a
+TicketFlow1 ticket lead assigned to a ticket from an Organization they haven't
+worked with before is not restricted — TICKETFLOW1-party users are not
+partitioned by client.
+
+## Permissions & seeded roles
+
+Access is enforced by **permission**, not by role name. The permission
+catalog is fixed in code (e.g. `TICKET_READ`, `TICKET_CREATE`,
+`TICKET_UPDATE`, `TICKET_TRANSITION`, `PROPOSAL_APPROVE`, `COMMENT_PUBLIC_WRITE`,
+`COMMENT_INTERNAL_WRITE`, `USER_MANAGE`, `ROLE_MANAGE`, `TYPE_MANAGE`,
+`WORKFLOW_MANAGE`). Roles are configurable **bundles of permissions**, seeded
+from default templates: `ADMIN`, `CLIENT_USER`, `CLIENT_APPROVER`,
+`TICKETFLOW1_USER`, `TICKETFLOW1_MANAGER`. The **party axis** (`CLIENT` vs
+`TICKETFLOW1`) is a fixed structural attribute of every Organization and user;
+no role can grant cross-party visibility. See
+[data-model.md § AppUser](../data-model.md#appuser) for the
+org-required-for-client-side-users rule, and
+[research.md § Authorization](../research.md#authorization-method-level-security--service-layer-transition-guard)
+for how permission checks are implemented (coarse `@PreAuthorize` on
+permission authorities + fine-grained transition/org checks in the service
+layer — never UI-only).
 
 ## Requirements
 
-FR-007 (server-side enforcement for every state-changing action), FR-008
-(5-role minimum set), FR-015 (JWT authentication), FR-017/FR-018
+FR-007 (server-side permission enforcement for every state-changing action),
+FR-008 (fixed permission catalog), FR-009 (roles as configurable permission
+bundles, seeded templates), FR-018 (JWT authentication), FR-020/FR-021
 (multi-tenant Organization isolation) — full text in
 [spec.md § Functional Requirements](../spec.md#functional-requirements).
-
-## Roles
-
-`ADMIN`, `CLIENT_USER`, `CLIENT_APPROVER`, `DINIT_USER`, `DINIT_MANAGER` —
-see [data-model.md § AppUser](../data-model.md#appuser) for the
-org-required-for-client-roles rule, and [research.md § Authorization](../research.md#authorization-method-level-security--service-layer-transition-guard)
-for how role checks are actually implemented (coarse `@PreAuthorize` +
-fine-grained transition/org checks in the service layer — never UI-only).
 
 ## API
 
@@ -58,33 +73,33 @@ fine-grained transition/org checks in the service layer — never UI-only).
 | `GET /api/admin/users`, `POST /api/admin/users` | [contracts/admin.md](../contracts/admin.md) |
 | `GET/POST/PATCH /api/admin/organizations` | [contracts/admin.md](../contracts/admin.md) |
 
-Every other endpoint in the system also enforces role/org checks — see the
-"Auth & organization scoping" section in [contracts/README.md](../contracts/README.md)
+Every other endpoint in the system also enforces permission/org checks — see
+the "Auth & organization scoping" section in [contracts/README.md](../contracts/README.md)
 for the shared convention (cross-org access returns `404`, not `403`).
 
 ## Entities
 
-`Organization`, `AppUser`.
+`Organization`, `AppUser`, `Role`, `Permission`.
 
 ## Tasks
 
 - Phase 1 (Backend Foundation — dedicated to this story's admin surface):
-  T011, T012
+  T012, T013
 - Phase 7 (Frontend — admin users page): T064
 
 Full task text: [tasks.md](../tasks.md). Like US4, most of this story's
 actual enforcement work is threaded through every other phase (every
-endpoint's role/org check), not concentrated in one phase — T011/T012/T064
-are just the admin-management *screens*, not the whole story.
+endpoint's permission/org check), not concentrated in one phase —
+T012/T013/T064 are just the admin-management *screens*, not the whole story.
 
-Verify gate: none dedicated — role enforcement is checked throughout (e.g.
-T034 asserts a disallowed role gets `409`/`403`); org isolation is
-specifically verified in T025 (Phase 2) and T069 (Phase 8, full
-two-Organization check against SC-008).
+Verify gate: none dedicated — permission enforcement is checked throughout
+(e.g. T034 asserts an actor lacking the required permission gets `409`/`403`);
+org isolation is specifically verified in T027 (Phase 2) and T070 (Phase 8,
+full two-Organization check against SC-008).
 
 ## Success criteria
 
-SC-005 (a `CLIENT_USER` can never successfully perform a Dinit-only or
-approver-only action), SC-008 (Organization A never sees Organization B's
-tickets, while a Dinit manager sees both) —
+SC-005 (a user whose role lacks a permission can never successfully perform
+the corresponding action), SC-008 (Organization A never sees Organization B's
+tickets, while a TicketFlow1 manager sees both) —
 [spec.md § Success Criteria](../spec.md#success-criteria).

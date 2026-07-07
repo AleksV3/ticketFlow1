@@ -15,11 +15,11 @@ source file wins — treat that as a bug in this index, not in the source.
 | US3 | Defect severity & SLA tracking | P1 | 2, 3, 6, 7 | [US3-defect-sla.md](US3-defect-sla.md) |
 | US4 | Comments & audit trail | P2 | 3, 4, 7 | [US4-comments-audit.md](US4-comments-audit.md) |
 | US5 | Dashboard overview | P2 | 2, 7 | [US5-dashboard.md](US5-dashboard.md) |
-| US6 | Role-aware access & admin | P3 | 1, 7 | [US6-roles-admin.md](US6-roles-admin.md) |
+| US6 | Permission-based access & admin | P1 | 1, 7 | [US6-roles-admin.md](US6-roles-admin.md) |
 
 Cross-cutting docs these pages don't replace:
 
-- [spec.md](../spec.md) — full requirements, all 18 FRs, edge cases, assumptions
+- [spec.md](../spec.md) — full requirements, all 22 FRs, edge cases, assumptions
 - [plan.md](../plan.md) — architecture, Constitution Check, project structure
 - [data-model.md](../data-model.md) — ERD and every entity's fields
 - [contracts/](../contracts/) — full request/response shapes for every endpoint

@@ -1,4 +1,4 @@
-# Dinit Ticketing Tool
+# TicketFlow1 Ticketing Tool
 
 Internal ticketing system for Change Management and Defect Management — tracks Change Requests, Tasks, and Defects through their lifecycles with roles, comments, audit history, SLA tracking, and dashboards.
 
