@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Dinit Ticketing — Project Dashboard</title>
+<title>TicketFlow1 Ticketing — Project Dashboard</title>
 <script src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js"></script>
 <style>
   :root {
@@ -112,7 +112,7 @@
 </head>
 <body>
 <header>
-  <h1>Dinit Ticketing Tool — Project Dashboard</h1>
+  <h1>TicketFlow1 Ticketing Tool — Project Dashboard</h1>
   <div class="sub">Process-based Change &amp; Defect Management · Java 21 / Spring Boot + Next.js · derived from the spec-kit spec, plan &amp; 69-task breakdown</div>
   <div class="overall">
     <div class="bar"><span id="overallBar"></span></div>
@@ -132,12 +132,12 @@
     <h2>Locked decisions</h2>
     <div class="cards">
       <div class="card"><div class="k">Auth</div><div class="v">Stateless JWT</div><div class="d">Bearer token, no server session — easy to demo multiple roles at once</div></div>
-      <div class="card"><div class="k">Tenancy</div><div class="v">Multi-tenant</div><div class="d">Client Orgs isolated from each other; Dinit-side roles work across all</div></div>
-      <div class="card"><div class="k">Priority</div><div class="v">Display-only enum</div><div class="d">LOW/MED/HIGH/CRITICAL — filterable, does not drive SLA</div></div>
-      <div class="card"><div class="k">Status model</div><div class="v">One enum + per-type maps</div><div class="d">Transition legality lives in TicketTransitionService, not scattered</div></div>
+      <div class="card"><div class="k">Tenancy</div><div class="v">Multi-tenant</div><div class="d">Client Orgs isolated from each other; TicketFlow1-side roles work across all</div></div>
+      <div class="card"><div class="k">Priority</div><div class="v">Display-only fixed set</div><div class="d">LOW/MED/HIGH/CRITICAL — filterable, does not drive SLA</div></div>
+      <div class="card"><div class="k">Status model</div><div class="v">One status set + per-type maps</div><div class="d">Transition legality lives in TicketTransitionService, not scattered</div></div>
       <div class="card"><div class="k">SLA</div><div class="v">Computed at read time</div><div class="d">No scheduled job; deadlines persisted, status derived on read</div></div>
       <div class="card"><div class="k">Attachments</div><div class="v">Metadata-only (MVP)</div><div class="d">Filename/type/size recorded; real bytes deferred</div></div>
-      <div class="card"><div class="k">Out of scope</div><div class="v">DISPUTE type</div><div class="d">Enum designed to add it later without restructuring</div></div>
+      <div class="card"><div class="k">Out of scope</div><div class="v">DISPUTE type</div><div class="d">Type model designed to add it later without restructuring</div></div>
       <div class="card"><div class="k">Layering</div><div class="v">controller → service → repo</div><div class="d">DTOs at the boundary; entities never leak past the service</div></div>
     </div>
   </section>
@@ -156,20 +156,20 @@
       <pre class="mermaid">
 stateDiagram-v2
     [*] --> SUBMITTED: create (CLIENT_USER/APPROVER)
-    SUBMITTED --> ANALYSIS: start analysis (DINIT)
-    SUBMITTED --> CANCELLED: cancel (DINIT_MANAGER/ADMIN)
-    ANALYSIS --> PROPOSAL: create proposal (DINIT)
-    ANALYSIS --> CANCELLED: cancel (DINIT_MANAGER/ADMIN)
+    SUBMITTED --> ANALYSIS: start analysis (TICKETFLOW1)
+    SUBMITTED --> CANCELLED: cancel (TICKETFLOW1_MANAGER/ADMIN)
+    ANALYSIS --> PROPOSAL: create proposal (TICKETFLOW1)
+    ANALYSIS --> CANCELLED: cancel (TICKETFLOW1_MANAGER/ADMIN)
     PROPOSAL --> PROPOSAL_APPROVED: approve (CLIENT_APPROVER)
     PROPOSAL --> PROPOSAL_REJECTED: reject (CLIENT_APPROVER)
-    PROPOSAL_REJECTED --> ANALYSIS: revise (DINIT)
-    PROPOSAL_REJECTED --> CANCELLED: cancel (DINIT_MANAGER/ADMIN)
-    PROPOSAL_APPROVED --> DEVELOPMENT: start dev (DINIT)
-    DEVELOPMENT --> FIRST_OCCURRENCE_TESTING: dev done (DINIT)
-    FIRST_OCCURRENCE_TESTING --> USER_ACCEPTANCE_TESTING: FOT ok (DINIT)
-    USER_ACCEPTANCE_TESTING --> READY_FOR_PRODUCTION: UAT ok (DINIT)
-    READY_FOR_PRODUCTION --> IN_PRODUCTION: deploy (DINIT)
-    IN_PRODUCTION --> CLOSED: close (DINIT)
+    PROPOSAL_REJECTED --> ANALYSIS: revise (TICKETFLOW1)
+    PROPOSAL_REJECTED --> CANCELLED: cancel (TICKETFLOW1_MANAGER/ADMIN)
+    PROPOSAL_APPROVED --> DEVELOPMENT: start dev (TICKETFLOW1)
+    DEVELOPMENT --> FIRST_OCCURRENCE_TESTING: dev done (TICKETFLOW1)
+    FIRST_OCCURRENCE_TESTING --> USER_ACCEPTANCE_TESTING: FOT ok (TICKETFLOW1)
+    USER_ACCEPTANCE_TESTING --> READY_FOR_PRODUCTION: UAT ok (TICKETFLOW1)
+    READY_FOR_PRODUCTION --> IN_PRODUCTION: deploy (TICKETFLOW1)
+    IN_PRODUCTION --> CLOSED: close (TICKETFLOW1)
     CANCELLED --> [*]
     CLOSED --> [*]
       </pre>
@@ -178,15 +178,15 @@ stateDiagram-v2
       <pre class="mermaid">
 stateDiagram-v2
     [*] --> SUBMITTED: create (any role)
-    SUBMITTED --> ANALYSIS: start analysis (DINIT)
-    SUBMITTED --> CANCELLED: cancel (DINIT_MANAGER/ADMIN)
-    ANALYSIS --> DEVELOPMENT: start action (DINIT)
-    ANALYSIS --> CANCELLED: cancel (DINIT_MANAGER/ADMIN)
-    DEVELOPMENT --> FIRST_OCCURRENCE_TESTING: action done (DINIT)
-    FIRST_OCCURRENCE_TESTING --> USER_ACCEPTANCE_TESTING: FOT ok (DINIT)
-    USER_ACCEPTANCE_TESTING --> READY_FOR_PRODUCTION: UAT ok (DINIT)
-    READY_FOR_PRODUCTION --> IN_PRODUCTION: deploy (DINIT)
-    IN_PRODUCTION --> CLOSED: close (DINIT)
+    SUBMITTED --> ANALYSIS: start analysis (TICKETFLOW1)
+    SUBMITTED --> CANCELLED: cancel (TICKETFLOW1_MANAGER/ADMIN)
+    ANALYSIS --> DEVELOPMENT: start action (TICKETFLOW1)
+    ANALYSIS --> CANCELLED: cancel (TICKETFLOW1_MANAGER/ADMIN)
+    DEVELOPMENT --> FIRST_OCCURRENCE_TESTING: action done (TICKETFLOW1)
+    FIRST_OCCURRENCE_TESTING --> USER_ACCEPTANCE_TESTING: FOT ok (TICKETFLOW1)
+    USER_ACCEPTANCE_TESTING --> READY_FOR_PRODUCTION: UAT ok (TICKETFLOW1)
+    READY_FOR_PRODUCTION --> IN_PRODUCTION: deploy (TICKETFLOW1)
+    IN_PRODUCTION --> CLOSED: close (TICKETFLOW1)
     CANCELLED --> [*]
     CLOSED --> [*]
       </pre>
@@ -195,11 +195,11 @@ stateDiagram-v2
       <pre class="mermaid">
 stateDiagram-v2
     [*] --> REPORTED: report (CLIENT_USER/APPROVER)
-    REPORTED --> ANALYSIS: triage (DINIT)
-    REPORTED --> CANCELLED: dup/not-repro (DINIT_MANAGER/ADMIN)
-    ANALYSIS --> FIX_IN_PROGRESS: root cause found (DINIT)
-    ANALYSIS --> CANCELLED: dup/not-repro (DINIT_MANAGER/ADMIN)
-    FIX_IN_PROGRESS --> CLIENT_CONFIRMATION: fix deployed (DINIT)
+    REPORTED --> ANALYSIS: triage (TICKETFLOW1)
+    REPORTED --> CANCELLED: dup/not-repro (TICKETFLOW1_MANAGER/ADMIN)
+    ANALYSIS --> FIX_IN_PROGRESS: root cause found (TICKETFLOW1)
+    ANALYSIS --> CANCELLED: dup/not-repro (TICKETFLOW1_MANAGER/ADMIN)
+    FIX_IN_PROGRESS --> CLIENT_CONFIRMATION: fix deployed (TICKETFLOW1)
     CLIENT_CONFIRMATION --> CLOSED: confirm resolved (CLIENT)
     CLIENT_CONFIRMATION --> FIX_IN_PROGRESS: reject fix (CLIENT)
     CANCELLED --> [*]
@@ -212,11 +212,11 @@ stateDiagram-v2
   <section>
     <h2>Data model</h2>
     <div class="ent-grid">
-      <div class="ent"><h3>Organization</h3><p>Client company. Client users &amp; their tickets belong to one; Dinit-side roles span all.</p></div>
-      <div class="ent"><h3>AppUser</h3><p>Account + role. org required for CLIENT_*, null for Dinit-side.</p></div>
+      <div class="ent"><h3>Organization</h3><p>Client company. Client users &amp; their tickets belong to one; TicketFlow1-side roles span all.</p></div>
+      <div class="ent"><h3>AppUser</h3><p>Account + role. org required for CLIENT_*, null for TicketFlow1-side.</p></div>
       <div class="ent"><h3>Ticket</h3><p>Central record. type · status · priority · severity(defect) · responsibility · SLA fields.</p></div>
       <div class="ent"><h3>ChangeProposal</h3><p>Approve/reject gate. Change Requests only. Reused across resubmissions.</p></div>
-      <div class="ent"><h3>Comment</h3><p>INTERNAL (Dinit-only) or PUBLIC (client-visible).</p></div>
+      <div class="ent"><h3>Comment</h3><p>INTERNAL (TicketFlow1-only) or PUBLIC (client-visible).</p></div>
       <div class="ent"><h3>Attachment</h3><p>Metadata-only in MVP: filename, type, size, uploader.</p></div>
       <div class="ent"><h3>AuditLog</h3><p>Append-only. Every status/field change, comment, proposal decision.</p></div>
       <div class="ent"><h3>StatusHistory</h3><p>Append-only lifecycle timeline, separate from the audit feed.</p></div>
@@ -240,7 +240,7 @@ const PHASES = [
     { id: "T004", t: "application.yml — datasource, flyway on, ddl-auto=validate" },
     { id: "T005", t: "Flyway V1: organization + app_user tables + bootstrap admin + 2 demo orgs" },
     { id: "T006", p: 1, t: "Organization entity + repository" },
-    { id: "T007", p: 1, t: "AppUser entity + Role enum + repo + org-required validation" },
+    { id: "T007", p: 1, t: "AppUser entity + Role + Permission catalog + repo + org-required validation" },
     { id: "T008", t: "JwtService + OncePerRequestFilter (role + org claims)" },
     { id: "T009", t: "POST /auth/login + GET /users/me" },
     { id: "T010", t: "Global @RestControllerAdvice error handler + standard error codes" },
@@ -249,13 +249,13 @@ const PHASES = [
     { id: "T013", verify: 1, t: "Verify: compose up, Flyway V1 applies, Swagger loads, login returns JWT" },
   ]},
   { n: 2, title: "Ticket Core", goal: "Tickets can be created and read, org-scoped. Audit + status history introduced now (Principle II).", tasks: [
-    { id: "T014", t: "Flyway V2: ticket table + native PG enum types" },
+    { id: "T014", t: "Flyway V2: ticket table + native PG types" },
     { id: "T015", t: "Flyway V3: status_history + audit_log tables" },
     { id: "T016", p: 1, t: "TicketType/TicketStatus/Priority/Severity enums (full status union)" },
     { id: "T017", t: "Ticket entity + repo with org-scoped queries" },
     { id: "T018", p: 1, t: "AuditLog entity + AuditService.record() — single audit call site" },
     { id: "T019", p: 1, t: "StatusHistory entity + StatusHistoryService.record()" },
-    { id: "T020", t: "Ticket key generation (DIN-<sequence>)" },
+    { id: "T020", t: "Ticket key generation (TF-<sequence>)" },
     { id: "T021", us: [1,2,3], t: "TicketService.createTicket — initial status per type, org inheritance, severity rule, audit+history" },
     { id: "T022", us: [1,2,3], t: "POST /tickets + GET /tickets/{key} + DTOs, org-scoping (cross-org = 404)" },
     { id: "T023", us: [5], t: "GET /tickets list with pagination + all filters (slaStatus TODO'd for Phase 6)" },
@@ -271,7 +271,7 @@ const PHASES = [
     { id: "T031", p: 1, t: "GET /tickets/{key}/audit-log" },
     { id: "T032", p: 1, t: "PATCH /tickets/{key} for non-status fields, per-field audit, reject status in body" },
     { id: "T033", p: 1, t: "Unit test transition maps — legal per role succeeds, illegal rejected" },
-    { id: "T034", verify: 1, t: "Verify: SUBMITTED→ANALYSIS ok for DINIT / rejected for CLIENT; history+audit show it" },
+    { id: "T034", verify: 1, t: "Verify: SUBMITTED→ANALYSIS ok for TICKETFLOW1 / rejected for CLIENT; history+audit show it" },
   ]},
   { n: 4, title: "Comments & Attachments", goal: "Doc 02's 'all documentation and communication in one place.'", tasks: [
     { id: "T035", t: "Flyway V4: comment + attachment tables" },
@@ -320,7 +320,7 @@ const PHASES = [
   ]},
 ];
 
-const KEY = "dinit-ticketing-progress-v1";
+const KEY = "ticketflow1-ticketing-progress-v1";
 let state = JSON.parse(localStorage.getItem(KEY) || "{}");
 
 const TOTAL = PHASES.reduce((a, p) => a + p.tasks.length, 0);
