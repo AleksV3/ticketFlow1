@@ -2,7 +2,7 @@
 
 ## Purpose of this document
 
-This document gives a second AI/coding agent the product and technical brief for Gregor's TicketFlow1 summer project.
+This document gives a second AI/coding agent the product and technical brief for Gregor and Aleks's TicketFlow1 summer project.
 
 The project should be treated as a simplified internal ticketing system inspired by Jira, but tailored to the mentor's presentation about TicketFlow1's Change Management and Defect Management processes.
 
