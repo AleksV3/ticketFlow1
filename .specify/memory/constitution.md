@@ -1,8 +1,8 @@
 <!--
 Sync Impact Report
-- Version change: none → 1.0.0 (initial ratification)
-- Modified principles: n/a (new document)
-- Added sections: Core Principles (I–VII), Technology Stack, Development
+- Version change: 1.0.0 → 1.1.0
+- Modified principles: Core Principles
+- Added sections: Core Principles (VIII), Technology Stack, Development
   Workflow, Governance
 - Removed sections: none
 - Templates requiring updates:
@@ -104,6 +104,26 @@ why, how to run and test it, and the underlying Spring/JPA/SQL concept involved
 machines, migrations, security filters). Code should never just "appear" —
 the reasoning behind it is part of the deliverable.
 
+### VIII. Secure By Default, OWASP-Aware (NON-NEGOTIABLE)
+Security is a first-class engineering requirement, not a late review pass. Any
+new work that touches input handling, authentication, authorization, secrets,
+storage, file upload, redirects, session handling, serialization, or external
+requests MUST be checked against the OWASP Top 10 and the most common secure
+coding failures for that area.
+
+At minimum, code must avoid the usual classes of mistakes: injection
+vulnerabilities, broken access control, sensitive data exposure, insecure
+deserialization, security misconfiguration, use of known-vulnerable
+dependencies, missing logging/monitoring for security-relevant events,
+hardcoded secrets, and unsafe defaults. Prefer parameterized queries, explicit
+allowlists, least privilege, server-side authorization, output encoding where
+needed, and central security filters over ad-hoc checks.
+
+If a change introduces a security-sensitive path, the change is incomplete
+until the relevant threat is called out and the mitigation is visible in code,
+tests, or review notes. "It should be fine" is not an acceptable security
+argument.
+
 ## Technology Stack
 
 Fixed for this project; do not introduce alternative frameworks or swap
@@ -167,4 +187,4 @@ Constitution Check against these principles before task breakdown begins. Any
 violation must be justified explicitly in that plan's Complexity Tracking
 section or the plan must be revised.
 
-**Version**: 1.0.0 | **Ratified**: 2026-07-02 | **Last Amended**: 2026-07-02
+**Version**: 1.1.0 | **Ratified**: 2026-07-02 | **Last Amended**: 2026-07-08
