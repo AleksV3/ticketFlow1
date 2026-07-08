@@ -31,7 +31,7 @@ types, and workflows are seeded so nothing is a broken half-configured state
 Goal: a running Spring Boot app with Postgres, JWT login, permission-based
 security, the seeded permission catalog + default roles, and a bootstrap admin.
 
-- [ ] T001 Create `backend/` Spring Boot 3.x project (Java 21, Maven wrapper) with dependencies: Spring Web, Spring Data JPA, Spring Security, Flyway, PostgreSQL driver, springdoc-openapi, jjwt (plan.md Technical Context)
+- [x] T001 Create `backend/` Spring Boot 3.x project (Java 21, Maven wrapper) with dependencies: Spring Web, Spring Data JPA, Spring Security, Flyway, PostgreSQL driver, springdoc-openapi, jjwt (plan.md Technical Context)
 - [ ] T002 [P] Create `frontend/` Next.js (App Router) + TypeScript + Tailwind scaffold — no pages yet beyond the default
 - [ ] T003 [P] Create root `docker-compose.yml` with a `postgres` service (Postgres 16, named volume, exposed on 5432) and a `.env.example` documenting `POSTGRES_DB`/`POSTGRES_USER`/`POSTGRES_PASSWORD`/`JWT_SECRET`
 - [ ] T004 Configure `backend/src/main/resources/application.yml`: datasource pointing at the Compose Postgres, `spring.flyway.enabled=true`, `spring.jpa.hibernate.ddl-auto=validate` (schema truth lives in Flyway)
@@ -46,6 +46,19 @@ security, the seeded permission catalog + default roles, and a bootstrap admin.
 - [ ] T013 [P] [US6] Implement `GET/POST /api/admin/users` in `user/UserAdminController.java` per contracts/admin.md, gated `USER_MANAGE`, enforcing the party/org rule from T008
 - [ ] T014 [P] [US7] Implement `GET /api/admin/permissions`, `GET/POST/PATCH /api/admin/roles` in `rbac/RoleAdminController.java` per contracts/admin.md, gated `ROLE_MANAGE` — create/edit a role as a bundle of catalog permissions
 - [ ] T015 **Verify**: `docker compose up -d postgres`, start backend, confirm Flyway applies `V1`, Swagger UI loads, `POST /api/auth/login` for the bootstrap admin returns a JWT, and a `USER_MANAGE`-gated endpoint returns `403` for a token whose role lacks it
+- [x] T003 [P] Create root `docker-compose.yml` with a `postgres` service (Postgres 16, named volume, exposed on 5432) and a `.env.example` documenting `POSTGRES_DB`/`POSTGRES_USER`/`POSTGRES_PASSWORD`/`JWT_SECRET`
+- [x] T004 Configure `backend/src/main/resources/application.yml`: datasource pointing at the Compose Postgres, `spring.flyway.enabled=true`, `spring.jpa.hibernate.ddl-auto=validate` (schema truth lives in Flyway)
+- [x] T005 Add Flyway migration `db/migration/V1__create_rbac.sql`: `permission`, `role`, `role_permission`, `organization`, `app_user` tables per data-model.md (bigint identity PKs; `party` as TEXT+CHECK). Seed the permission catalog, the five default **role templates** (`ADMIN`, `CLIENT_USER`, `CLIENT_APPROVER`, `TICKETFLOW1_USER`, `TICKETFLOW1_MANAGER`) with their `role_permission` mappings, a bootstrap `ADMIN` user (BCrypt demo password), and 2 demo Organizations so login can be verified this phase
+- [x] T006 [P] Implement the permission-catalog constants and `Permission`, `Role`, `RolePermission` JPA entities + repositories in `backend/src/main/java/com/ticketflow1/ticketing/rbac/`
+- [x] T007 [P] Implement `Organization` entity + `OrganizationRepository` in `organization/`
+- [x] T008 [P] Implement `AppUser` entity (`party`, `role_id` FK), `AppUserRepository`, and a service-layer check that `organizationId` is required when `party = CLIENT` and null when `party = TICKETFLOW1`, in `user/` (data-model.md validation rules)
+- [x] T009 Implement JWT issuing/parsing (`JwtService`) and a `OncePerRequestFilter` that validates `Authorization: Bearer` and populates `SecurityContext` with the user's **permission authorities** (resolved from its role's permissions) plus `party` and `organizationId` claims, in `auth/` (research.md Authentication decision)
+- [x] T010 Configure method security so `@PreAuthorize("hasAuthority('<PERMISSION_KEY>')")` gates endpoints, and implement global exception handling (`@RestControllerAdvice`, `ApiExceptionHandler`) producing the standard error shape/codes from contracts/README.md (`VALIDATION_FAILED`, `UNAUTHENTICATED`, `FORBIDDEN`, `NOT_FOUND`, `INTERNAL_ERROR`; `ILLEGAL_TRANSITION`/`INVALID_STATE` added in Phase 3)
+- [x] T011 Implement `POST /api/auth/login` and `GET /api/users/me` in `auth/AuthController.java` per contracts/auth.md (the `me` response includes the caller's permission set for the frontend)
+- [x] T012 [P] [US6] Implement `GET/POST/PATCH /api/admin/organizations` in `organization/OrganizationAdminController.java` per contracts/admin.md, gated `hasAuthority('USER_MANAGE')`
+- [x] T013 [P] [US6] Implement `GET/POST /api/admin/users` in `user/UserAdminController.java` per contracts/admin.md, gated `USER_MANAGE`, enforcing the party/org rule from T008
+- [x] T014 [P] [US7] Implement `GET /api/admin/permissions`, `GET/POST/PATCH /api/admin/roles` in `rbac/RoleAdminController.java` per contracts/admin.md, gated `ROLE_MANAGE` — create/edit a role as a bundle of catalog permissions
+- [x] T015 **Verify**: `docker compose up -d postgres`, start backend, confirm Flyway applies `V1`, Swagger UI loads, `POST /api/auth/login` for the bootstrap admin returns a JWT, and a `USER_MANAGE`-gated endpoint returns `403` for a token whose role lacks it
 
 ---
 

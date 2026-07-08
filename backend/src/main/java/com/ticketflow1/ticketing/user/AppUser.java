@@ -1,5 +1,6 @@
 package com.ticketflow1.ticketing.user;
 
+import com.ticketflow1.ticketing.common.Auditable;
 import com.ticketflow1.ticketing.organization.Organization;
 import com.ticketflow1.ticketing.rbac.Role;
 import com.ticketflow1.ticketing.ticket.Responsibility;
@@ -19,7 +20,7 @@ import org.hibernate.annotations.CreationTimestamp;
 
 @Entity
 @Table(name = "app_user")
-public class AppUser {
+public class AppUser extends Auditable {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
