@@ -16,6 +16,14 @@ constraints; configurable sets are lookup tables.
 - Tickets additionally carry a human-readable business key `ticket_key`
   (`TF-1042`), generated from a dedicated sequence and shown throughout the UI.
 
+## Row audit metadata
+
+Every table in this schema stores `updated_at` and `updated_by_id` so the
+system can show who last changed a row and when. Those fields are set on insert
+and refreshed on every update. Append-only event tables (`audit_log` and
+`status_history`) are still inserted with their actor/timestamp metadata, but
+their rows are never updated after insert.
+
 ## Entity-Relationship Diagram
 
 ```mermaid
@@ -192,6 +200,8 @@ not editable at runtime (FR-008).
 |---|---|---|
 | id | bigint, PK, identity | generated |
 | key | varchar(60) | required, unique — e.g. `TICKET_READ`, `TICKET_CREATE`, `TICKET_UPDATE`, `TICKET_TRANSITION`, `PROPOSAL_APPROVE`, `COMMENT_PUBLIC_WRITE`, `COMMENT_INTERNAL_WRITE`, `USER_MANAGE`, `ROLE_MANAGE`, `TYPE_MANAGE`, `WORKFLOW_MANAGE` |
+| updated_at | timestamptz | set on insert and update |
+| updated_by_id | bigint, FK → app_user | the actor who last changed the row |
 
 ### Role
 
@@ -207,6 +217,8 @@ marks the seed rows that new Organizations clone from.
 | party | varchar(12) | required, `CHECK (party IN ('CLIENT','TICKETFLOW1'))` |
 | organization_id | bigint, FK → organization, nullable | null = global template or TICKETFLOW1 role; set = this Organization's own role |
 | is_template | boolean | default false; true for the seed rows cloned on org creation |
+| updated_at | timestamptz | set on insert and update |
+| updated_by_id | bigint, FK → app_user | the actor who last changed the row |
 
 ### RolePermission
 
@@ -216,6 +228,8 @@ Join table mapping roles to the permissions they grant.
 |---|---|---|
 | role_id | bigint, FK → role | PK part |
 | permission_id | bigint, FK → permission | PK part |
+| updated_at | timestamptz | set on insert and update |
+| updated_by_id | bigint, FK → app_user | the actor who last changed the row |
 
 ### TicketType
 
@@ -231,6 +245,8 @@ Change Request, Task, Defect. Cloned per Organization from templates.
 | organization_id | bigint, FK → organization, nullable | null = global template |
 | is_template | boolean | default false |
 | requires_proposal | boolean | default false; true for the Change Request type (FR-003) |
+| updated_at | timestamptz | set on insert and update |
+| updated_by_id | bigint, FK → app_user | the actor who last changed the row |
 
 ### Workflow / WorkflowState / WorkflowTransition
 
@@ -244,6 +260,8 @@ transition engine loads these per ticket type and rejects any move not present.
 | id | bigint, PK, identity | generated |
 | name | varchar(100) | required |
 | organization_id | bigint, FK → organization, nullable | null = global template |
+| updated_at | timestamptz | set on insert and update |
+| updated_by_id | bigint, FK → app_user | the actor who last changed the row |
 
 **WorkflowState**
 
@@ -255,6 +273,8 @@ transition engine loads these per ticket type and rejects any move not present.
 | is_initial | boolean | exactly one per workflow |
 | is_terminal | boolean | one or more per workflow (e.g. `CLOSED`, `CANCELLED`) |
 | sort_order | int | for display ordering |
+| updated_at | timestamptz | set on insert and update |
+| updated_by_id | bigint, FK → app_user | the actor who last changed the row |
 
 **WorkflowTransition**
 
@@ -267,6 +287,8 @@ transition engine loads these per ticket type and rejects any move not present.
 | required_permission_id | bigint, FK → permission | required — the permission the actor must hold |
 | required_party | varchar(12), nullable | `CHECK (... IN ('CLIENT','TICKETFLOW1'))`; restricts who may fire the transition to that party (e.g. only a client confirms a defect fix), null = any party |
 | responsibility_after | varchar(12), nullable | `CHECK (... IN ('CLIENT','TICKETFLOW1'))`; sets `ticket.current_responsibility` when this transition fires, null = unchanged |
+| updated_at | timestamptz | set on insert and update |
+| updated_by_id | bigint, FK → app_user | the actor who last changed the row |
 
 ## Operational entities
 
@@ -281,6 +303,8 @@ belong to exactly one; TICKETFLOW1-party users have none.
 | name | varchar(200) | required, unique |
 | active | boolean | default true |
 | created_at | timestamptz | set on insert |
+| updated_at | timestamptz | set on insert and update |
+| updated_by_id | bigint, FK → app_user | the actor who last changed the row |
 
 ### AppUser
 
@@ -297,6 +321,8 @@ belong to exactly one; TICKETFLOW1-party users have none.
 | organization_id | bigint, FK → organization | required if party = `CLIENT`; null if party = `TICKETFLOW1` (service-layer check for a clear error) |
 | active | boolean | default true |
 | created_at | timestamptz | set on insert |
+| updated_at | timestamptz | set on insert and update |
+| updated_by_id | bigint, FK → app_user | the actor who last changed the row |
 
 ### Ticket
 
@@ -315,7 +341,10 @@ belong to exactly one; TICKETFLOW1-party users have none.
 | ticket_lead_id | bigint, FK → app_user, nullable | TICKETFLOW1-side owner, assigned during Analysis |
 | assigned_team | varchar(100), nullable | free text (e.g. "MCE", "Service Desk") |
 | current_responsibility | varchar(12) | required, default `TICKETFLOW1`, `CHECK (... IN ('CLIENT','TICKETFLOW1'))` |
-| created_at / updated_at / closed_at | timestamptz | closed_at set when the current state is terminal |
+| created_at | timestamptz | set on insert |
+| updated_at | timestamptz | set on insert and update |
+| updated_by_id | bigint, FK → app_user | the actor who last changed the row |
+| closed_at | timestamptz | nullable, set when the current state is terminal |
 | response_due_at / first_info_due_at / next_update_due_at | timestamptz, nullable | Defect only, computed per severity formulas (doc 02 §4) when severity is set/changed |
 
 `slaStatus` is **not** a column — computed at read time (see research.md).
@@ -334,6 +363,8 @@ belong to exactly one; TICKETFLOW1-party users have none.
 | decided_by_id | bigint, FK → app_user, nullable | must hold `PROPOSAL_APPROVE` and be CLIENT party in the ticket's org (FR-011) |
 | decided_at | timestamptz, nullable | set on approve/reject |
 | created_at | timestamptz | set on insert |
+| updated_at | timestamptz | set on insert and update |
+| updated_by_id | bigint, FK → app_user | the actor who last changed the row |
 
 A ticket may have multiple proposals over time (rejection → resubmission);
 "current proposal" = most recent by `created_at`.
@@ -348,6 +379,7 @@ A ticket may have multiple proposals over time (rejection → resubmission);
 | body | text | required, non-empty |
 | visibility | varchar(10) | required, `CHECK (visibility IN ('INTERNAL','PUBLIC'))` |
 | created_at / updated_at | timestamptz | |
+| updated_by_id | bigint, FK → app_user | the actor who last changed the row |
 
 ### Attachment
 
@@ -361,6 +393,8 @@ A ticket may have multiple proposals over time (rejection → resubmission);
 | size_bytes | bigint | required |
 | storage_path | varchar(500), nullable | null for MVP (metadata-only per spec Assumptions) |
 | created_at | timestamptz | |
+| updated_at | timestamptz | set on insert and update |
+| updated_by_id | bigint, FK → app_user | the actor who last changed the row |
 
 ### AuditLog
 
@@ -375,6 +409,8 @@ Append-only; no update/delete operations exposed.
 | field_name | varchar(100), nullable | set for field-change actions |
 | old_value / new_value | text, nullable | |
 | created_at | timestamptz | |
+| updated_at | timestamptz | set on insert and update (append-only rows keep the insert time) |
+| updated_by_id | bigint, FK → app_user | set to `actor_id` on insert |
 
 ### StatusHistory
 
@@ -389,6 +425,8 @@ lifecycle timeline without filtering the general audit feed.
 | to_state_id | bigint, FK → workflow_state | required |
 | changed_by_id | bigint, FK → app_user | required |
 | created_at | timestamptz | |
+| updated_at | timestamptz | set on insert and update (append-only rows keep the insert time) |
+| updated_by_id | bigint, FK → app_user | set to `changed_by_id` on insert |
 
 ## Fixed vs configurable value sets
 
@@ -397,6 +435,9 @@ lifecycle timeline without filtering the general audit feed.
   with `CHECK` constraints. Their values follow business rules and change only
   by migration; a `CHECK` gives the same integrity guarantee as a native type
   while evolving with a single `ALTER TABLE ... DROP/ADD CONSTRAINT`.
+- **Audit metadata** — every table carries `updated_at` and `updated_by_id` so
+  schema consumers can identify the last editor and edit time without guessing
+  from application logs.
 - **Configurable sets** — ticket type, workflow state, and role — are lookup
   tables so an admin can add or adjust them at runtime (FR-001, FR-009).
 - **Severity stays fixed** specifically because the SLA formulas are keyed to
@@ -408,12 +449,12 @@ One migration per logical unit, in build order, so each phase has its own
 reviewable migration:
 
 ```text
-V1__create_rbac.sql            -- permission (+ seed catalog), role, role_permission, organization, app_user; seed default role templates + mappings
-V2__create_workflow_model.sql  -- ticket_type, workflow, workflow_state, workflow_transition; seed the 3 default types and their workflows
-V3__create_ticket.sql          -- ticket (+ TF- sequence), status_history, audit_log
-V4__create_comment_and_attachment.sql
-V5__create_change_proposal.sql
-V6__seed_demo_data.sql         -- demo orgs (client roles/types cloned from templates), one user per role, sample tickets
+V1__create_rbac.sql            -- permission (+ seed catalog), role, role_permission, organization, app_user; include audit columns (`updated_at`, `updated_by_id`) on every table; seed default role templates + mappings
+V2__create_workflow_model.sql  -- ticket_type, workflow, workflow_state, workflow_transition; include audit columns on every table; seed the 3 default types and their workflows
+V3__create_ticket.sql          -- ticket (+ TF- sequence), status_history, audit_log; include audit columns on every table (append-only tables still record actor + timestamp on insert)
+V4__create_comment_and_attachment.sql -- comment and attachment tables with audit columns
+V5__create_change_proposal.sql  -- change_proposal table with audit columns
+V6__seed_demo_data.sql         -- demo orgs (client roles/types cloned from templates), one user per role, sample tickets; seed updated_at/updated_by_id values consistently
 ```
 
 ## Validation rules summary (service-layer, not just DB constraints)

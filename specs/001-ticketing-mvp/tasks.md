@@ -35,7 +35,7 @@ security, the seeded permission catalog + default roles, and a bootstrap admin.
 - [ ] T002 [P] Create `frontend/` Next.js (App Router) + TypeScript + Tailwind scaffold — no pages yet beyond the default
 - [ ] T003 [P] Create root `docker-compose.yml` with a `postgres` service (Postgres 16, named volume, exposed on 5432) and a `.env.example` documenting `POSTGRES_DB`/`POSTGRES_USER`/`POSTGRES_PASSWORD`/`JWT_SECRET`
 - [ ] T004 Configure `backend/src/main/resources/application.yml`: datasource pointing at the Compose Postgres, `spring.flyway.enabled=true`, `spring.jpa.hibernate.ddl-auto=validate` (schema truth lives in Flyway)
-- [ ] T005 Add Flyway migration `db/migration/V1__create_rbac.sql`: `permission`, `role`, `role_permission`, `organization`, `app_user` tables per data-model.md (bigint identity PKs; `party` as TEXT+CHECK). Seed the permission catalog, the five default **role templates** (`ADMIN`, `CLIENT_USER`, `CLIENT_APPROVER`, `TICKETFLOW1_USER`, `TICKETFLOW1_MANAGER`) with their `role_permission` mappings, a bootstrap `ADMIN` user (BCrypt demo password), and 2 demo Organizations so login can be verified this phase
+- [ ] T005 Add Flyway migration `db/migration/V1__create_rbac.sql`: `permission`, `role`, `role_permission`, `organization`, `app_user` tables per data-model.md (bigint identity PKs; `party` as TEXT+CHECK; `updated_at`/`updated_by_id` audit columns on every table). Seed the permission catalog, the five default **role templates** (`ADMIN`, `CLIENT_USER`, `CLIENT_APPROVER`, `TICKETFLOW1_USER`, `TICKETFLOW1_MANAGER`) with their `role_permission` mappings, a bootstrap `ADMIN` user (BCrypt demo password), and 2 demo Organizations so login can be verified this phase
 - [ ] T006 [P] Implement the permission-catalog constants and `Permission`, `Role`, `RolePermission` JPA entities + repositories in `backend/src/main/java/com/ticketflow1/ticketing/rbac/`
 - [ ] T007 [P] Implement `Organization` entity + `OrganizationRepository` in `organization/`
 - [ ] T008 [P] Implement `AppUser` entity (`party`, `role_id` FK), `AppUserRepository`, and a service-layer check that `organizationId` is required when `party = CLIENT` and null when `party = TICKETFLOW1`, in `user/` (data-model.md validation rules)
@@ -56,9 +56,9 @@ created and read (org-scoped) referencing them. AuditLog/StatusHistory are
 introduced here because Principle II requires `TICKET_CREATED` recorded from the
 first ticket.
 
-- [ ] T016 Add Flyway migration `db/migration/V2__create_workflow_model.sql`: `ticket_type`, `workflow`, `workflow_state`, `workflow_transition` tables per data-model.md (each transition carries `required_permission_id`, optional `required_party`, `responsibility_after`). Seed the three default **types** (Change Request, Task, Defect) and their default workflows/states/transitions exactly per plan.md's seeded state diagrams
+- [ ] T016 Add Flyway migration `db/migration/V2__create_workflow_model.sql`: `ticket_type`, `workflow`, `workflow_state`, `workflow_transition` tables per data-model.md (`updated_at`/`updated_by_id` audit columns on every table; each transition carries `required_permission_id`, optional `required_party`, `responsibility_after`). Seed the three default **types** (Change Request, Task, Defect) and their default workflows/states/transitions exactly per plan.md's seeded state diagrams
 - [ ] T017 [P] Implement `TicketType`, `Workflow`, `WorkflowState`, `WorkflowTransition` entities + repositories in `workflow/`
-- [ ] T018 Add Flyway migration `db/migration/V3__create_ticket.sql`: `ticket` table (`ticket_type_id`, `current_state_id` FKs; `priority`/`severity`/`current_responsibility` as TEXT+CHECK; `ticket_key` sequence `TF-<n>`), plus `status_history` and `audit_log` per data-model.md
+- [ ] T018 Add Flyway migration `db/migration/V3__create_ticket.sql`: `ticket` table (`ticket_type_id`, `current_state_id` FKs; `priority`/`severity`/`current_responsibility` as TEXT+CHECK; `ticket_key` sequence `TF-<n>`; `updated_at`/`updated_by_id` audit columns), plus `status_history` and `audit_log` per data-model.md
 - [ ] T019 [P] Implement `Ticket` entity + `TicketRepository` with org-scoped query methods (`findByOrganizationId`, …) in `ticket/`
 - [ ] T020 [P] Implement `AuditLog` entity, repo, and `AuditService.record(...)` (single audit call site) in `audit/`
 - [ ] T021 [P] Implement `StatusHistory` entity, repo, and `StatusHistoryService.record(...)` in `statushistory/`
@@ -91,7 +91,7 @@ transitions (constitution Principle I).
 
 Goal: doc 02's "all documentation and communication in one place."
 
-- [ ] T036 Add Flyway migration `db/migration/V4__create_comment_and_attachment.sql`: `comment` and `attachment` tables per data-model.md
+- [ ] T036 Add Flyway migration `db/migration/V4__create_comment_and_attachment.sql`: `comment` and `attachment` tables per data-model.md, including `updated_at`/`updated_by_id` audit columns
 - [ ] T037 [P] [US4] Implement `Comment` entity, repo, `CommentService` (visibility filtering: `INTERNAL` returned only to callers holding the internal-read permission, per FR-012) in `comment/`
 - [ ] T038 [P] [US4] Implement `GET/POST /api/tickets/{ticketKey}/comments` in `CommentController` per contracts/comments.md, rejecting `visibility=INTERNAL` from callers lacking `COMMENT_INTERNAL_WRITE` with `403`, writing a `COMMENT_ADDED` audit entry
 - [ ] T039 Refactor T028's inline transition-comment persistence to call `CommentService`
@@ -107,7 +107,7 @@ Goal: doc 02's "all documentation and communication in one place."
 Goal: the Change Request approval gate — spec.md's highest-priority
 differentiator (User Story 1).
 
-- [ ] T044 Add Flyway migration `db/migration/V5__create_change_proposal.sql`: `change_proposal` table per data-model.md
+- [ ] T044 Add Flyway migration `db/migration/V5__create_change_proposal.sql`: `change_proposal` table per data-model.md, including `updated_at`/`updated_by_id` audit columns
 - [ ] T045 [US1] Implement `ChangeProposal` entity, repo, `ChangeProposalService` in `proposal/` — `createProposal` rejects tickets whose type has `requires_proposal = false`, tickets not in the proposal-eligible state, or an existing `PENDING` proposal (`409 INVALID_STATE`), and transitions the ticket into `PROPOSAL` (flipping responsibility to CLIENT) via `TicketTransitionService` in the same transaction (no duplicated transition logic)
 - [ ] T046 [US1] Implement `approve`/`reject` in `ChangeProposalService`: gated on `PROPOSAL_APPROVE` **and** CLIENT party in the ticket's own org; `reject` requires a non-empty comment; both transition the ticket (`PROPOSAL_APPROVED`/`PROPOSAL_REJECTED`) and write the matching audit entries
 - [ ] T047 [US1] Implement `POST /api/tickets/{ticketKey}/proposals`, `POST /api/proposals/{proposalId}/approve`, `POST /api/proposals/{proposalId}/reject` in `proposal/ChangeProposalController.java` per contracts/proposals.md
@@ -152,7 +152,7 @@ seeded roles, with the admin configuration surfaces (spec US1–US8 made visible
 
 Goal: the tool is demoable, per doc 02 §12/§13.
 
-- [ ] T067 Add Flyway migration `db/migration/V6__seed_demo_data.sql`: 2 Organizations (each with client roles/types cloned from the templates), one user per default role, and sample tickets spanning multiple statuses/severities so the dashboard has real data on first run
+- [ ] T067 Add Flyway migration `db/migration/V6__seed_demo_data.sql`: 2 Organizations (each with client roles/types cloned from the templates), one user per default role, and sample tickets spanning multiple statuses/severities so the dashboard has real data on first run; seed consistent `updated_at`/`updated_by_id` values
 - [ ] T068 [P] Write the `README.md` setup section: prerequisites, `docker compose up`, backend/frontend run commands, seeded demo credentials
 - [ ] T069 [P] Write a demo script following doc 02 §12's steps, with the exact seeded accounts for each step
 - [ ] T070 **Verify**: time a full demo run end to end — under 10 minutes (spec SC-006) — and run the two-Organization isolation check (spec SC-008) in the same pass
