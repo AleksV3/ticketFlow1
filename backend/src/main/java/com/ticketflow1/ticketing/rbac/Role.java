@@ -1,5 +1,6 @@
 package com.ticketflow1.ticketing.rbac;
 
+import com.ticketflow1.ticketing.common.Auditable;
 import com.ticketflow1.ticketing.organization.Organization;
 import com.ticketflow1.ticketing.ticket.Responsibility;
 import jakarta.persistence.Column;
@@ -27,7 +28,7 @@ import java.util.Set;
  */
 @Entity
 @Table(name = "role")
-public class Role {
+public class Role extends Auditable {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)

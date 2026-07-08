@@ -1,5 +1,6 @@
 package com.ticketflow1.ticketing.organization;
 
+import com.ticketflow1.ticketing.common.Auditable;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
@@ -11,7 +12,7 @@ import org.hibernate.annotations.CreationTimestamp;
 
 @Entity
 @Table(name = "organization")
-public class Organization {
+public class Organization extends Auditable {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
