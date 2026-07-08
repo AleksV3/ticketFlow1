@@ -75,6 +75,9 @@ public class RoleAdminService {
         if (request.permissionKeys() != null) {
             role.getPermissions().clear();
             role.getPermissions().addAll(resolvePermissions(request.permissionKeys()));
+            // Join-table writes alone don't dirty the role row — force the
+            // UPDATE so updated_at/updated_by_id reflect this change.
+            role.touchForAudit();
         }
         return RoleResponse.from(role);
     }

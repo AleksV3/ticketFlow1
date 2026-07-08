@@ -11,12 +11,20 @@ CREATE TABLE permission (
 -- always global; CLIENT-party roles are cloned per organization on org
 -- creation via clone_org_templates(), defined in V2). is_template marks the
 -- seed rows every organization's CLIENT-party roles are cloned from.
+-- updated_at / updated_by_id: row-level "who touched this last" metadata on
+-- every mutable table (stamped by JPA auditing; NULL updated_by_id = the row
+-- was written by a migration/seed). Append-only tables in later migrations
+-- (audit_log, status_history) deliberately don't get these — their rows are
+-- never updated. permission and role_permission are exempt too: permission is
+-- the fixed code-owned catalog, and role_permission edits stamp the role row.
 CREATE TABLE role (
     id              BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
     name            VARCHAR(100) NOT NULL,
     party           VARCHAR(12)  NOT NULL CHECK (party IN ('CLIENT', 'TICKETFLOW1')),
     organization_id BIGINT,
     is_template     BOOLEAN      NOT NULL DEFAULT FALSE,
+    updated_at      TIMESTAMPTZ  NOT NULL DEFAULT now(),
+    updated_by_id   BIGINT,
     UNIQUE (organization_id, name)
 );
 
@@ -27,10 +35,12 @@ CREATE TABLE role_permission (
 );
 
 CREATE TABLE organization (
-    id         BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
-    name       VARCHAR(200) NOT NULL UNIQUE,
-    active     BOOLEAN      NOT NULL DEFAULT TRUE,
-    created_at TIMESTAMPTZ  NOT NULL DEFAULT now()
+    id            BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    name          VARCHAR(200) NOT NULL UNIQUE,
+    active        BOOLEAN      NOT NULL DEFAULT TRUE,
+    created_at    TIMESTAMPTZ  NOT NULL DEFAULT now(),
+    updated_at    TIMESTAMPTZ  NOT NULL DEFAULT now(),
+    updated_by_id BIGINT
 );
 
 ALTER TABLE role ADD CONSTRAINT fk_role_organization
@@ -47,8 +57,17 @@ CREATE TABLE app_user (
     role_id         BIGINT       NOT NULL REFERENCES role (id),
     organization_id BIGINT       REFERENCES organization (id),
     active          BOOLEAN      NOT NULL DEFAULT TRUE,
-    created_at      TIMESTAMPTZ  NOT NULL DEFAULT now()
+    created_at      TIMESTAMPTZ  NOT NULL DEFAULT now(),
+    updated_at      TIMESTAMPTZ  NOT NULL DEFAULT now(),
+    updated_by_id   BIGINT       REFERENCES app_user (id)
 );
+
+-- role/organization are created before app_user exists, so their
+-- updated_by_id FKs are added here (same pattern as fk_role_organization).
+ALTER TABLE role ADD CONSTRAINT fk_role_updated_by
+    FOREIGN KEY (updated_by_id) REFERENCES app_user (id);
+ALTER TABLE organization ADD CONSTRAINT fk_organization_updated_by
+    FOREIGN KEY (updated_by_id) REFERENCES app_user (id);
 
 CREATE INDEX idx_app_user_organization_id ON app_user (organization_id);
 CREATE INDEX idx_role_organization_id ON role (organization_id);
