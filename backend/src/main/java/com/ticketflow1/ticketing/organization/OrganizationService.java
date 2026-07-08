@@ -4,7 +4,6 @@ import com.ticketflow1.ticketing.common.ApiException;
 import com.ticketflow1.ticketing.organization.dto.CreateOrganizationRequest;
 import com.ticketflow1.ticketing.organization.dto.OrganizationResponse;
 import com.ticketflow1.ticketing.organization.dto.UpdateOrganizationRequest;
-import jakarta.persistence.EntityManager;
 import java.util.List;
 import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
@@ -14,11 +13,9 @@ import org.springframework.transaction.annotation.Transactional;
 public class OrganizationService {
 
     private final OrganizationRepository organizationRepository;
-    private final EntityManager entityManager;
 
-    public OrganizationService(OrganizationRepository organizationRepository, EntityManager entityManager) {
+    public OrganizationService(OrganizationRepository organizationRepository) {
         this.organizationRepository = organizationRepository;
-        this.entityManager = entityManager;
     }
 
     @Transactional(readOnly = true)
@@ -36,12 +33,8 @@ public class OrganizationService {
         // saveAndFlush forces the INSERT now so @CreationTimestamp is populated
         // before we map the response (UUID keys otherwise defer INSERT to commit).
         Organization saved = organizationRepository.saveAndFlush(new Organization(request.name()));
-        // FR-022: clone the CLIENT-party role templates and ticket
-        // types/workflows so this organization gets its own editable copies —
-        // the same function V6 calls for the demo seed orgs (V2 migration).
-        entityManager.createNativeQuery("SELECT clone_org_templates(:orgId)")
-                .setParameter("orgId", saved.getId())
-                .getSingleResult();
+        // FR-022 template cloning (roles, ticket types, workflows) is wired in
+        // here once the template model and clone_org_templates() exist (V2).
         return OrganizationResponse.from(saved);
     }
 
