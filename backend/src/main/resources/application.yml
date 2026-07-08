@@ -1,0 +1,38 @@
+server:
+  # 8081, not the conventional 8080, to avoid clashing with another local
+  # service already bound to 8080. Override with SERVER_PORT if needed.
+  port: ${SERVER_PORT:8081}
+
+spring:
+  application:
+    name: ticketing
+
+  # Defaults match docker-compose.yml, so `./mvnw spring-boot:run` works with no
+  # .env exported. Override via env vars (POSTGRES_*, JWT_SECRET) in real setups.
+  datasource:
+    url: jdbc:postgresql://localhost:${POSTGRES_PORT:5433}/${POSTGRES_DB:ticketflow1_ticketing}
+    username: ${POSTGRES_USER:ticketflow1}
+    password: ${POSTGRES_PASSWORD:ticketflow1}
+
+  jpa:
+    # Schema truth lives in Flyway. Hibernate only validates that entities match
+    # the migrated schema at startup — it never creates or alters tables.
+    hibernate:
+      ddl-auto: validate
+    open-in-view: false
+    properties:
+      hibernate:
+        format_sql: true
+
+  flyway:
+    enabled: true
+
+# App-specific config (bound in Phase 1 Step 4 by JwtService)
+app:
+  jwt:
+    secret: ${JWT_SECRET:dev-only-insecure-secret-change-me-at-least-32-bytes-long}
+    expiration-hours: 8
+
+springdoc:
+  swagger-ui:
+    path: /swagger-ui.html

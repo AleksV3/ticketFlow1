@@ -1,0 +1,23 @@
+services:
+  postgres:
+    image: postgres:16
+    container_name: ticketflow1-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-ticketflow1_ticketing}
+      POSTGRES_USER: ${POSTGRES_USER:-ticketflow1}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-ticketflow1}
+    # Host port 5433 (not 5432) to avoid clashing with a locally-installed
+    # Postgres already bound to 5432. Container-internal port stays 5432.
+    ports:
+      - "${POSTGRES_PORT:-5433}:5432"
+    volumes:
+      - ticketflow1_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-ticketflow1} -d ${POSTGRES_DB:-ticketflow1_ticketing}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  ticketflow1_pgdata:
