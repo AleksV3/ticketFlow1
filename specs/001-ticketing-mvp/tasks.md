@@ -56,18 +56,18 @@ created and read (org-scoped) referencing them. AuditLog/StatusHistory are
 introduced here because Principle II requires `TICKET_CREATED` recorded from the
 first ticket.
 
-- [ ] T016 Add Flyway migration `db/migration/V2__create_workflow_model.sql`: `ticket_type`, `workflow`, `workflow_state`, `workflow_transition` tables per data-model.md (`updated_at`/`updated_by_id` audit columns on every table; each transition carries `required_permission_id`, optional `required_party`, `responsibility_after`). Seed the three default **types** (Change Request, Task, Defect) and their default workflows/states/transitions exactly per plan.md's seeded state diagrams
-- [ ] T017 [P] Implement `TicketType`, `Workflow`, `WorkflowState`, `WorkflowTransition` entities + repositories in `workflow/`
-- [ ] T018 Add Flyway migration `db/migration/V3__create_ticket.sql`: `ticket` table (`ticket_type_id`, `current_state_id` FKs; `priority`/`severity`/`current_responsibility` as TEXT+CHECK; `ticket_key` sequence `TF-<n>`; `updated_at`/`updated_by_id` audit columns), plus `status_history` and `audit_log` per data-model.md
-- [ ] T019 [P] Implement `Ticket` entity + `TicketRepository` with org-scoped query methods (`findByOrganizationId`, …) in `ticket/`
-- [ ] T020 [P] Implement `AuditLog` entity, repo, and `AuditService.record(...)` (single audit call site) in `audit/`
-- [ ] T021 [P] Implement `StatusHistory` entity, repo, and `StatusHistoryService.record(...)` in `statushistory/`
-- [ ] T022 Implement ticket key generation (`TF-<sequence>`) — a Postgres sequence + `TicketKeyGenerator` in `ticket/`
-- [ ] T023 [US1][US2][US3] Implement `TicketService.createTicket(...)`: resolves the org's `TicketType`, sets `current_state` to that type's workflow initial state, inherits `organizationId` from the business owner, requires `severity` only when the type is Defect (FR-004), writes a `TICKET_CREATED` audit entry + initial `StatusHistory` row (`from_state=null`) in one transaction, in `ticket/TicketService.java`
-- [ ] T024 [US1][US2][US3] Implement `POST /api/tickets` and `GET /api/tickets/{ticketKey}` in `ticket/TicketController.java` per contracts/tickets.md, with DTOs in `ticket/dto/` — org-scoping enforced (CLIENT-party callers filtered to their own org; cross-org access returns `404`, not `403`)
-- [ ] T025 [US5] Implement `GET /api/tickets` list with pagination and the filters from contracts/tickets.md (`type`, `status`, `severity`, `priority`, `assignedTo=me`, `responsibility`, `slaStatus`, `organizationId`, `q`) — leave a `// TODO Phase 6` for `slaStatus`, don't stub incorrect behavior
-- [ ] T026 [P] Unit test `TicketService.createTicket`: correct initial state per type, org inheritance, severity rule, audit + history rows written
-- [ ] T027 **Verify**: Testcontainers integration test hitting `POST /api/tickets` then `GET /api/tickets/{ticketKey}` for each of the 3 seeded types, confirming the correct initial state and that a CLIENT user from Organization B gets `404` on Organization A's ticket (spec SC-008 partial)
+- [x] T016 Add Flyway migration `db/migration/V2__create_workflow_model.sql`: `ticket_type`, `workflow`, `workflow_state`, `workflow_transition` tables per data-model.md (`updated_at`/`updated_by_id` audit columns on every table; each transition carries `required_permission_id`, optional `required_party`, `responsibility_after`). Seed the three default **types** (Change Request, Task, Defect) and their default workflows/states/transitions exactly per plan.md's seeded state diagrams
+- [x] T017 [P] Implement `TicketType`, `Workflow`, `WorkflowState`, `WorkflowTransition` entities + repositories in `workflow/`
+- [x] T018 Add Flyway migration `db/migration/V3__create_ticket.sql`: `ticket` table (`ticket_type_id`, `current_state_id` FKs; `priority`/`severity`/`current_responsibility` as TEXT+CHECK; `ticket_key` sequence `TF-<n>`; `updated_at`/`updated_by_id` audit columns), plus `status_history` and `audit_log` per data-model.md
+- [x] T019 [P] Implement `Ticket` entity + `TicketRepository` with org-scoped query methods (`findByOrganizationId`, …) in `ticket/`
+- [x] T020 [P] Implement `AuditLog` entity, repo, and `AuditService.record(...)` (single audit call site) in `audit/`
+- [x] T021 [P] Implement `StatusHistory` entity, repo, and `StatusHistoryService.record(...)` in `statushistory/`
+- [x] T022 Implement ticket key generation (`TF-<sequence>`) — a Postgres sequence + `TicketKeyGenerator` in `ticket/`
+- [x] T023 [US1][US2][US3] Implement `TicketService.createTicket(...)`: resolves the org's `TicketType`, sets `current_state` to that type's workflow initial state, inherits `organizationId` from the business owner, requires `severity` only when the type is Defect (FR-004), writes a `TICKET_CREATED` audit entry + initial `StatusHistory` row (`from_state=null`) in one transaction, in `ticket/TicketService.java`
+- [x] T024 [US1][US2][US3] Implement `POST /api/tickets` and `GET /api/tickets/{ticketKey}` in `ticket/TicketController.java` per contracts/tickets.md, with DTOs in `ticket/dto/` — org-scoping enforced (CLIENT-party callers filtered to their own org; cross-org access returns `404`, not `403`)
+- [x] T025 [US5] Implement `GET /api/tickets` list with pagination and the filters from contracts/tickets.md (`type`, `status`, `severity`, `priority`, `assignedTo=me`, `responsibility`, `slaStatus`, `organizationId`, `q`) — leave a `// TODO Phase 6` for `slaStatus`, don't stub incorrect behavior
+- [x] T026 [P] Unit test `TicketService.createTicket`: correct initial state per type, org inheritance, severity rule, audit + history rows written
+- [x] T027 **Verify**: Testcontainers integration test hitting `POST /api/tickets` then `GET /api/tickets/{ticketKey}` for each of the 3 seeded types, confirming the correct initial state and that a CLIENT user from Organization B gets `404` on Organization A's ticket (spec SC-008 partial)
 
 ---
 

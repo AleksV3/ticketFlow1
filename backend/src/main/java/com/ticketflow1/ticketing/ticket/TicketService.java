@@ -4,11 +4,13 @@ import com.ticketflow1.ticketing.audit.AuditAction;
 import com.ticketflow1.ticketing.audit.AuditService;
 import com.ticketflow1.ticketing.auth.AuthPrincipal;
 import com.ticketflow1.ticketing.common.ApiException;
+import com.ticketflow1.ticketing.common.PagedResponse;
 import com.ticketflow1.ticketing.organization.Organization;
 import com.ticketflow1.ticketing.organization.OrganizationRepository;
 import com.ticketflow1.ticketing.statushistory.StatusHistoryService;
 import com.ticketflow1.ticketing.ticket.dto.CreateTicketRequest;
 import com.ticketflow1.ticketing.ticket.dto.TicketDetailResponse;
+import com.ticketflow1.ticketing.ticket.dto.TicketSummaryResponse;
 import com.ticketflow1.ticketing.user.AppUser;
 import com.ticketflow1.ticketing.user.AppUserRepository;
 import com.ticketflow1.ticketing.workflow.TicketType;
@@ -16,6 +18,10 @@ import com.ticketflow1.ticketing.workflow.TicketTypeRepository;
 import com.ticketflow1.ticketing.workflow.WorkflowState;
 import com.ticketflow1.ticketing.workflow.WorkflowStateRepository;
 import java.util.List;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -23,6 +29,8 @@ import org.springframework.transaction.annotation.Transactional;
 public class TicketService {
 
     private static final String DEFECT_TYPE_KEY = "DEFECT";
+    private static final int DEFAULT_PAGE_SIZE = 20;
+    private static final int MAX_PAGE_SIZE = 100;
 
     private final TicketRepository ticketRepository;
     private final TicketTypeRepository ticketTypeRepository;
@@ -89,6 +97,62 @@ public class TicketService {
     @Transactional(readOnly = true)
     public TicketDetailResponse getTicket(String ticketKey, AuthPrincipal principal) {
         return TicketDetailResponse.from(findVisibleTicket(ticketKey, principal), List.of());
+    }
+
+    @Transactional(readOnly = true)
+    public PagedResponse<TicketSummaryResponse> listTickets(String type, String status, Severity severity,
+            Priority priority, String assignedTo, Responsibility responsibility, String slaStatus,
+            Long organizationId, String q, int page, int pageSize, AuthPrincipal principal) {
+        if (slaStatus != null && !slaStatus.isBlank()) {
+            // TODO Phase 6: implement slaStatus filter against persisted due-date columns.
+            throw ApiException.validation("slaStatus filter is not available yet.");
+        }
+
+        int size = pageSize <= 0 ? DEFAULT_PAGE_SIZE : Math.min(pageSize, MAX_PAGE_SIZE);
+        int pageNumber = Math.max(page, 0);
+        Pageable pageable = PageRequest.of(pageNumber, size, Sort.by("updatedAt").descending());
+
+        Specification<Ticket> spec = Specification.where(null);
+        if (principal.party() == Responsibility.CLIENT) {
+            spec = spec.and((root, query, cb) ->
+                    cb.equal(root.get("organization").get("id"), principal.organizationId()));
+        } else if (organizationId != null) {
+            spec = spec.and((root, query, cb) ->
+                    cb.equal(root.get("organization").get("id"), organizationId));
+        }
+        if (type != null && !type.isBlank()) {
+            spec = spec.and((root, query, cb) -> cb.equal(root.get("ticketType").get("key"), type));
+        }
+        if (status != null && !status.isBlank()) {
+            spec = spec.and((root, query, cb) -> cb.equal(root.get("currentState").get("key"), status));
+        }
+        if (severity != null) {
+            spec = spec.and((root, query, cb) -> cb.equal(root.get("severity"), severity));
+        }
+        if (priority != null) {
+            spec = spec.and((root, query, cb) -> cb.equal(root.get("priority"), priority));
+        }
+        if (responsibility != null) {
+            spec = spec.and((root, query, cb) ->
+                    cb.equal(root.get("currentResponsibility"), responsibility));
+        }
+        if ("me".equals(assignedTo)) {
+            spec = spec.and((root, query, cb) ->
+                    cb.equal(root.get("ticketLead").get("id"), principal.userId()));
+        } else if ("unassigned".equals(assignedTo)) {
+            spec = spec.and((root, query, cb) -> cb.isNull(root.get("ticketLead")));
+        } else if (assignedTo != null && !assignedTo.isBlank()) {
+            throw ApiException.validation("assignedTo must be 'me' or 'unassigned'.");
+        }
+        if (q != null && !q.isBlank()) {
+            String like = "%" + q.toLowerCase() + "%";
+            spec = spec.and((root, query, cb) -> cb.or(
+                    cb.like(cb.lower(root.get("title")), like),
+                    cb.like(cb.lower(root.get("description")), like),
+                    cb.like(cb.lower(root.get("ticketKey")), like)));
+        }
+
+        return PagedResponse.from(ticketRepository.findAll(spec, pageable), TicketSummaryResponse::from);
     }
 
     @Transactional(readOnly = true)
