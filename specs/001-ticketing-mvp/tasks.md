@@ -32,7 +32,7 @@ Goal: a running Spring Boot app with Postgres, JWT login, permission-based
 security, the seeded permission catalog + default roles, and a bootstrap admin.
 
 - [x] T001 Create `backend/` Spring Boot 3.x project (Java 21, Maven wrapper) with dependencies: Spring Web, Spring Data JPA, Spring Security, Flyway, PostgreSQL driver, springdoc-openapi, jjwt (plan.md Technical Context)
-- [ ] T002 [P] Create `frontend/` Next.js (App Router) + TypeScript + Tailwind scaffold — no pages yet beyond the default
+- [x] T002 [P] Create `frontend/` Next.js (App Router) + TypeScript + Tailwind scaffold — no pages yet beyond the default
 - [x] T003 [P] Create root `docker-compose.yml` with a `postgres` service (Postgres 16, named volume, exposed on 5432) and a `.env.example` documenting `POSTGRES_DB`/`POSTGRES_USER`/`POSTGRES_PASSWORD`/`JWT_SECRET`
 - [x] T004 Configure `backend/src/main/resources/application.yml`: datasource pointing at the Compose Postgres, `spring.flyway.enabled=true`, `spring.jpa.hibernate.ddl-auto=validate` (schema truth lives in Flyway)
 - [x] T005 Add Flyway migration `db/migration/V1__create_rbac.sql`: `permission`, `role`, `role_permission`, `organization`, `app_user` tables per data-model.md (bigint identity PKs; `party` as TEXT+CHECK). Seed the permission catalog, the five default **role templates** (`ADMIN`, `CLIENT_USER`, `CLIENT_APPROVER`, `TICKETFLOW1_USER`, `TICKETFLOW1_MANAGER`) with their `role_permission` mappings, a bootstrap `ADMIN` user (BCrypt demo password), and 2 demo Organizations so login can be verified this phase
@@ -136,7 +136,7 @@ Goal: every backend capability becomes usable through a browser, for all five
 seeded roles, with the admin configuration surfaces (spec US1–US8 made visible).
 
 - [ ] T057 Implement `frontend/lib/api.ts` (typed fetch client, base URL, auth header injection, error-shape parsing per contracts/README.md) and `frontend/lib/auth.ts` (JWT storage + attach; holds the caller's permission set)
-- [ ] T058 [P] Implement `frontend/app/login/page.tsx` calling `POST /api/auth/login`, storing the token, redirecting to `/dashboard`
+- [x] T058 [P] Implement `frontend/app/login/page.tsx` calling `POST /api/auth/login`, storing the token, redirecting to `/dashboard`
 - [ ] T059 [P] Implement shared components in `frontend/components/`: `StatusBadge`, `SlaBadge`, `TransitionButtons` (renders exactly `ticket.allowedTransitions` from the API, never computes legality client-side)
 - [ ] T060 [US5] Implement `frontend/app/dashboard/page.tsx` + the backend `dashboard/DashboardService` and `GET /api/dashboard` (contracts/dashboard.md): active/closed counts, by-type, by-status, defects-by-severity, SLA breached/due-soon, waiting-for-approval, waiting-for-confirmation, my-assigned
 - [ ] T061 [P] Implement `frontend/app/tickets/page.tsx`: list view with the filters from contracts/tickets.md
