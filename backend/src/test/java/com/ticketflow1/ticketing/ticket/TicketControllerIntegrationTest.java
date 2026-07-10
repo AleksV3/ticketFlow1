@@ -13,6 +13,7 @@ import com.ticketflow1.ticketing.rbac.Role;
 import com.ticketflow1.ticketing.rbac.RoleRepository;
 import com.ticketflow1.ticketing.user.AppUser;
 import com.ticketflow1.ticketing.user.AppUserRepository;
+import jakarta.servlet.http.Cookie;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -97,10 +98,10 @@ class TicketControllerIntegrationTest {
 
     @Test
     void createAndReadSeededTypes_andCrossOrgReadReturns404() throws Exception {
-        String clientAToken = login("client-a@demo.test", "client123");
-        String clientBToken = login("client-b@demo.test", "client123");
+        Cookie clientACookie = login("client-a@demo.test", "client123");
+        Cookie clientBCookie = login("client-b@demo.test", "client123");
 
-        String changeRequestKey = createTicket(clientAToken, """
+        String changeRequestKey = createTicket(clientACookie, """
                 {
                   "type":"CHANGE_REQUEST",
                   "title":"CR title",
@@ -109,7 +110,7 @@ class TicketControllerIntegrationTest {
                 }
                 """, "SUBMITTED");
 
-        createTicket(clientAToken, """
+        createTicket(clientACookie, """
                 {
                   "type":"TASK",
                   "title":"Task title",
@@ -118,7 +119,7 @@ class TicketControllerIntegrationTest {
                 }
                 """, "SUBMITTED");
 
-        createTicket(clientAToken, """
+        createTicket(clientACookie, """
                 {
                   "type":"DEFECT",
                   "title":"Defect title",
@@ -129,12 +130,73 @@ class TicketControllerIntegrationTest {
                 """, "REPORTED");
 
         mockMvc.perform(get("/api/tickets/{ticketKey}", changeRequestKey)
-                        .header("Authorization", "Bearer " + clientBToken))
+                        .cookie(clientBCookie))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.error").value("NOT_FOUND"));
     }
 
-    private String login(String email, String password) throws Exception {
+    @Test
+    void transitionToAnalysis_writesHistoryAndAudit_andClientCannotPerformIt() throws Exception {
+        Cookie clientCookie = login("client-a@demo.test", "client123");
+        Cookie internalCookie = login("admin@ticketflow1.demo", "admin123");
+
+        String allowedTicketKey = createTicket(clientCookie, """
+                {
+                  "type":"CHANGE_REQUEST",
+                  "title":"Transition ok",
+                  "description":"CR desc",
+                  "priority":"MEDIUM"
+                }
+                """, "SUBMITTED");
+
+        String forbiddenTicketKey = createTicket(clientCookie, """
+                {
+                  "type":"CHANGE_REQUEST",
+                  "title":"Transition blocked",
+                  "description":"CR desc",
+                  "priority":"MEDIUM"
+                }
+                """, "SUBMITTED");
+
+        mockMvc.perform(post("/api/tickets/{ticketKey}/transition", allowedTicketKey)
+                        .cookie(internalCookie)
+                        .contentType("application/json")
+                        .content("""
+                                {
+                                  "toStatus":"ANALYSIS"
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("ANALYSIS"));
+
+        mockMvc.perform(post("/api/tickets/{ticketKey}/transition", forbiddenTicketKey)
+                        .cookie(clientCookie)
+                        .contentType("application/json")
+                        .content("""
+                                {
+                                  "toStatus":"ANALYSIS"
+                                }
+                                """))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.error").value("ILLEGAL_TRANSITION"));
+
+        mockMvc.perform(get("/api/tickets/{ticketKey}/status-history", allowedTicketKey)
+                        .cookie(internalCookie))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].toStatus").value("SUBMITTED"))
+                .andExpect(jsonPath("$[1].fromStatus").value("SUBMITTED"))
+                .andExpect(jsonPath("$[1].toStatus").value("ANALYSIS"));
+
+        mockMvc.perform(get("/api/tickets/{ticketKey}/audit-log", allowedTicketKey)
+                        .cookie(internalCookie))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].action").value("TICKET_CREATED"))
+                .andExpect(jsonPath("$[1].action").value("STATUS_CHANGED"))
+                .andExpect(jsonPath("$[1].oldValue").value("SUBMITTED"))
+                .andExpect(jsonPath("$[1].newValue").value("ANALYSIS"));
+    }
+
+    private Cookie login(String email, String password) throws Exception {
         MvcResult result = mockMvc.perform(post("/api/auth/login")
                         .contentType("application/json")
                         .content("""
@@ -145,13 +207,12 @@ class TicketControllerIntegrationTest {
                                 """.formatted(email, password)))
                 .andExpect(status().isOk())
                 .andReturn();
-        JsonNode json = objectMapper.readTree(result.getResponse().getContentAsString());
-        return json.get("token").asText();
+        return result.getResponse().getCookie("ticketflow1_auth");
     }
 
-    private String createTicket(String token, String body, String expectedInitialState) throws Exception {
+    private String createTicket(Cookie authCookie, String body, String expectedInitialState) throws Exception {
         MvcResult createResult = mockMvc.perform(post("/api/tickets")
-                        .header("Authorization", "Bearer " + token)
+                        .cookie(authCookie)
                         .contentType("application/json")
                         .content(body))
                 .andExpect(status().isCreated())
@@ -162,7 +223,7 @@ class TicketControllerIntegrationTest {
         String ticketKey = created.get("ticketKey").asText();
 
         mockMvc.perform(get("/api/tickets/{ticketKey}", ticketKey)
-                        .header("Authorization", "Bearer " + token))
+                        .cookie(authCookie))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.ticketKey").value(ticketKey))
                 .andExpect(jsonPath("$.status").value(expectedInitialState));

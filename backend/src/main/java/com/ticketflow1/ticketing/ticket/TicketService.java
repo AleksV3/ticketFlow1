@@ -11,6 +11,7 @@ import com.ticketflow1.ticketing.statushistory.StatusHistoryService;
 import com.ticketflow1.ticketing.ticket.dto.CreateTicketRequest;
 import com.ticketflow1.ticketing.ticket.dto.TicketDetailResponse;
 import com.ticketflow1.ticketing.ticket.dto.TicketSummaryResponse;
+import com.ticketflow1.ticketing.ticket.dto.UpdateTicketRequest;
 import com.ticketflow1.ticketing.user.AppUser;
 import com.ticketflow1.ticketing.user.AppUserRepository;
 import com.ticketflow1.ticketing.workflow.TicketType;
@@ -104,6 +105,92 @@ public class TicketService {
         return TicketDetailResponse.from(ticket, ticketTransitionService.allowedTransitions(ticket, principal));
     }
 
+    @Transactional
+    public TicketDetailResponse updateTicket(String ticketKey, UpdateTicketRequest request, AuthPrincipal principal) {
+        Ticket ticket = findVisibleTicket(ticketKey, principal);
+        AppUser actor = appUserRepository.findById(principal.userId())
+                .orElseThrow(() -> ApiException.notFound("Current user no longer exists."));
+
+        if (request.status() != null) {
+            throw ApiException.validation("status must be changed via /transition.");
+        }
+
+        boolean changed = false;
+
+        if (request.title() != null) {
+            String title = request.title().trim();
+            if (title.isEmpty()) {
+                throw ApiException.validation("title must not be blank.");
+            }
+            if (!title.equals(ticket.getTitle())) {
+                auditService.record(ticket, actor.getId(), AuditAction.TICKET_UPDATED,
+                        "title", ticket.getTitle(), title);
+                ticket.setTitle(title);
+                changed = true;
+            }
+        }
+
+        if (request.description() != null) {
+            String description = request.description().trim();
+            if (description.isEmpty()) {
+                throw ApiException.validation("description must not be blank.");
+            }
+            if (!description.equals(ticket.getDescription())) {
+                auditService.record(ticket, actor.getId(), AuditAction.TICKET_UPDATED,
+                        "description", ticket.getDescription(), description);
+                ticket.setDescription(description);
+                changed = true;
+            }
+        }
+
+        if (request.priority() != null) {
+            requireTicketflow1Party(principal, "priority");
+            if (ticket.getPriority() != request.priority()) {
+                auditService.record(ticket, actor.getId(), AuditAction.PRIORITY_CHANGED,
+                        "priority", ticket.getPriority().name(), request.priority().name());
+                ticket.setPriority(request.priority());
+                changed = true;
+            }
+        }
+
+        if (request.ticketLeadId() != null) {
+            requireTicketflow1Party(principal, "ticketLeadId");
+            AppUser ticketLead = appUserRepository.findById(request.ticketLeadId())
+                    .orElseThrow(() -> ApiException.validation("ticketLeadId not found: " + request.ticketLeadId()));
+            if (ticketLead.getParty() != Responsibility.TICKETFLOW1) {
+                throw ApiException.validation("ticketLeadId must belong to a TICKETFLOW1-party user.");
+            }
+            Long currentLeadId = ticket.getTicketLead() == null ? null : ticket.getTicketLead().getId();
+            if (!request.ticketLeadId().equals(currentLeadId)) {
+                auditService.record(ticket, actor.getId(), AuditAction.ASSIGNEE_CHANGED,
+                        "ticketLeadId",
+                        ticket.getTicketLead() == null ? null : ticket.getTicketLead().getDisplayName(),
+                        ticketLead.getDisplayName());
+                ticket.setTicketLead(ticketLead);
+                changed = true;
+            }
+        }
+
+        if (request.assignedTeam() != null) {
+            requireTicketflow1Party(principal, "assignedTeam");
+            String assignedTeam = request.assignedTeam().trim();
+            if (assignedTeam.isEmpty()) {
+                assignedTeam = null;
+            }
+            String currentAssignedTeam = ticket.getAssignedTeam();
+            if ((assignedTeam == null && currentAssignedTeam != null)
+                    || (assignedTeam != null && !assignedTeam.equals(currentAssignedTeam))) {
+                auditService.record(ticket, actor.getId(), AuditAction.TICKET_UPDATED,
+                        "assignedTeam", currentAssignedTeam, assignedTeam);
+                ticket.setAssignedTeam(assignedTeam);
+                changed = true;
+            }
+        }
+
+        Ticket saved = changed ? ticketRepository.save(ticket) : ticket;
+        return TicketDetailResponse.from(saved, ticketTransitionService.allowedTransitions(saved, principal));
+    }
+
     @Transactional(readOnly = true)
     public PagedResponse<TicketSummaryResponse> listTickets(String type, String status, Severity severity,
             Priority priority, String assignedTo, Responsibility responsibility, String slaStatus,
@@ -193,6 +280,12 @@ public class TicketService {
         }
         if (!isDefect && request.severity() != null) {
             throw ApiException.validation("severity is allowed only when type is DEFECT.");
+        }
+    }
+
+    private void requireTicketflow1Party(AuthPrincipal principal, String fieldName) {
+        if (principal.party() != Responsibility.TICKETFLOW1) {
+            throw ApiException.forbidden("Only TICKETFLOW1-party users may change " + fieldName + ".");
         }
     }
 }

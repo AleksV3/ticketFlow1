@@ -6,6 +6,7 @@ import com.ticketflow1.ticketing.ticket.dto.CreateTicketRequest;
 import com.ticketflow1.ticketing.ticket.dto.TicketDetailResponse;
 import com.ticketflow1.ticketing.ticket.dto.TicketSummaryResponse;
 import com.ticketflow1.ticketing.ticket.dto.TransitionTicketRequest;
+import com.ticketflow1.ticketing.ticket.dto.UpdateTicketRequest;
 import com.ticketflow1.ticketing.workflow.TicketTransitionService;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
@@ -14,6 +15,7 @@ import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -64,6 +66,14 @@ public class TicketController {
     public TicketDetailResponse getByTicketKey(@PathVariable String ticketKey,
             @AuthenticationPrincipal AuthPrincipal principal) {
         return ticketService.getTicket(ticketKey, principal);
+    }
+
+    @PatchMapping("/{ticketKey}")
+    @PreAuthorize("hasAuthority('TICKET_UPDATE')")
+    public TicketDetailResponse update(@PathVariable String ticketKey,
+            @RequestBody UpdateTicketRequest request,
+            @AuthenticationPrincipal AuthPrincipal principal) {
+        return ticketService.updateTicket(ticketKey, request, principal);
     }
 
     @PostMapping("/{ticketKey}/transition")
