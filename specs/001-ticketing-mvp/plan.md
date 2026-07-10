@@ -129,7 +129,7 @@ frontend/
 │       └── config/page.tsx    # roles, types, workflows
 ├── lib/
 │   ├── api.ts                 # typed fetch client (research.md)
-│   └── auth.ts                # JWT storage/attach
+│   └── auth.ts                # auth cookie-aware helpers + current-user fetch
 └── components/                # shared UI (StatusBadge, SlaBadge, TransitionButtons, etc.)
 ```
 

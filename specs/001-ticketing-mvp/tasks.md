@@ -135,8 +135,8 @@ Goal: severity-driven SLA deadlines and status — User Story 3.
 Goal: every backend capability becomes usable through a browser, for all five
 seeded roles, with the admin configuration surfaces (spec US1–US8 made visible).
 
-- [ ] T057 Implement `frontend/lib/api.ts` (typed fetch client, base URL, auth header injection, error-shape parsing per contracts/README.md) and `frontend/lib/auth.ts` (JWT storage + attach; holds the caller's permission set)
-- [x] T058 [P] Implement `frontend/app/login/page.tsx` calling `POST /api/auth/login`, storing the token, redirecting to `/dashboard`
+- [ ] T057 Implement `frontend/lib/api.ts` (typed fetch client, base URL, `credentials: 'include'`, error-shape parsing per contracts/README.md) and `frontend/lib/auth.ts` (cookie-aware auth helpers + current-user fetch)
+- [x] T058 [P] Implement `frontend/app/login/page.tsx` calling `POST /api/auth/login`, relying on the backend's `HttpOnly` auth cookie, redirecting to `/dashboard`
 - [ ] T059 [P] Implement shared components in `frontend/components/`: `StatusBadge`, `SlaBadge`, `TransitionButtons` (renders exactly `ticket.allowedTransitions` from the API, never computes legality client-side)
 - [ ] T060 [US5] Implement `frontend/app/dashboard/page.tsx` + the backend `dashboard/DashboardService` and `GET /api/dashboard` (contracts/dashboard.md): active/closed counts, by-type, by-status, defects-by-severity, SLA breached/due-soon, waiting-for-approval, waiting-for-confirmation, my-assigned
 - [ ] T061 [P] Implement `frontend/app/tickets/page.tsx`: list view with the filters from contracts/tickets.md

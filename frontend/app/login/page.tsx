@@ -3,10 +3,8 @@
 import { FormEvent, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
+  fetchCurrentUser,
   getApiBaseUrl,
-  readSession,
-  storeSession,
-  type CurrentUser,
   type LoginResponse
 } from "@/lib/auth";
 
@@ -23,9 +21,19 @@ export default function LoginPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
-    if (readSession()) {
-      router.replace("/dashboard");
-    }
+    let isActive = true;
+
+    fetchCurrentUser()
+      .then((currentUser) => {
+        if (isActive && currentUser) {
+          router.replace("/dashboard");
+        }
+      })
+      .catch(() => undefined);
+
+    return () => {
+      isActive = false;
+    };
   }, [router]);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
@@ -37,6 +45,7 @@ export default function LoginPage() {
       const apiBaseUrl = getApiBaseUrl();
       const loginResponse = await fetch(`${apiBaseUrl}/auth/login`, {
         method: "POST",
+        credentials: "include",
         headers: {
           "Content-Type": "application/json"
         },
@@ -48,24 +57,7 @@ export default function LoginPage() {
         throw new Error(payload.message ?? "Login failed.");
       }
 
-      const loginData = (await loginResponse.json()) as LoginResponse;
-      const meResponse = await fetch(`${apiBaseUrl}/users/me`, {
-        headers: {
-          Authorization: `Bearer ${loginData.token}`
-        }
-      });
-
-      if (!meResponse.ok) {
-        const payload = (await safeParseError(meResponse)) as ApiError;
-        throw new Error(payload.message ?? "Could not load the current user.");
-      }
-
-      const currentUser = (await meResponse.json()) as CurrentUser;
-      storeSession({
-        token: loginData.token,
-        expiresAt: loginData.expiresAt,
-        user: currentUser
-      });
+      await loginResponse.json() as LoginResponse;
 
       router.replace("/dashboard");
     } catch (caughtError) {
@@ -86,7 +78,7 @@ export default function LoginPage() {
           </p>
           <h1 className="mt-3 text-3xl font-bold text-slate-900">Sign in</h1>
           <p className="mt-2 text-sm text-slate-600">
-            Authenticate against the Spring Boot backend and store the JWT locally.
+            Authenticate against the Spring Boot backend using an HttpOnly cookie.
           </p>
         </div>
 

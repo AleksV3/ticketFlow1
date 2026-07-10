@@ -380,7 +380,8 @@ ticket of that type; confirm `OPEN → CLOSED` is rejected (undefined) while
   ticket and uploader.
 - **FR-018**: System MUST authenticate users before granting access to any
   ticket data or action, using a stateless token (JWT) issued at login and
-  presented on subsequent requests — no server-side session store.
+  presented on subsequent requests via an `HttpOnly` cookie — no server-side
+  session store.
 - **FR-019**: Every ticket MUST carry a priority field with values `LOW` /
   `MEDIUM` / `HIGH` / `CRITICAL` (a fixed set), settable by TICKETFLOW1-party users,
   shown on the ticket list/detail, and filterable. Priority is informational

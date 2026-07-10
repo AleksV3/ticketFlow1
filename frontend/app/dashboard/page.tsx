@@ -2,28 +2,43 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { clearSession, readSession, type StoredSession } from "@/lib/auth";
+import { fetchCurrentUser, logout, type CurrentUser } from "@/lib/auth";
 
 export default function DashboardPage() {
   const router = useRouter();
-  const [session, setSession] = useState<StoredSession | null>(null);
+  const [currentUser, setCurrentUser] = useState<CurrentUser | null>(null);
 
   useEffect(() => {
-    const storedSession = readSession();
-    if (!storedSession) {
-      router.replace("/login");
-      return;
-    }
+    let isActive = true;
 
-    setSession(storedSession);
+    fetchCurrentUser()
+      .then((user) => {
+        if (!isActive) {
+          return;
+        }
+        if (!user) {
+          router.replace("/login");
+          return;
+        }
+        setCurrentUser(user);
+      })
+      .catch(() => {
+        if (isActive) {
+          router.replace("/login");
+        }
+      });
+
+    return () => {
+      isActive = false;
+    };
   }, [router]);
 
-  function handleSignOut() {
-    clearSession();
+  async function handleSignOut() {
+    await logout();
     router.replace("/login");
   }
 
-  if (!session) {
+  if (!currentUser) {
     return (
       <main className="flex min-h-screen items-center justify-center bg-slate-100">
         <p className="text-sm text-slate-600">Loading session…</p>
@@ -55,17 +70,17 @@ export default function DashboardPage() {
         </div>
 
         <dl className="mt-8 grid gap-4 sm:grid-cols-2">
-          <InfoCard label="Name" value={session.user.displayName} />
-          <InfoCard label="Email" value={session.user.email} />
-          <InfoCard label="Role" value={session.user.roleName} />
-          <InfoCard label="Party" value={session.user.party} />
+          <InfoCard label="Name" value={currentUser.displayName} />
+          <InfoCard label="Email" value={currentUser.email} />
+          <InfoCard label="Role" value={currentUser.roleName} />
+          <InfoCard label="Party" value={currentUser.party} />
           <InfoCard
             label="Organization"
-            value={session.user.organizationName ?? "TicketFlow1 internal"}
+            value={currentUser.organizationName ?? "TicketFlow1 internal"}
           />
           <InfoCard
             label="Permissions"
-            value={session.user.permissions.length.toString()}
+            value={currentUser.permissions.length.toString()}
           />
         </dl>
       </section>

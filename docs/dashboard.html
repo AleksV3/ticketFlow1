@@ -131,7 +131,7 @@
   <section>
     <h2>Locked decisions</h2>
     <div class="cards">
-      <div class="card"><div class="k">Auth</div><div class="v">Stateless JWT</div><div class="d">Bearer token, no server session — easy to demo multiple roles at once</div></div>
+      <div class="card"><div class="k">Auth</div><div class="v">Stateless JWT</div><div class="d">JWT carried in an HttpOnly cookie, no server session — easy to demo multiple roles at once</div></div>
       <div class="card"><div class="k">Tenancy</div><div class="v">Multi-tenant</div><div class="d">Client Orgs isolated from each other; TicketFlow1-side roles work across all</div></div>
       <div class="card"><div class="k">Priority</div><div class="v">Display-only fixed set</div><div class="d">LOW/MED/HIGH/CRITICAL — filterable, does not drive SLA</div></div>
       <div class="card"><div class="k">Status model</div><div class="v">One status set + per-type maps</div><div class="d">Transition legality lives in TicketTransitionService, not scattered</div></div>
@@ -302,8 +302,8 @@ const PHASES = [
     { id: "T056", verify: 1, t: "Verify: SEV_1 due-dates immediate; backdated ticket flips to BREACHED with no job" },
   ]},
   { n: 7, title: "Frontend", goal: "Every backend capability becomes usable in a browser, for all 5 roles.", tasks: [
-    { id: "T057", t: "lib/api.ts (typed fetch + auth header + error parsing) + lib/auth.ts (JWT storage)" },
-    { id: "T058", p: 1, t: "login page → POST /auth/login, store token, redirect" },
+    { id: "T057", t: "lib/api.ts (typed fetch + credentials include + error parsing) + lib/auth.ts (cookie-aware auth helpers)" },
+    { id: "T058", p: 1, t: "login page → POST /auth/login, rely on HttpOnly auth cookie, redirect" },
     { id: "T059", p: 1, t: "Shared components: StatusBadge, SlaBadge, TransitionButtons (renders API's allowedTransitions)" },
     { id: "T060", us: [5], t: "Dashboard page — all cards from contracts/dashboard.md" },
     { id: "T061", p: 1, t: "Ticket list page with filters" },

@@ -3,6 +3,7 @@ package com.ticketflow1.ticketing.auth;
 import com.ticketflow1.ticketing.ticket.Responsibility;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.JwtException;
+import jakarta.servlet.http.Cookie;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -40,10 +41,8 @@ public class JwtAuthFilter extends OncePerRequestFilter {
             @NonNull HttpServletResponse response, @NonNull FilterChain filterChain)
             throws ServletException, IOException {
 
-        String header = request.getHeader("Authorization");
-        if (header != null && header.startsWith(BEARER_PREFIX)
-                && SecurityContextHolder.getContext().getAuthentication() == null) {
-            String token = header.substring(BEARER_PREFIX.length());
+        String token = resolveToken(request);
+        if (token != null && SecurityContextHolder.getContext().getAuthentication() == null) {
             try {
                 Claims claims = jwtService.parse(token);
                 AuthPrincipal principal = toPrincipal(claims);
@@ -61,6 +60,25 @@ public class JwtAuthFilter extends OncePerRequestFilter {
         }
 
         filterChain.doFilter(request, response);
+    }
+
+    private String resolveToken(HttpServletRequest request) {
+        String header = request.getHeader("Authorization");
+        if (header != null && header.startsWith(BEARER_PREFIX)) {
+            return header.substring(BEARER_PREFIX.length());
+        }
+
+        Cookie[] cookies = request.getCookies();
+        if (cookies == null) {
+            return null;
+        }
+
+        for (Cookie cookie : cookies) {
+            if (JwtService.AUTH_COOKIE_NAME.equals(cookie.getName()) && !cookie.getValue().isBlank()) {
+                return cookie.getValue();
+            }
+        }
+        return null;
     }
 
     private AuthPrincipal toPrincipal(Claims claims) {

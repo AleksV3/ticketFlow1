@@ -4,6 +4,8 @@ import com.ticketflow1.ticketing.auth.dto.CurrentUserResponse;
 import com.ticketflow1.ticketing.auth.dto.LoginRequest;
 import com.ticketflow1.ticketing.auth.dto.LoginResponse;
 import jakarta.validation.Valid;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -22,8 +24,18 @@ public class AuthController {
     }
 
     @PostMapping("/auth/login")
-    public LoginResponse login(@Valid @RequestBody LoginRequest request) {
-        return authService.login(request);
+    public ResponseEntity<LoginResponse> login(@Valid @RequestBody LoginRequest request) {
+        var login = authService.login(request);
+        return ResponseEntity.ok()
+                .header(HttpHeaders.SET_COOKIE, login.cookie().toString())
+                .body(login.response());
+    }
+
+    @PostMapping("/auth/logout")
+    public ResponseEntity<Void> logout() {
+        return ResponseEntity.noContent()
+                .header(HttpHeaders.SET_COOKIE, authService.clearLoginCookie().toString())
+                .build();
     }
 
     @GetMapping("/users/me")

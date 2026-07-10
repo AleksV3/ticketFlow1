@@ -5,26 +5,31 @@ All technology choices are fixed by the [constitution](../../.specify/memory/con
 This document resolves the *how*, not the *what* — the specific patterns and
 libraries used to implement the constitution's fixed stack correctly.
 
-## Authentication: stateless JWT
+## Authentication: stateless JWT in `HttpOnly` cookie
 
 **Decision**: Spring Security with a custom `OncePerRequestFilter` that
-validates a `Bearer` JWT on every request, backed by `io.jsonwebtoken` (jjwt)
-for signing/parsing. Passwords hashed with BCrypt (`BCryptPasswordEncoder`).
-The JWT carries the user's `party`, `organizationId`, and the set of
-**permission** authorities resolved from its role. No refresh tokens for MVP —
-access token expiry set generously (e.g. 8 hours) since this is an internal
-demo tool.
+validates a JWT on every request, backed by `io.jsonwebtoken` (jjwt) for
+signing/parsing. The JWT is issued at login and delivered to the browser in an
+`HttpOnly` cookie rather than exposed to frontend JavaScript. Passwords hashed
+with BCrypt (`BCryptPasswordEncoder`). The JWT carries the user's `party`,
+`organizationId`, and the set of **permission** authorities resolved from its
+role. No refresh tokens for MVP — access token expiry set generously (e.g. 8
+hours) since this is an internal demo tool.
 
 **Rationale**: Resolved in spec clarification (FR-018). JWT needs no
-server-side session store and lets the demo/dev workflow log in as multiple
-roles in parallel browser tabs/Postman without session collision. Standard,
-well-documented Spring Security integration path — good learning value for
-understanding filter chains.
+server-side session store while avoiding token exposure through
+`localStorage`/`sessionStorage`. Cookie delivery still lets the demo/dev
+workflow log in as multiple roles in parallel browser profiles/Postman without
+building a server-side session store. Standard, well-documented Spring
+Security integration path — good learning value for understanding filter
+chains.
 
-**Alternatives considered**: Server-side session + cookie — rejected because
-juggling several roles simultaneously during development is more awkward with
-sticky sessions, and a JWT filter forces understanding of the whole filter
-chain explicitly. Rejected.
+**Alternatives considered**: Server-side session + cookie — rejected because it
+adds server-side session state we do not need for the MVP, while the same UX
+goal is satisfied by a stateless JWT carried in a cookie. Exposing the JWT to
+frontend JavaScript via `localStorage` or an in-memory bearer-token pattern was
+rejected because the token should not be script-readable when a secure
+`HttpOnly` delivery path is available.
 
 ## Authorization: permission authorities + config-driven transition engine
 

@@ -8,6 +8,7 @@ import com.ticketflow1.ticketing.organization.Organization;
 import com.ticketflow1.ticketing.rbac.Permission;
 import com.ticketflow1.ticketing.user.AppUser;
 import com.ticketflow1.ticketing.user.AppUserRepository;
+import org.springframework.http.ResponseCookie;
 import java.util.Set;
 import java.util.stream.Collectors;
 import org.springframework.http.HttpStatus;
@@ -30,7 +31,7 @@ public class AuthService {
     }
 
     @Transactional(readOnly = true)
-    public LoginResponse login(LoginRequest request) {
+    public LoginResult login(LoginRequest request) {
         // Same 401 message for every failure mode (unknown email, wrong password,
         // inactive account, deactivated org) so we never leak which one failed.
         AppUser user = userRepository.findByEmail(request.email())
@@ -49,7 +50,13 @@ public class AuthService {
         var summary = new LoginResponse.UserSummary(
                 user.getId(), user.getEmail(), user.getDisplayName(),
                 user.getRole().getName(), user.getParty(), orgId);
-        return new LoginResponse(issued.token(), issued.expiresAt(), summary);
+        return new LoginResult(
+                new LoginResponse(issued.expiresAt(), summary),
+                jwtService.buildAuthCookie(issued.token()));
+    }
+
+    public ResponseCookie clearLoginCookie() {
+        return jwtService.clearAuthCookie();
     }
 
     @Transactional(readOnly = true)
@@ -70,5 +77,8 @@ public class AuthService {
 
     private static ApiException invalidCredentials() {
         return new ApiException(HttpStatus.UNAUTHORIZED, "UNAUTHENTICATED", "Invalid email or password.");
+    }
+
+    public record LoginResult(LoginResponse response, ResponseCookie cookie) {
     }
 }

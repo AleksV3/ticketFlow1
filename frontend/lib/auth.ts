@@ -1,12 +1,9 @@
-export const AUTH_STORAGE_KEY = "ticketflow1.auth";
-
 export type LoginRequest = {
   email: string;
   password: string;
 };
 
 export type LoginResponse = {
-  token: string;
   expiresAt: string;
   user: {
     id: number;
@@ -29,34 +26,29 @@ export type CurrentUser = {
   permissions: string[];
 };
 
-export type StoredSession = {
-  token: string;
-  expiresAt: string;
-  user: CurrentUser;
-};
-
 export function getApiBaseUrl(): string {
   return process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8081/api";
 }
 
-export function storeSession(session: StoredSession): void {
-  window.localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(session));
-}
+export async function fetchCurrentUser(): Promise<CurrentUser | null> {
+  const response = await fetch(`${getApiBaseUrl()}/users/me`, {
+    credentials: "include"
+  });
 
-export function readSession(): StoredSession | null {
-  const raw = window.localStorage.getItem(AUTH_STORAGE_KEY);
-  if (!raw) {
+  if (response.status === 401) {
     return null;
   }
 
-  try {
-    return JSON.parse(raw) as StoredSession;
-  } catch {
-    window.localStorage.removeItem(AUTH_STORAGE_KEY);
-    return null;
+  if (!response.ok) {
+    throw new Error("Could not load the current user.");
   }
+
+  return (await response.json()) as CurrentUser;
 }
 
-export function clearSession(): void {
-  window.localStorage.removeItem(AUTH_STORAGE_KEY);
+export async function logout(): Promise<void> {
+  await fetch(`${getApiBaseUrl()}/auth/logout`, {
+    method: "POST",
+    credentials: "include"
+  });
 }

@@ -12,6 +12,7 @@ import java.util.Date;
 import java.util.stream.Collectors;
 import javax.crypto.SecretKey;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.ResponseCookie;
 import org.springframework.stereotype.Service;
 
 /**
@@ -23,6 +24,8 @@ import org.springframework.stereotype.Service;
  */
 @Service
 public class JwtService {
+
+    public static final String AUTH_COOKIE_NAME = "ticketflow1_auth";
 
     private final SecretKey key;
     private final Duration expiration;
@@ -53,6 +56,26 @@ public class JwtService {
                 .signWith(key)
                 .compact();
         return new IssuedToken(token, expiresAt);
+    }
+
+    public ResponseCookie buildAuthCookie(String token) {
+        return ResponseCookie.from(AUTH_COOKIE_NAME, token)
+                .httpOnly(true)
+                .secure(false)
+                .sameSite("Lax")
+                .path("/")
+                .maxAge(expiration)
+                .build();
+    }
+
+    public ResponseCookie clearAuthCookie() {
+        return ResponseCookie.from(AUTH_COOKIE_NAME, "")
+                .httpOnly(true)
+                .secure(false)
+                .sameSite("Lax")
+                .path("/")
+                .maxAge(Duration.ZERO)
+                .build();
     }
 
     /** Parses and verifies the signature/expiry. Throws JwtException if invalid. */

@@ -17,20 +17,21 @@ No auth required.
 
 ```json
 {
-  "token": "eyJhbGciOi...",
   "expiresAt": "2026-07-02T18:15:30Z",
   "user": {
     "id": 41,
     "email": "approver@clientco.com",
     "displayName": "Jane Client",
     "party": "CLIENT",
-    "roleId": 7,
     "roleName": "Client Approver",
-    "permissions": ["TICKET_READ", "TICKET_CREATE", "COMMENT_PUBLIC_WRITE", "PROPOSAL_APPROVE"],
     "organizationId": 3
   }
 }
 ```
+
+The backend also sets an `HttpOnly` auth cookie containing the JWT. The
+frontend must authenticate subsequent requests with `credentials: 'include'`,
+not by storing or attaching the token in JavaScript.
 
 The `permissions` array is the resolved permission set the client uses to show
 or hide controls; the server independently enforces the same permissions on
@@ -39,6 +40,12 @@ every request, so a hidden control is never the only guard.
 **Errors**: `400 VALIDATION_FAILED` (missing fields), `401 UNAUTHENTICATED`
 (bad credentials or inactive account — same message for both, standard
 practice to avoid leaking which one failed).
+
+## `POST /api/auth/logout`
+
+Clears the `HttpOnly` auth cookie.
+
+**Response `204`**: no body.
 
 ## `GET /api/users/me`
 
@@ -50,7 +57,6 @@ practice to avoid leaking which one failed).
   "email": "approver@clientco.com",
   "displayName": "Jane Client",
   "party": "CLIENT",
-  "roleId": 7,
   "roleName": "Client Approver",
   "permissions": ["TICKET_READ", "TICKET_CREATE", "COMMENT_PUBLIC_WRITE", "PROPOSAL_APPROVE"],
   "organizationId": 3,

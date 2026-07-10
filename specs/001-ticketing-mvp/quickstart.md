@@ -89,8 +89,8 @@ npm run dev
 ```
 
 Open `http://localhost:3000/login`, log in as each seeded demo role in turn
-(separate browser profiles or incognito windows, since JWT is stored
-client-side per session), and confirm the dashboard and ticket list render
+(separate browser profiles or incognito windows, since auth rides on an
+`HttpOnly` cookie scoped to the browser session), and confirm the dashboard and ticket list render
 without console errors, and that only role-appropriate transition buttons
 appear on a ticket detail page (`allowedTransitions` from
 [contracts/tickets.md](contracts/tickets.md) drives this — never

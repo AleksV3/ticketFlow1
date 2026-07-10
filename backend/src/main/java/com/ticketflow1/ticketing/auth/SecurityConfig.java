@@ -24,6 +24,7 @@ class SecurityConfig {
 
     private static final String[] PUBLIC_PATHS = {
         "/api/auth/login",
+        "/api/auth/logout",
         "/swagger-ui.html",
         "/swagger-ui/**",
         "/v3/api-docs/**"
@@ -44,7 +45,7 @@ class SecurityConfig {
     @Bean
     SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         http
-            // Stateless JWT API: no CSRF tokens, no server session.
+            // Stateless JWT API stored in an HttpOnly cookie.
             .csrf(AbstractHttpConfigurer::disable)
             // CORS must be handled INSIDE the security chain (and before auth):
             // the browser's OPTIONS preflight carries no Authorization header,
@@ -82,10 +83,8 @@ class SecurityConfig {
      * for the single-machine case. Widen this list if your network uses a
      * different private range (10.x.x.x, 172.16-31.x.x).
      *
-     * allowCredentials stays false: we authenticate with a Bearer HEADER the
-     * frontend attaches explicitly, not with cookies the browser attaches
-     * automatically. Credentials-mode CORS (and its stricter rules) is only
-     * needed for the cookie case.
+     * allowCredentials must be true because auth now rides on an HttpOnly
+     * cookie attached by the browser.
      */
     @Bean
     CorsConfigurationSource corsConfigurationSource() {
@@ -95,7 +94,7 @@ class SecurityConfig {
                 "http://192.168.*.*:3000"));
         config.setAllowedMethods(List.of("GET", "POST", "PATCH", "DELETE", "OPTIONS"));
         config.setAllowedHeaders(List.of("Authorization", "Content-Type"));
-        config.setAllowCredentials(false);
+        config.setAllowCredentials(true);
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
         source.registerCorsConfiguration("/api/**", config);
         return source;
