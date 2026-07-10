@@ -5,6 +5,8 @@ import com.ticketflow1.ticketing.common.PagedResponse;
 import com.ticketflow1.ticketing.ticket.dto.CreateTicketRequest;
 import com.ticketflow1.ticketing.ticket.dto.TicketDetailResponse;
 import com.ticketflow1.ticketing.ticket.dto.TicketSummaryResponse;
+import com.ticketflow1.ticketing.ticket.dto.TransitionTicketRequest;
+import com.ticketflow1.ticketing.workflow.TicketTransitionService;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -23,9 +25,11 @@ import org.springframework.web.bind.annotation.RestController;
 public class TicketController {
 
     private final TicketService ticketService;
+    private final TicketTransitionService ticketTransitionService;
 
-    public TicketController(TicketService ticketService) {
+    public TicketController(TicketService ticketService, TicketTransitionService ticketTransitionService) {
         this.ticketService = ticketService;
+        this.ticketTransitionService = ticketTransitionService;
     }
 
     @GetMapping
@@ -60,5 +64,13 @@ public class TicketController {
     public TicketDetailResponse getByTicketKey(@PathVariable String ticketKey,
             @AuthenticationPrincipal AuthPrincipal principal) {
         return ticketService.getTicket(ticketKey, principal);
+    }
+
+    @PostMapping("/{ticketKey}/transition")
+    @PreAuthorize("hasAuthority('TICKET_TRANSITION')")
+    public TicketDetailResponse transition(@PathVariable String ticketKey,
+            @Valid @RequestBody TransitionTicketRequest request,
+            @AuthenticationPrincipal AuthPrincipal principal) {
+        return ticketTransitionService.transition(ticketKey, request.toStatus(), request.comment(), principal);
     }
 }

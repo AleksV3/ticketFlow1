@@ -15,6 +15,7 @@ import com.ticketflow1.ticketing.user.AppUser;
 import com.ticketflow1.ticketing.user.AppUserRepository;
 import com.ticketflow1.ticketing.workflow.TicketType;
 import com.ticketflow1.ticketing.workflow.TicketTypeRepository;
+import com.ticketflow1.ticketing.workflow.TicketTransitionService;
 import com.ticketflow1.ticketing.workflow.WorkflowState;
 import com.ticketflow1.ticketing.workflow.WorkflowStateRepository;
 import java.util.List;
@@ -40,6 +41,7 @@ public class TicketService {
     private final TicketKeyGenerator ticketKeyGenerator;
     private final AuditService auditService;
     private final StatusHistoryService statusHistoryService;
+    private final TicketTransitionService ticketTransitionService;
 
     public TicketService(TicketRepository ticketRepository,
             TicketTypeRepository ticketTypeRepository,
@@ -48,7 +50,8 @@ public class TicketService {
             OrganizationRepository organizationRepository,
             TicketKeyGenerator ticketKeyGenerator,
             AuditService auditService,
-            StatusHistoryService statusHistoryService) {
+            StatusHistoryService statusHistoryService,
+            TicketTransitionService ticketTransitionService) {
         this.ticketRepository = ticketRepository;
         this.ticketTypeRepository = ticketTypeRepository;
         this.workflowStateRepository = workflowStateRepository;
@@ -57,6 +60,7 @@ public class TicketService {
         this.ticketKeyGenerator = ticketKeyGenerator;
         this.auditService = auditService;
         this.statusHistoryService = statusHistoryService;
+        this.ticketTransitionService = ticketTransitionService;
     }
 
     @Transactional
@@ -91,12 +95,13 @@ public class TicketService {
         Ticket saved = ticketRepository.saveAndFlush(ticket);
         auditService.record(saved, actor.getId(), AuditAction.TICKET_CREATED);
         statusHistoryService.record(saved, null, initialState, actor.getId());
-        return TicketDetailResponse.from(saved, List.of());
+        return TicketDetailResponse.from(saved, ticketTransitionService.allowedTransitions(saved, principal));
     }
 
     @Transactional(readOnly = true)
     public TicketDetailResponse getTicket(String ticketKey, AuthPrincipal principal) {
-        return TicketDetailResponse.from(findVisibleTicket(ticketKey, principal), List.of());
+        Ticket ticket = findVisibleTicket(ticketKey, principal);
+        return TicketDetailResponse.from(ticket, ticketTransitionService.allowedTransitions(ticket, principal));
     }
 
     @Transactional(readOnly = true)

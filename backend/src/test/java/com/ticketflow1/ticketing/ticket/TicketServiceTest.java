@@ -20,10 +20,12 @@ import com.ticketflow1.ticketing.user.AppUser;
 import com.ticketflow1.ticketing.user.AppUserRepository;
 import com.ticketflow1.ticketing.workflow.TicketType;
 import com.ticketflow1.ticketing.workflow.TicketTypeRepository;
+import com.ticketflow1.ticketing.workflow.TicketTransitionService;
 import com.ticketflow1.ticketing.workflow.Workflow;
 import com.ticketflow1.ticketing.workflow.WorkflowState;
 import com.ticketflow1.ticketing.workflow.WorkflowStateRepository;
 import java.time.Instant;
+import java.util.List;
 import java.util.Set;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -54,13 +56,16 @@ class TicketServiceTest {
     private AuditService auditService;
     @Mock
     private StatusHistoryService statusHistoryService;
+    @Mock
+    private TicketTransitionService ticketTransitionService;
 
     private TicketService ticketService;
 
     @BeforeEach
     void setUp() {
         ticketService = new TicketService(ticketRepository, ticketTypeRepository, workflowStateRepository,
-                appUserRepository, organizationRepository, ticketKeyGenerator, auditService, statusHistoryService);
+                appUserRepository, organizationRepository, ticketKeyGenerator, auditService,
+                statusHistoryService, ticketTransitionService);
     }
 
     @ParameterizedTest
@@ -87,6 +92,8 @@ class TicketServiceTest {
         when(workflowStateRepository.findByWorkflowIdAndInitialTrue(workflow.getId()))
                 .thenReturn(java.util.Optional.of(initialState));
         when(ticketKeyGenerator.nextKey()).thenReturn("TF-1001");
+        when(ticketTransitionService.allowedTransitions(any(Ticket.class), eq(principal)))
+                .thenReturn(List.of("ANALYSIS"));
         when(ticketRepository.saveAndFlush(any(Ticket.class))).thenAnswer(invocation -> {
             Ticket saved = invocation.getArgument(0);
             ReflectionTestUtils.setField(saved, "id", 501L);
@@ -107,6 +114,7 @@ class TicketServiceTest {
         assertThat(savedTicket.getSeverity()).isEqualTo(defectType ? Severity.SEV_2 : null);
         assertThat(response.status()).isEqualTo(initialStateKey);
         assertThat(response.type()).isEqualTo(typeKey);
+        assertThat(response.allowedTransitions()).containsExactly("ANALYSIS");
 
         verify(auditService).record(savedTicket, actor.getId(), AuditAction.TICKET_CREATED);
         verify(statusHistoryService).record(savedTicket, null, initialState, actor.getId());
