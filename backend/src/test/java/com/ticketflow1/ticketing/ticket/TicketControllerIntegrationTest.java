@@ -1,5 +1,6 @@
 package com.ticketflow1.ticketing.ticket;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -292,6 +293,77 @@ class TicketControllerIntegrationTest {
                 .andExpect(jsonPath("$.error").value("VALIDATION_FAILED"));
     }
 
+    @Test
+    void commentAuditFeedIsPrivacySafe_andAuditFailureRollsBackComment() throws Exception {
+        Cookie clientCookie = login("client-a@demo.test", "client123");
+        Cookie internalCookie = login("admin@ticketflow1.demo", "admin123");
+        String ticketKey = createTicket(clientCookie, """
+                {
+                  "type":"TASK",
+                  "title":"Audit privacy test",
+                  "description":"Internal events must not leak",
+                  "priority":"MEDIUM"
+                }
+                """, "SUBMITTED");
+
+        mockMvc.perform(post("/api/tickets/{ticketKey}/comments", ticketKey)
+                        .cookie(clientCookie)
+                        .contentType("application/json")
+                        .content("""
+                                {"body":"Public audit comment","visibility":"PUBLIC"}
+                                """))
+                .andExpect(status().isCreated());
+        mockMvc.perform(post("/api/tickets/{ticketKey}/comments", ticketKey)
+                        .cookie(internalCookie)
+                        .contentType("application/json")
+                        .content("""
+                                {"body":"Sensitive internal body","visibility":"INTERNAL"}
+                                """))
+                .andExpect(status().isCreated());
+
+        MvcResult clientAudit = mockMvc.perform(get("/api/tickets/{ticketKey}/audit-log", ticketKey)
+                        .cookie(clientCookie))
+                .andExpect(status().isOk())
+                .andReturn();
+        assertThat(countActions(clientAudit, "COMMENT_ADDED")).isEqualTo(1);
+        assertThat(clientAudit.getResponse().getContentAsString())
+                .doesNotContain("Sensitive internal body", "INTERNAL");
+
+        MvcResult internalAudit = mockMvc.perform(get("/api/tickets/{ticketKey}/audit-log", ticketKey)
+                        .cookie(internalCookie))
+                .andExpect(status().isOk())
+                .andReturn();
+        assertThat(countActions(internalAudit, "COMMENT_ADDED")).isEqualTo(2);
+        assertThat(internalAudit.getResponse().getContentAsString()).doesNotContain("Sensitive internal body");
+
+        Integer beforeCount = jdbcTemplate.queryForObject("""
+                SELECT count(*) FROM comment c
+                JOIN ticket t ON t.id = c.ticket_id
+                WHERE t.ticket_key = ?
+                """, Integer.class, ticketKey);
+        jdbcTemplate.execute("""
+                ALTER TABLE audit_log ADD CONSTRAINT test_reject_comment_audit
+                CHECK (action <> 'COMMENT_ADDED') NOT VALID
+                """);
+        try {
+            mockMvc.perform(post("/api/tickets/{ticketKey}/comments", ticketKey)
+                            .cookie(clientCookie)
+                            .contentType("application/json")
+                            .content("""
+                                    {"body":"Must roll back","visibility":"PUBLIC"}
+                                    """))
+                    .andExpect(status().isInternalServerError());
+        } finally {
+            jdbcTemplate.execute("ALTER TABLE audit_log DROP CONSTRAINT test_reject_comment_audit");
+        }
+        Integer afterCount = jdbcTemplate.queryForObject("""
+                SELECT count(*) FROM comment c
+                JOIN ticket t ON t.id = c.ticket_id
+                WHERE t.ticket_key = ?
+                """, Integer.class, ticketKey);
+        assertThat(afterCount).isEqualTo(beforeCount);
+    }
+
     private Cookie login(String email, String password) throws Exception {
         MvcResult result = mockMvc.perform(post("/api/auth/login")
                         .contentType("application/json")
@@ -304,6 +376,17 @@ class TicketControllerIntegrationTest {
                 .andExpect(status().isOk())
                 .andReturn();
         return result.getResponse().getCookie("ticketflow1_auth");
+    }
+
+    private long countActions(MvcResult result, String action) throws Exception {
+        JsonNode body = objectMapper.readTree(result.getResponse().getContentAsString());
+        long count = 0;
+        for (JsonNode entry : body) {
+            if (action.equals(entry.path("action").asText())) {
+                count++;
+            }
+        }
+        return count;
     }
 
     private String createTicket(Cookie authCookie, String body, String expectedInitialState) throws Exception {

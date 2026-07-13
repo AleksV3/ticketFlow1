@@ -47,6 +47,9 @@ public class AuditService {
     public List<AuditLogResponse> list(String ticketKey, AuthPrincipal principal) {
         Ticket ticket = findVisibleTicket(ticketKey, principal);
         return auditLogRepository.findByTicketIdOrderByCreatedAtAsc(ticket.getId()).stream()
+                .filter(entry -> principal.hasPermission("COMMENT_INTERNAL_READ")
+                        || entry.getAction() != AuditAction.COMMENT_ADDED
+                        || !"INTERNAL".equals(entry.getOldValue()))
                 .map(AuditLogResponse::from)
                 .toList();
     }
