@@ -12,6 +12,7 @@ import com.ticketflow1.ticketing.audit.AuditService;
 import com.ticketflow1.ticketing.auth.AuthPrincipal;
 import com.ticketflow1.ticketing.organization.Organization;
 import com.ticketflow1.ticketing.organization.OrganizationRepository;
+import com.ticketflow1.ticketing.proposal.ProposalDetailService;
 import com.ticketflow1.ticketing.rbac.Role;
 import com.ticketflow1.ticketing.statushistory.StatusHistoryService;
 import com.ticketflow1.ticketing.ticket.dto.CreateTicketRequest;
@@ -58,6 +59,7 @@ class TicketServiceTest {
     private StatusHistoryService statusHistoryService;
     @Mock
     private TicketTransitionService ticketTransitionService;
+    @Mock private ProposalDetailService proposalDetailService;
 
     private TicketService ticketService;
 
@@ -65,7 +67,7 @@ class TicketServiceTest {
     void setUp() {
         ticketService = new TicketService(ticketRepository, ticketTypeRepository, workflowStateRepository,
                 appUserRepository, organizationRepository, ticketKeyGenerator, auditService,
-                statusHistoryService, ticketTransitionService);
+                statusHistoryService, ticketTransitionService, proposalDetailService);
     }
 
     @ParameterizedTest

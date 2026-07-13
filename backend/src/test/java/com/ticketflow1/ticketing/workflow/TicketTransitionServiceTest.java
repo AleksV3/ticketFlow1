@@ -15,6 +15,7 @@ import com.ticketflow1.ticketing.comment.CommentService;
 import com.ticketflow1.ticketing.comment.CommentVisibility;
 import com.ticketflow1.ticketing.common.IllegalTransitionException;
 import com.ticketflow1.ticketing.organization.Organization;
+import com.ticketflow1.ticketing.proposal.ProposalDetailService;
 import com.ticketflow1.ticketing.rbac.Permission;
 import com.ticketflow1.ticketing.rbac.Role;
 import com.ticketflow1.ticketing.statushistory.StatusHistoryService;
@@ -56,13 +57,15 @@ class TicketTransitionServiceTest {
     private StatusHistoryService statusHistoryService;
     @Mock
     private CommentService commentService;
+    @Mock private ProposalDetailService proposalDetailService;
 
     private TicketTransitionService ticketTransitionService;
 
     @BeforeEach
     void setUp() {
         ticketTransitionService = new TicketTransitionService(ticketRepository, workflowStateRepository,
-                workflowTransitionRepository, appUserRepository, auditService, statusHistoryService, commentService);
+                workflowTransitionRepository, appUserRepository, auditService, statusHistoryService, commentService,
+                proposalDetailService);
     }
 
     @ParameterizedTest
@@ -132,7 +135,6 @@ class TicketTransitionServiceTest {
 
         when(ticketRepository.findByTicketKey(fixture.ticket().getTicketKey()))
                 .thenReturn(java.util.Optional.of(fixture.ticket()));
-        when(appUserRepository.findById(fixture.actor().getId())).thenReturn(java.util.Optional.of(fixture.actor()));
         when(workflowStateRepository.findByWorkflowIdAndKey(fixture.workflow().getId(), "DEVELOPMENT"))
                 .thenReturn(java.util.Optional.of(workflowState(77L, fixture.workflow(), "DEVELOPMENT", false)));
         when(workflowTransitionRepository.findByWorkflowIdAndFromStateIdAndToStateId(
@@ -163,6 +165,7 @@ class TicketTransitionServiceTest {
 
     private void stubSuccessPath(Fixture fixture, AuthPrincipal principal, String toKey) {
         stubLookupPath(fixture, principal, toKey);
+        when(appUserRepository.findById(fixture.actor().getId())).thenReturn(java.util.Optional.of(fixture.actor()));
         when(ticketRepository.save(any(Ticket.class))).thenAnswer(invocation -> invocation.getArgument(0));
         when(workflowTransitionRepository.findByWorkflowIdAndFromStateId(fixture.workflow().getId(),
                 fixture.toState().getId())).thenReturn(List.of());
@@ -177,7 +180,6 @@ class TicketTransitionServiceTest {
             when(ticketRepository.findByTicketKey(fixture.ticket().getTicketKey()))
                     .thenReturn(java.util.Optional.of(fixture.ticket()));
         }
-        when(appUserRepository.findById(fixture.actor().getId())).thenReturn(java.util.Optional.of(fixture.actor()));
         when(workflowStateRepository.findByWorkflowIdAndKey(fixture.workflow().getId(), toKey))
                 .thenReturn(java.util.Optional.of(fixture.toState()));
         when(workflowTransitionRepository.findByWorkflowIdAndFromStateIdAndToStateId(

@@ -7,6 +7,7 @@ import com.ticketflow1.ticketing.common.ApiException;
 import com.ticketflow1.ticketing.common.PagedResponse;
 import com.ticketflow1.ticketing.organization.Organization;
 import com.ticketflow1.ticketing.organization.OrganizationRepository;
+import com.ticketflow1.ticketing.proposal.ProposalDetailService;
 import com.ticketflow1.ticketing.statushistory.StatusHistoryService;
 import com.ticketflow1.ticketing.ticket.dto.CreateTicketRequest;
 import com.ticketflow1.ticketing.ticket.dto.TicketDetailResponse;
@@ -43,6 +44,7 @@ public class TicketService {
     private final AuditService auditService;
     private final StatusHistoryService statusHistoryService;
     private final TicketTransitionService ticketTransitionService;
+    private final ProposalDetailService proposalDetailService;
 
     public TicketService(TicketRepository ticketRepository,
             TicketTypeRepository ticketTypeRepository,
@@ -52,7 +54,8 @@ public class TicketService {
             TicketKeyGenerator ticketKeyGenerator,
             AuditService auditService,
             StatusHistoryService statusHistoryService,
-            TicketTransitionService ticketTransitionService) {
+            TicketTransitionService ticketTransitionService,
+            ProposalDetailService proposalDetailService) {
         this.ticketRepository = ticketRepository;
         this.ticketTypeRepository = ticketTypeRepository;
         this.workflowStateRepository = workflowStateRepository;
@@ -62,6 +65,7 @@ public class TicketService {
         this.auditService = auditService;
         this.statusHistoryService = statusHistoryService;
         this.ticketTransitionService = ticketTransitionService;
+        this.proposalDetailService = proposalDetailService;
     }
 
     @Transactional
@@ -96,13 +100,13 @@ public class TicketService {
         Ticket saved = ticketRepository.saveAndFlush(ticket);
         auditService.record(saved, actor.getId(), AuditAction.TICKET_CREATED);
         statusHistoryService.record(saved, null, initialState, actor.getId());
-        return TicketDetailResponse.from(saved, ticketTransitionService.allowedTransitions(saved, principal));
+        return detail(saved, principal);
     }
 
     @Transactional(readOnly = true)
     public TicketDetailResponse getTicket(String ticketKey, AuthPrincipal principal) {
         Ticket ticket = findVisibleTicket(ticketKey, principal);
-        return TicketDetailResponse.from(ticket, ticketTransitionService.allowedTransitions(ticket, principal));
+        return detail(ticket, principal);
     }
 
     @Transactional
@@ -188,7 +192,7 @@ public class TicketService {
         }
 
         Ticket saved = changed ? ticketRepository.save(ticket) : ticket;
-        return TicketDetailResponse.from(saved, ticketTransitionService.allowedTransitions(saved, principal));
+        return detail(saved, principal);
     }
 
     @Transactional(readOnly = true)
@@ -256,6 +260,11 @@ public class TicketService {
         }
         return ticketRepository.findByTicketKey(ticketKey)
                 .orElseThrow(() -> ApiException.notFound("Ticket not found: " + ticketKey));
+    }
+
+    private TicketDetailResponse detail(Ticket ticket, AuthPrincipal principal) {
+        return TicketDetailResponse.from(ticket, ticketTransitionService.allowedTransitions(ticket, principal),
+                proposalDetailService.detail(ticket, principal));
     }
 
     private Organization resolveOrganization(AppUser actor, AuthPrincipal principal, Long organizationId) {

@@ -6,6 +6,8 @@ import com.ticketflow1.ticketing.ticket.Ticket;
 import com.ticketflow1.ticketing.user.AppUser;
 import java.time.Instant;
 import java.util.List;
+import com.ticketflow1.ticketing.proposal.ProposalDetailService.ProposalDetail;
+import com.ticketflow1.ticketing.proposal.dto.ChangeProposalResponse;
 
 @JsonInclude(JsonInclude.Include.NON_NULL)
 public record TicketDetailResponse(
@@ -26,9 +28,11 @@ public record TicketDetailResponse(
         Instant updatedAt,
         Instant closedAt,
         SlaRef sla,
-        List<String> allowedTransitions) {
+        List<String> allowedTransitions,
+        ChangeProposalResponse latestProposal,
+        List<String> proposalCommands) {
 
-    public static TicketDetailResponse from(Ticket ticket, List<String> allowedTransitions) {
+    public static TicketDetailResponse from(Ticket ticket, List<String> allowedTransitions, ProposalDetail proposal) {
         return new TicketDetailResponse(
                 ticket.getId(),
                 ticket.getTicketKey(),
@@ -47,7 +51,9 @@ public record TicketDetailResponse(
                 ticket.getUpdatedAt(),
                 ticket.getClosedAt(),
                 null,
-                allowedTransitions);
+                allowedTransitions,
+                proposal == null ? null : proposal.latestProposal(),
+                proposal == null ? List.of() : proposal.permittedCommands());
     }
 
     public record OrganizationRef(Long id, String name) {

@@ -5,6 +5,7 @@ import com.ticketflow1.ticketing.audit.AuditService;
 import com.ticketflow1.ticketing.auth.AuthPrincipal;
 import com.ticketflow1.ticketing.comment.CommentService;
 import com.ticketflow1.ticketing.comment.CommentVisibility;
+import com.ticketflow1.ticketing.proposal.ProposalDetailService;
 import com.ticketflow1.ticketing.common.ApiException;
 import com.ticketflow1.ticketing.common.IllegalTransitionException;
 import com.ticketflow1.ticketing.statushistory.StatusHistoryService;
@@ -28,6 +29,7 @@ public class TicketTransitionService {
     private final AuditService auditService;
     private final StatusHistoryService statusHistoryService;
     private final CommentService commentService;
+    private final ProposalDetailService proposalDetailService;
 
     public TicketTransitionService(TicketRepository ticketRepository,
             WorkflowStateRepository workflowStateRepository,
@@ -35,7 +37,8 @@ public class TicketTransitionService {
             AppUserRepository appUserRepository,
             AuditService auditService,
             StatusHistoryService statusHistoryService,
-            CommentService commentService) {
+            CommentService commentService,
+            ProposalDetailService proposalDetailService) {
         this.ticketRepository = ticketRepository;
         this.workflowStateRepository = workflowStateRepository;
         this.workflowTransitionRepository = workflowTransitionRepository;
@@ -43,6 +46,7 @@ public class TicketTransitionService {
         this.auditService = auditService;
         this.statusHistoryService = statusHistoryService;
         this.commentService = commentService;
+        this.proposalDetailService = proposalDetailService;
     }
 
     @Transactional
@@ -53,7 +57,8 @@ public class TicketTransitionService {
         if (comment != null && !comment.isBlank()) {
             commentService.createForTicket(saved, comment, CommentVisibility.PUBLIC, principal);
         }
-        return TicketDetailResponse.from(saved, allowedTransitions(saved, principal));
+        return TicketDetailResponse.from(saved, allowedTransitions(saved, principal),
+                proposalDetailService.detail(saved, principal));
     }
 
     @Transactional

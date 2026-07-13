@@ -16,6 +16,10 @@ import com.ticketflow1.ticketing.rbac.RoleRepository;
 import com.ticketflow1.ticketing.user.AppUser;
 import com.ticketflow1.ticketing.user.AppUserRepository;
 import jakarta.servlet.http.Cookie;
+import jakarta.persistence.EntityManagerFactory;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -23,6 +27,8 @@ import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMock
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
@@ -63,6 +69,8 @@ class TicketControllerIntegrationTest {
     private PasswordEncoder passwordEncoder;
     @Autowired
     private ChangeProposalRepository changeProposalRepository;
+    @Autowired private EntityManagerFactory entityManagerFactory;
+    @Autowired private PlatformTransactionManager transactionManager;
 
     @BeforeEach
     void ensureClientUsersExist() {
@@ -92,6 +100,12 @@ class TicketControllerIntegrationTest {
                     .filter(r -> "Client Approver".equals(r.getName())).findFirst().orElseThrow();
             appUserRepository.save(new AppUser("approver-a@demo.test", passwordEncoder.encode("client123"),
                     "Client A Approver", Responsibility.CLIENT, role, role.getOrganization()));
+        }
+        if (!appUserRepository.existsByEmailIgnoreCase("approver-b@demo.test")) {
+            Role role = roleRepository.findByOrganizationId(orgB.getId()).stream()
+                    .filter(r -> "Client Approver".equals(r.getName())).findFirst().orElseThrow();
+            appUserRepository.save(new AppUser("approver-b@demo.test", passwordEncoder.encode("client123"),
+                    "Client B Approver", Responsibility.CLIENT, role, role.getOrganization()));
         }
     }
 
@@ -437,6 +451,121 @@ class TicketControllerIntegrationTest {
                 .andExpect(status().isOk()).andExpect(jsonPath("$.status").value("APPROVED"));
         mockMvc.perform(get("/api/tickets/{ticketKey}", ticketKey).cookie(client))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.status").value("PROPOSAL_APPROVED"));
+    }
+
+    @Test
+    void proposalPermissionsIsolationDuplicateAndRollbackBoundaries() throws Exception {
+        Cookie client = login("client-a@demo.test", "client123");
+        Cookie internal = login("admin@ticketflow1.demo", "admin123");
+        Cookie approverA = login("approver-a@demo.test", "client123");
+        Cookie approverB = login("approver-b@demo.test", "client123");
+        String ticketKey = createTicket(client, """
+                {"type":"CHANGE_REQUEST","title":"Proposal boundaries","description":"Boundary test","priority":"MEDIUM"}
+                """, "SUBMITTED");
+        transition(ticketKey, "ANALYSIS", internal, status().isOk());
+
+        mockMvc.perform(get("/api/tickets/{ticketKey}", ticketKey).cookie(internal))
+                .andExpect(jsonPath("$.proposalCommands[0]").value("CREATE"))
+                .andExpect(jsonPath("$.allowedTransitions").isArray());
+        MvcResult created = createProposal(ticketKey, internal, "Boundary proposal", status().isCreated());
+        long proposalId = objectMapper.readTree(created.getResponse().getContentAsString()).get("id").asLong();
+        createProposal(ticketKey, internal, "Duplicate", status().isConflict());
+        mockMvc.perform(get("/api/tickets/{ticketKey}", ticketKey).cookie(approverA))
+                .andExpect(jsonPath("$.proposalCommands[0]").value("APPROVE"))
+                .andExpect(jsonPath("$.proposalCommands[1]").value("REJECT"))
+                .andExpect(jsonPath("$.latestProposal.id").value(proposalId));
+        mockMvc.perform(post("/api/proposals/{id}/approve", proposalId).cookie(approverB)
+                        .contentType("application/json").content("{}"))
+                .andExpect(status().isNotFound());
+        mockMvc.perform(post("/api/proposals/{id}/reject", proposalId).cookie(approverA)
+                        .contentType("application/json").content("{}"))
+                .andExpect(status().isBadRequest());
+        mockMvc.perform(post("/api/tickets/{ticketKey}/transition", ticketKey).cookie(approverA)
+                        .contentType("application/json").content("{\"toStatus\":\"PROPOSAL_APPROVED\"}"))
+                .andExpect(status().isConflict());
+
+        Integer commentsBefore = jdbcTemplate.queryForObject("SELECT count(*) FROM comment c JOIN ticket t ON t.id=c.ticket_id WHERE t.ticket_key=?", Integer.class, ticketKey);
+        jdbcTemplate.execute("ALTER TABLE audit_log ADD CONSTRAINT test_reject_decision_audit CHECK (action <> 'PROPOSAL_REJECTED') NOT VALID");
+        try {
+            mockMvc.perform(post("/api/proposals/{id}/reject", proposalId).cookie(approverA)
+                            .contentType("application/json").content("{\"comment\":\"Must also roll back\"}"))
+                    .andExpect(status().isInternalServerError());
+        } finally { jdbcTemplate.execute("ALTER TABLE audit_log DROP CONSTRAINT test_reject_decision_audit"); }
+        assertThat(changeProposalRepository.findById(proposalId).orElseThrow().getStatus().name()).isEqualTo("PENDING");
+        mockMvc.perform(get("/api/tickets/{ticketKey}", ticketKey).cookie(client))
+                .andExpect(jsonPath("$.status").value("PROPOSAL"));
+        assertThat(jdbcTemplate.queryForObject("SELECT count(*) FROM comment c JOIN ticket t ON t.id=c.ticket_id WHERE t.ticket_key=?", Integer.class, ticketKey)).isEqualTo(commentsBefore);
+
+        String taskKey = createTicket(client, """
+                {"type":"TASK","title":"No proposal","description":"Task rejection","priority":"MEDIUM"}
+                """, "SUBMITTED");
+        transition(taskKey, "ANALYSIS", internal, status().isOk());
+        createProposal(taskKey, internal, "Invalid task proposal", status().isConflict());
+
+        String defectKey = createTicket(client, """
+                {"type":"DEFECT","title":"No defect proposal","description":"Defect rejection","priority":"HIGH","severity":"SEV_3"}
+                """, "REPORTED");
+        transition(defectKey, "ANALYSIS", internal, status().isOk());
+        createProposal(defectKey, internal, "Invalid defect proposal", status().isConflict());
+
+        String rollbackKey = createTicket(client, """
+                {"type":"CHANGE_REQUEST","title":"Rollback proposal","description":"Atomic rollback","priority":"MEDIUM"}
+                """, "SUBMITTED");
+        transition(rollbackKey, "ANALYSIS", internal, status().isOk());
+        Integer historyBefore = jdbcTemplate.queryForObject("SELECT count(*) FROM status_history h JOIN ticket t ON t.id=h.ticket_id WHERE t.ticket_key=?", Integer.class, rollbackKey);
+        jdbcTemplate.execute("ALTER TABLE audit_log ADD CONSTRAINT test_reject_proposal_audit CHECK (action <> 'PROPOSAL_CREATED') NOT VALID");
+        try { createProposal(rollbackKey, internal, "Must roll back", status().isInternalServerError()); }
+        finally { jdbcTemplate.execute("ALTER TABLE audit_log DROP CONSTRAINT test_reject_proposal_audit"); }
+        mockMvc.perform(get("/api/tickets/{ticketKey}", rollbackKey).cookie(internal))
+                .andExpect(jsonPath("$.status").value("ANALYSIS"));
+        assertThat(jdbcTemplate.queryForObject("SELECT count(*) FROM change_proposal p JOIN ticket t ON t.id=p.ticket_id WHERE t.ticket_key=?", Integer.class, rollbackKey)).isZero();
+        assertThat(jdbcTemplate.queryForObject("SELECT count(*) FROM status_history h JOIN ticket t ON t.id=h.ticket_id WHERE t.ticket_key=?", Integer.class, rollbackKey)).isEqualTo(historyBefore);
+    }
+
+    @Test
+    void concurrentProposalDecisionsUseOptimisticLocking() throws Exception {
+        Cookie client = login("client-a@demo.test", "client123");
+        Cookie internal = login("admin@ticketflow1.demo", "admin123");
+        String key = createTicket(client, """
+                {"type":"CHANGE_REQUEST","title":"Concurrent proposal","description":"Race","priority":"MEDIUM"}
+                """, "SUBMITTED");
+        transition(key, "ANALYSIS", internal, status().isOk());
+        long id = objectMapper.readTree(createProposal(key, internal, "Race proposal", status().isCreated())
+                .getResponse().getContentAsString()).get("id").asLong();
+        Long actorId = jdbcTemplate.queryForObject("SELECT id FROM app_user WHERE email='approver-a@demo.test'", Long.class);
+        CountDownLatch loaded = new CountDownLatch(2); CountDownLatch release = new CountDownLatch(1);
+        java.util.function.Supplier<Boolean> decision = () -> {
+            try {
+                new TransactionTemplate(transactionManager).executeWithoutResult(tx -> {
+                    var em = entityManagerFactory.createEntityManager();
+                    try {
+                        em.joinTransaction();
+                        var proposal = em.find(com.ticketflow1.ticketing.proposal.ChangeProposal.class, id);
+                        var actor = em.getReference(AppUser.class, actorId);
+                        loaded.countDown();
+                        try { release.await(5, TimeUnit.SECONDS); } catch (InterruptedException e) { throw new RuntimeException(e); }
+                        proposal.decide(com.ticketflow1.ticketing.proposal.ProposalStatus.APPROVED, actor, java.time.Instant.now());
+                        em.flush();
+                    } finally { em.close(); }
+                });
+                return true;
+            } catch (RuntimeException ex) { return false; }
+        };
+        var first = CompletableFuture.supplyAsync(decision); var second = CompletableFuture.supplyAsync(decision);
+        assertThat(loaded.await(5, TimeUnit.SECONDS)).isTrue(); release.countDown();
+        assertThat(java.util.List.of(first.get(), second.get())).containsExactlyInAnyOrder(true, false);
+    }
+
+    private void transition(String key, String to, Cookie cookie, org.springframework.test.web.servlet.ResultMatcher expected) throws Exception {
+        mockMvc.perform(post("/api/tickets/{ticketKey}/transition", key).cookie(cookie)
+                .contentType("application/json").content("{\"toStatus\":\"" + to + "\"}")).andExpect(expected);
+    }
+
+    private MvcResult createProposal(String key, Cookie cookie, String description,
+            org.springframework.test.web.servlet.ResultMatcher expected) throws Exception {
+        return mockMvc.perform(post("/api/tickets/{ticketKey}/proposals", key).cookie(cookie)
+                .contentType("application/json").content("{\"description\":\"" + description + "\"}"))
+                .andExpect(expected).andReturn();
     }
 
     private Cookie login(String email, String password) throws Exception {
