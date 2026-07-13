@@ -110,9 +110,9 @@ build on the transition engine.
 Goal: public/internal communication with tenant-safe visibility; attachment
 records are metadata references only.
 
-- [ ] T043 Add `V5__create_comment_and_attachment.sql` with validation constraints and indexes by `(ticket_id, created_at)`
-- [ ] T044 [P] [US4] Implement `Comment` entity/repository and `CommentService`; resolve the visible parent ticket first and filter INTERNAL reads by `COMMENT_INTERNAL_READ`
-- [ ] T045 [P] [US4] Implement `GET/POST /api/tickets/{ticketKey}/comments`; enforce public/internal write permissions and write privacy-safe `COMMENT_ADDED` audit entries
+- [x] T043 Add `V5__create_comment_and_attachment.sql` with validation constraints and indexes by `(ticket_id, created_at)`
+- [x] T044 [P] [US4] Implement `Comment` entity/repository and `CommentService`; resolve the visible parent ticket first and filter INTERNAL reads by `COMMENT_INTERNAL_READ`
+- [x] T045 [P] [US4] Implement `GET/POST /api/tickets/{ticketKey}/comments`; enforce public/internal write permissions and write privacy-safe `COMMENT_ADDED` audit entries
 - [ ] T046 Replace T028's temporary transition-comment rejection with atomic PUBLIC-comment persistence through `CommentService`
 - [ ] T047 [P] Implement attachment-reference entity/repository/service with filename, MIME, size bounds, and parent-ticket organization scoping
 - [ ] T048 [P] Implement `GET/POST /api/tickets/{ticketKey}/attachments` and privacy-safe `ATTACHMENT_ADDED` audit entries
