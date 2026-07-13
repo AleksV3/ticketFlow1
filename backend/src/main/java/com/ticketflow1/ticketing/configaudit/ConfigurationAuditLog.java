@@ -5,6 +5,8 @@ import com.ticketflow1.ticketing.user.AppUser;
 import jakarta.persistence.*;
 import java.time.Instant;
 import org.hibernate.annotations.CreationTimestamp;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
 @Entity
 @Table(name = "configuration_audit_log")
@@ -15,8 +17,8 @@ public class ConfigurationAuditLog {
     @Column(name = "target_type", nullable = false, length = 40) private String targetType;
     @Column(name = "target_id", nullable = false) private Long targetId;
     @Column(nullable = false, length = 40) private String action;
-    @Column(name = "old_value", columnDefinition = "jsonb") private String oldValue;
-    @Column(name = "new_value", columnDefinition = "jsonb") private String newValue;
+    @JdbcTypeCode(SqlTypes.JSON) @Column(name = "old_value", columnDefinition = "jsonb") private String oldValue;
+    @JdbcTypeCode(SqlTypes.JSON) @Column(name = "new_value", columnDefinition = "jsonb") private String newValue;
     @CreationTimestamp @Column(name = "created_at", nullable = false, updatable = false) private Instant createdAt;
 
     protected ConfigurationAuditLog() {}

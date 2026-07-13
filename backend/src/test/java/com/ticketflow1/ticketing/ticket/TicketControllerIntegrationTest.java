@@ -728,6 +728,54 @@ class TicketControllerIntegrationTest {
         assertSlaAgreement(clientA, ok, "OK");
     }
 
+    @Test
+    void adminWorkflowMutationsValidateGraphScopeOptimisticVersionAndAudit() throws Exception {
+        Cookie internal = login("admin@ticketflow1.demo", "admin123");
+        Long orgA = jdbcTemplate.queryForObject("SELECT id FROM organization WHERE name='Client A'", Long.class);
+        Long orgB = jdbcTemplate.queryForObject("SELECT id FROM organization WHERE name='Client B'", Long.class);
+
+        mockMvc.perform(post("/api/admin/workflows").cookie(internal).contentType("application/json").content("""
+                {"name":"Invalid workflow","organizationId":%d,"states":[{"key":"OPEN","isInitial":false,"isTerminal":false,"sortOrder":1}],"transitions":[]}
+                """.formatted(orgA))).andExpect(status().isBadRequest());
+
+        MvcResult created = mockMvc.perform(post("/api/admin/workflows").cookie(internal)
+                        .contentType("application/json").content("""
+                {"name":"Access workflow","organizationId":%d,
+                 "states":[{"key":"OPEN","isInitial":true,"isTerminal":false,"sortOrder":1},{"key":"CLOSED","isInitial":false,"isTerminal":true,"sortOrder":2}],
+                 "transitions":[{"fromState":"OPEN","toState":"CLOSED","requiredPermission":"TICKET_TRANSITION","requiredParty":"TICKETFLOW1","operationKind":"STANDARD"}]}
+                """.formatted(orgA))).andExpect(status().isCreated()).andReturn();
+        JsonNode workflow = objectMapper.readTree(created.getResponse().getContentAsString());
+        long workflowId = workflow.path("id").asLong();
+        long version = workflow.path("version").asLong();
+
+        mockMvc.perform(post("/api/admin/ticket-types").cookie(internal).contentType("application/json").content("""
+                {"key":"ACCESS_REQUEST","name":"Access Request","workflowId":%d,"organizationId":%d,"requiresProposal":false}
+                """.formatted(workflowId, orgA))).andExpect(status().isCreated());
+        mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch(
+                        "/api/admin/workflows/{id}", workflowId).cookie(internal).contentType("application/json")
+                        .content("{\"version\":999,\"transitions\":[]}"))
+                .andExpect(status().isConflict());
+        mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch(
+                        "/api/admin/workflows/{id}", workflowId).cookie(internal).contentType("application/json")
+                        .content("""
+                {"version":%d,"states":[{"key":"REVIEW","isInitial":false,"isTerminal":false,"sortOrder":2}],
+                 "transitions":[{"fromState":"OPEN","toState":"REVIEW","requiredPermission":"TICKET_TRANSITION","operationKind":"STANDARD"},{"fromState":"REVIEW","toState":"CLOSED","requiredPermission":"TICKET_TRANSITION","operationKind":"STANDARD"}]}
+                """.formatted(version))).andExpect(status().isOk())
+                .andExpect(jsonPath("$.states.length()").value(3));
+        mockMvc.perform(get("/api/admin/configuration-audit").cookie(internal).param("organizationId", orgA.toString()))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.totalItems").value(org.hamcrest.Matchers.greaterThanOrEqualTo(3)));
+
+        jdbcTemplate.update("""
+                INSERT INTO role_permission(role_id,permission_id)
+                SELECT r.id,p.id FROM role r JOIN permission p ON p.key IN ('TYPE_MANAGE','WORKFLOW_MANAGE')
+                WHERE r.organization_id=? AND r.name='Client User' ON CONFLICT DO NOTHING
+                """, orgA);
+        Cookie clientAdmin = login("client-a@demo.test", "client123");
+        mockMvc.perform(post("/api/admin/workflows").cookie(clientAdmin).contentType("application/json").content("""
+                {"name":"Cross org","organizationId":%d,"states":[{"key":"OPEN","isInitial":true,"isTerminal":false,"sortOrder":1},{"key":"CLOSED","isInitial":false,"isTerminal":true,"sortOrder":2}],"transitions":[]}
+                """.formatted(orgB))).andExpect(status().isNotFound());
+    }
+
     private void transition(String key, String to, Cookie cookie, org.springframework.test.web.servlet.ResultMatcher expected) throws Exception {
         mockMvc.perform(post("/api/tickets/{ticketKey}/transition", key).cookie(cookie)
                 .contentType("application/json").content("{\"toStatus\":\"" + to + "\"}")).andExpect(expected);

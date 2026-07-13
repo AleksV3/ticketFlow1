@@ -166,9 +166,9 @@ browser without duplicating authorization/workflow logic.
 - [x] T072 [US8] Implement tenant-scoped ticket-type/workflow admin services and controllers, additive workflow editing, reference integrity checks, optimistic locking, and configuration audit
 - [x] T073 [P] [US6][US7] Enforce CLIENT admin scope across user/role/type/workflow services; TICKETFLOW1 admins retain cross-org management
 - [x] T074 [P] Implement safe reference endpoints for visible ticket types, active Organizations, active TicketFlow1 leads, and assignable roles
-- [ ] T075 [P] Implement paginated `GET /api/admin/configuration-audit` with permission and organization scoping
-- [ ] T076 [P] Integration-test all admin mutations, cross-org denial, referenced-state deletion rejection, invalid workflow graphs, and audit entries
-- [ ] T077 Implement `frontend/lib/api.ts`: client-side cookie credentials, CSRF header, typed error parsing, and no caching of authenticated reads
+- [x] T075 [P] Implement paginated `GET /api/admin/configuration-audit` with permission and organization scoping
+- [x] T076 [P] Integration-test all admin mutations, cross-org denial, referenced-state deletion rejection, invalid workflow graphs, and audit entries
+- [x] T077 Implement `frontend/lib/api.ts`: client-side cookie credentials, CSRF header, typed error parsing, and no caching of authenticated reads
 - [x] T078 Implement login/logout/current-user flow using the HttpOnly cookie (existing phase-3 scaffold; CSRF wiring completed in T077)
 - [ ] T079 Implement application shell, permission-aware navigation, route guards, and accessible loading/error/empty states
 - [ ] T080 [P] Implement reusable status/SLA badges, pagination/filter controls, and standard transition buttons driven only by `allowedTransitions`
