@@ -87,6 +87,12 @@ public class Ticket extends Auditable {
     @Column(name = "next_update_due_at")
     private Instant nextUpdateDueAt;
 
+    @Column(name = "responded_at")
+    private Instant respondedAt;
+
+    @Column(name = "first_info_at")
+    private Instant firstInfoAt;
+
     protected Ticket() {
         // JPA
     }
@@ -228,5 +234,21 @@ public class Ticket extends Auditable {
 
     public void setNextUpdateDueAt(Instant nextUpdateDueAt) {
         this.nextUpdateDueAt = nextUpdateDueAt;
+    }
+
+    public Instant getRespondedAt() {
+        return respondedAt;
+    }
+
+    public void setRespondedAt(Instant respondedAt) {
+        this.respondedAt = respondedAt;
+    }
+
+    public Instant getFirstInfoAt() {
+        return firstInfoAt;
+    }
+
+    public void setFirstInfoAt(Instant firstInfoAt) {
+        this.firstInfoAt = firstInfoAt;
     }
 }

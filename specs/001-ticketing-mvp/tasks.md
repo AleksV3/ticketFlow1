@@ -144,9 +144,9 @@ one concurrency-safe business command.
 Goal: event-aware SLA deadlines/status plus a fully tested dashboard API before
 frontend work begins.
 
-- [ ] T061 [US3] Add `V7__add_defect_sla_events.sql` with `responded_at`, `first_info_at`, and indexes needed by SLA status queries
-- [ ] T062 [US3] Implement `SlaCalculator` for all four severities, including the documented Europe/Ljubljana weekday approximation
-- [ ] T063 [US3] Implement `SlaStatusService` with exact `NOT_APPLICABLE`/`BREACHED`/`DUE_SOON`/`OK` precedence and an injectable `Clock`
+- [x] T061 [US3] Add `V7__add_defect_sla_events.sql` with `responded_at`, `first_info_at`, and indexes needed by SLA status queries
+- [x] T062 [US3] Implement `SlaCalculator` for all four severities, including the documented Europe/Ljubljana weekday approximation
+- [x] T063 [US3] Implement `SlaStatusService` with exact `NOT_APPLICABLE`/`BREACHED`/`DUE_SOON`/`OK` precedence and an injectable `Clock`
 - [ ] T064 [US3] Calculate deadlines at Defect creation and recompute them on audited severity changes
 - [ ] T065 [US3] Set `respondedAt` on first `REPORTED → ANALYSIS`; set `firstInfoAt` and advance SEV_1/SEV_2 update deadlines from qualifying PUBLIC TicketFlow1 comments
 - [ ] T066 [US3] Add the complete `sla` response block and database predicates for paginated `slaStatus` filters using the same semantics as `SlaStatusService`
