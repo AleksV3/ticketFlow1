@@ -11,7 +11,8 @@ import static org.mockito.Mockito.when;
 import com.ticketflow1.ticketing.audit.AuditAction;
 import com.ticketflow1.ticketing.audit.AuditService;
 import com.ticketflow1.ticketing.auth.AuthPrincipal;
-import com.ticketflow1.ticketing.common.ApiException;
+import com.ticketflow1.ticketing.comment.CommentService;
+import com.ticketflow1.ticketing.comment.CommentVisibility;
 import com.ticketflow1.ticketing.common.IllegalTransitionException;
 import com.ticketflow1.ticketing.organization.Organization;
 import com.ticketflow1.ticketing.rbac.Permission;
@@ -53,13 +54,15 @@ class TicketTransitionServiceTest {
     private AuditService auditService;
     @Mock
     private StatusHistoryService statusHistoryService;
+    @Mock
+    private CommentService commentService;
 
     private TicketTransitionService ticketTransitionService;
 
     @BeforeEach
     void setUp() {
         ticketTransitionService = new TicketTransitionService(ticketRepository, workflowStateRepository,
-                workflowTransitionRepository, appUserRepository, auditService, statusHistoryService);
+                workflowTransitionRepository, appUserRepository, auditService, statusHistoryService, commentService);
     }
 
     @ParameterizedTest
@@ -144,17 +147,18 @@ class TicketTransitionServiceTest {
     }
 
     @Test
-    void transitionComment_isRejectedUntilCommentPersistenceExists() {
-        AuthPrincipal principal = new AuthPrincipal(1L, Responsibility.TICKETFLOW1, null,
-                Set.of("TICKET_TRANSITION"));
+    void transitionComment_isPersistedAsPublicInTheTransitionTransaction() {
+        Fixture fixture = fixture("Change Request Workflow", "SUBMITTED", "ANALYSIS",
+                "TICKET_TRANSITION", Responsibility.TICKETFLOW1, null);
+        AuthPrincipal principal = new AuthPrincipal(fixture.actor().getId(), Responsibility.TICKETFLOW1,
+                fixture.organization().getId(), Set.of("TICKET_TRANSITION"));
+        stubSuccessPath(fixture, principal, "ANALYSIS");
 
-        assertThatThrownBy(() -> ticketTransitionService.transition(
-                "TF-1000", "ANALYSIS", "Please investigate", principal))
-                .isInstanceOf(ApiException.class)
-                .hasMessageContaining("not available until Phase 4");
+        ticketTransitionService.transition(fixture.ticket().getTicketKey(), "ANALYSIS",
+                "Please investigate", principal);
 
-        verifyNoInteractions(ticketRepository, workflowStateRepository, workflowTransitionRepository,
-                appUserRepository, auditService, statusHistoryService);
+        verify(commentService).createForTicket(fixture.ticket(), "Please investigate",
+                CommentVisibility.PUBLIC, principal);
     }
 
     private void stubSuccessPath(Fixture fixture, AuthPrincipal principal, String toKey) {

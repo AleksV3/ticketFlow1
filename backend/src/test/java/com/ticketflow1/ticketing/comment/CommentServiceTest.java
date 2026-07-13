@@ -16,7 +16,7 @@ import com.ticketflow1.ticketing.comment.dto.CreateCommentRequest;
 import com.ticketflow1.ticketing.common.ApiException;
 import com.ticketflow1.ticketing.ticket.Responsibility;
 import com.ticketflow1.ticketing.ticket.Ticket;
-import com.ticketflow1.ticketing.ticket.TicketService;
+import com.ticketflow1.ticketing.ticket.TicketRepository;
 import com.ticketflow1.ticketing.user.AppUser;
 import com.ticketflow1.ticketing.user.AppUserRepository;
 import java.time.Instant;
@@ -33,7 +33,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 class CommentServiceTest {
 
     @Mock private CommentRepository commentRepository;
-    @Mock private TicketService ticketService;
+    @Mock private TicketRepository ticketRepository;
     @Mock private AppUserRepository appUserRepository;
     @Mock private AuditService auditService;
 
@@ -42,7 +42,7 @@ class CommentServiceTest {
 
     @BeforeEach
     void setUp() {
-        commentService = new CommentService(commentRepository, ticketService, appUserRepository, auditService);
+        commentService = new CommentService(commentRepository, ticketRepository, appUserRepository, auditService);
         ticket = mock(Ticket.class);
     }
 
@@ -51,7 +51,7 @@ class CommentServiceTest {
         AuthPrincipal principal = principal(Set.of("TICKET_READ"));
         Comment publicComment = comment(1L, CommentVisibility.PUBLIC, "Visible");
         when(ticket.getId()).thenReturn(42L);
-        when(ticketService.findVisibleTicket("TF-1000", principal)).thenReturn(ticket);
+        when(ticketRepository.findByTicketKeyAndOrganizationId("TF-1000", 3L)).thenReturn(Optional.of(ticket));
         when(commentRepository.findByTicketIdAndVisibilityOrderByCreatedAtAsc(42L, CommentVisibility.PUBLIC))
                 .thenReturn(List.of(publicComment));
 
@@ -68,7 +68,7 @@ class CommentServiceTest {
         Comment publicComment = comment(1L, CommentVisibility.PUBLIC, "Public");
         Comment internalComment = comment(2L, CommentVisibility.INTERNAL, "Internal");
         when(ticket.getId()).thenReturn(42L);
-        when(ticketService.findVisibleTicket("TF-1000", principal)).thenReturn(ticket);
+        when(ticketRepository.findByTicketKeyAndOrganizationId("TF-1000", 3L)).thenReturn(Optional.of(ticket));
         when(commentRepository.findByTicketIdOrderByCreatedAtAsc(42L))
                 .thenReturn(List.of(publicComment, internalComment));
 
@@ -78,7 +78,7 @@ class CommentServiceTest {
     @Test
     void createInternalWithoutPermissionIsForbiddenBeforePersistence() {
         AuthPrincipal principal = principal(Set.of("COMMENT_PUBLIC_WRITE"));
-        when(ticketService.findVisibleTicket("TF-1000", principal)).thenReturn(ticket);
+        when(ticketRepository.findByTicketKeyAndOrganizationId("TF-1000", 3L)).thenReturn(Optional.of(ticket));
 
         assertThatThrownBy(() -> commentService.create("TF-1000",
                 new CreateCommentRequest("Secret", CommentVisibility.INTERNAL), principal))
@@ -94,7 +94,7 @@ class CommentServiceTest {
         AuthPrincipal principal = principal(Set.of("COMMENT_PUBLIC_WRITE"));
         AppUser author = mock(AppUser.class);
         Comment saved = comment(9L, CommentVisibility.PUBLIC, "Hello");
-        when(ticketService.findVisibleTicket("TF-1000", principal)).thenReturn(ticket);
+        when(ticketRepository.findByTicketKeyAndOrganizationId("TF-1000", 3L)).thenReturn(Optional.of(ticket));
         when(appUserRepository.findById(7L)).thenReturn(Optional.of(author));
         when(author.getId()).thenReturn(7L);
         when(commentRepository.saveAndFlush(any(Comment.class))).thenReturn(saved);

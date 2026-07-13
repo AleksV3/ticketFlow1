@@ -113,9 +113,9 @@ records are metadata references only.
 - [x] T043 Add `V5__create_comment_and_attachment.sql` with validation constraints and indexes by `(ticket_id, created_at)`
 - [x] T044 [P] [US4] Implement `Comment` entity/repository and `CommentService`; resolve the visible parent ticket first and filter INTERNAL reads by `COMMENT_INTERNAL_READ`
 - [x] T045 [P] [US4] Implement `GET/POST /api/tickets/{ticketKey}/comments`; enforce public/internal write permissions and write privacy-safe `COMMENT_ADDED` audit entries
-- [ ] T046 Replace T028's temporary transition-comment rejection with atomic PUBLIC-comment persistence through `CommentService`
-- [ ] T047 [P] Implement attachment-reference entity/repository/service with filename, MIME, size bounds, and parent-ticket organization scoping
-- [ ] T048 [P] Implement `GET/POST /api/tickets/{ticketKey}/attachments` and privacy-safe `ATTACHMENT_ADDED` audit entries
+- [x] T046 Replace T028's temporary transition-comment rejection with atomic PUBLIC-comment persistence through `CommentService`
+- [x] T047 [P] Implement attachment-reference entity/repository/service with filename, MIME, size bounds, and parent-ticket organization scoping
+- [x] T048 [P] Implement `GET/POST /api/tickets/{ticketKey}/attachments` and privacy-safe `ATTACHMENT_ADDED` audit entries
 - [ ] T049 [P] [US4] Test public/internal visibility, cross-org 404s, and comment/attachment validation limits
 - [ ] T050 [P] [US4] Test privacy-safe comment audit feeds and transactional rollback when audit persistence fails
 - [ ] T051 **Verify**: compare TicketFlow1 and CLIENT comment/audit responses and confirm no INTERNAL body or event leaks; verify attachment reference isolation
