@@ -663,6 +663,71 @@ class TicketControllerIntegrationTest {
                 .andExpect(jsonPath("$.sla.status").value("DUE_SOON"));
     }
 
+    @Test
+    void dashboardCountsAndSlaCardsStayTenantScopedAndAgreeWithTicketApis() throws Exception {
+        Cookie clientA = login("client-a@demo.test", "client123");
+        Cookie clientB = login("client-b@demo.test", "client123");
+        Cookie internal = login("admin@ticketflow1.demo", "admin123");
+        JsonNode baseline = objectMapper.readTree(mockMvc.perform(get("/api/dashboard").cookie(clientA))
+                .andExpect(status().isOk()).andReturn().getResponse().getContentAsString());
+
+        String activeTask = createTicket(clientA, """
+                {"type":"TASK","title":"Dashboard active","description":"Active count","priority":"MEDIUM"}
+                """, "SUBMITTED");
+        String closedTask = createTicket(clientA, """
+                {"type":"TASK","title":"Dashboard closed","description":"Terminal metadata","priority":"MEDIUM"}
+                """, "SUBMITTED");
+        String otherTenant = createTicket(clientB, """
+                {"type":"TASK","title":"Dashboard hidden","description":"Tenant isolation","priority":"MEDIUM"}
+                """, "SUBMITTED");
+        String breached = createTicket(clientA, """
+                {"type":"DEFECT","title":"Dashboard breached","description":"SLA agreement","priority":"HIGH","severity":"SEV_1"}
+                """, "REPORTED");
+        String dueSoon = createTicket(clientA, """
+                {"type":"DEFECT","title":"Dashboard due soon","description":"SLA agreement","priority":"HIGH","severity":"SEV_1"}
+                """, "REPORTED");
+        String ok = createTicket(clientA, """
+                {"type":"DEFECT","title":"Dashboard ok","description":"SLA agreement","priority":"HIGH","severity":"SEV_1"}
+                """, "REPORTED");
+
+        jdbcTemplate.update("""
+                UPDATE ticket t SET current_state_id = (
+                    SELECT ws.id FROM workflow_state ws
+                    WHERE ws.workflow_id=ticket_type.workflow_id AND ws.is_terminal=true LIMIT 1
+                ), closed_at=now()
+                FROM ticket_type WHERE t.ticket_type_id=ticket_type.id AND t.ticket_key=?
+                """, closedTask);
+        jdbcTemplate.update("UPDATE ticket SET ticket_lead_id=(SELECT id FROM app_user WHERE email='admin@ticketflow1.demo') WHERE ticket_key=?",
+                activeTask);
+        jdbcTemplate.update("UPDATE ticket SET response_due_at=now()-interval '1 minute', first_info_due_at=now()+interval '1 hour', next_update_due_at=NULL WHERE ticket_key=?",
+                breached);
+        jdbcTemplate.update("UPDATE ticket SET response_due_at=now()+interval '2 minutes', first_info_due_at=now()+interval '1 hour', next_update_due_at=NULL WHERE ticket_key=?",
+                dueSoon);
+        jdbcTemplate.update("UPDATE ticket SET response_due_at=now()+interval '10 minutes', first_info_due_at=now()+interval '30 minutes', next_update_due_at=now()+interval '1 hour' WHERE ticket_key=?",
+                ok);
+
+        JsonNode dashboard = objectMapper.readTree(mockMvc.perform(get("/api/dashboard").cookie(clientA))
+                .andExpect(status().isOk()).andReturn().getResponse().getContentAsString());
+        assertThat(dashboard.path("activeCount").asLong()).isEqualTo(baseline.path("activeCount").asLong() + 4);
+        assertThat(dashboard.path("closedCount").asLong()).isEqualTo(baseline.path("closedCount").asLong() + 1);
+        assertThat(dashboard.path("byType").path("TASK").asLong())
+                .isEqualTo(baseline.path("byType").path("TASK").asLong() + 2);
+        assertThat(dashboard.path("byType").path("DEFECT").asLong())
+                .isEqualTo(baseline.path("byType").path("DEFECT").asLong() + 3);
+        assertThat(containsTicket(dashboard.path("slaBreached"), breached)).isTrue();
+        assertThat(containsTicket(dashboard.path("slaDueSoon"), dueSoon)).isTrue();
+        assertThat(containsTicket(dashboard.path("slaBreached"), otherTenant)).isFalse();
+        assertThat(dashboard.path("myAssignedTickets").isEmpty()).isTrue();
+
+        JsonNode internalDashboard = objectMapper.readTree(mockMvc.perform(get("/api/dashboard").cookie(internal))
+                .andExpect(status().isOk()).andReturn().getResponse().getContentAsString());
+        assertThat(containsTicket(internalDashboard.path("myAssignedTickets"), activeTask)).isTrue();
+
+        assertSlaAgreement(clientA, breached, "BREACHED");
+        assertSlaAgreement(clientA, dueSoon, "DUE_SOON");
+        assertSlaAgreement(clientA, ok, "OK");
+    }
+
     private void transition(String key, String to, Cookie cookie, org.springframework.test.web.servlet.ResultMatcher expected) throws Exception {
         mockMvc.perform(post("/api/tickets/{ticketKey}/transition", key).cookie(cookie)
                 .contentType("application/json").content("{\"toStatus\":\"" + to + "\"}")).andExpect(expected);
@@ -687,6 +752,24 @@ class TicketControllerIntegrationTest {
                 .andExpect(status().isOk())
                 .andReturn();
         return result.getResponse().getCookie("ticketflow1_auth");
+    }
+
+    private void assertSlaAgreement(Cookie cookie, String ticketKey, String expected) throws Exception {
+        mockMvc.perform(get("/api/tickets/{ticketKey}", ticketKey).cookie(cookie))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.sla.status").value(expected));
+        MvcResult list = mockMvc.perform(get("/api/tickets").param("slaStatus", expected).cookie(cookie))
+                .andExpect(status().isOk()).andReturn();
+        assertThat(containsTicket(objectMapper.readTree(list.getResponse().getContentAsString()).path("items"), ticketKey))
+                .isTrue();
+    }
+
+    private boolean containsTicket(JsonNode tickets, String ticketKey) {
+        for (JsonNode ticket : tickets) {
+            if (ticketKey.equals(ticket.path("ticketKey").asText())) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private long countActions(MvcResult result, String action) throws Exception {

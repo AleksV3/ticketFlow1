@@ -153,8 +153,8 @@ frontend work begins.
 - [x] T067 [P] [US3] Unit-test formulas, weekday boundaries, warning windows, completed milestones, terminal tickets, and severity recomputation
 - [x] T068 [P] [US3] Integration-test SLA list pagination and status/detail consistency against PostgreSQL
 - [x] T069 [US5] Implement tenant-scoped `DashboardService` and `GET /api/dashboard`; use terminal metadata for counts and document seeded-only waiting cards
-- [ ] T070 [P] [US5] Test dashboard counts/lists for empty data, two organizations, active/terminal tickets, assignment, and SLA states
-- [ ] T071 **Verify**: backdate SLA milestones without a debug endpoint, confirm each status and dashboard/list/detail agreement
+- [x] T070 [P] [US5] Test dashboard counts/lists for empty data, two organizations, active/terminal tickets, assignment, and SLA states
+- [x] T071 **Verify**: backdate SLA milestones without a debug endpoint, confirm each status and dashboard/list/detail agreement
 
 ---
 
