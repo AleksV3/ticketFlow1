@@ -128,7 +128,7 @@ Goal: proposal creation/decision and its protected workflow transition commit as
 one concurrency-safe business command.
 
 - [x] T052 Add `V6__create_change_proposal.sql` with `version` and a partial unique index allowing at most one `PENDING` proposal per ticket
-- [ ] T053 [US1] Implement `ChangeProposal` entity/repository and deterministic latest query (`createdAt DESC, id DESC`)
+- [x] T053 [US1] Implement `ChangeProposal` entity/repository and deterministic latest query (`createdAt DESC, id DESC`)
 - [ ] T054 [US1] Implement proposal creation via the protected `PROPOSAL_CREATE` transition in one transaction; reject wrong type/state/party or an existing pending proposal
 - [ ] T055 [US1] Implement approve/reject via protected operation kinds; require `PROPOSAL_APPROVE` + CLIENT party + same org, store rejection reason as PUBLIC comment, and audit atomically
 - [ ] T056 [US1] Implement proposal create/approve/reject controllers per contract and map stale decisions to `409 CONFLICT`

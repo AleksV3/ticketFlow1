@@ -10,6 +10,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.ticketflow1.ticketing.organization.Organization;
 import com.ticketflow1.ticketing.organization.OrganizationRepository;
+import com.ticketflow1.ticketing.proposal.ChangeProposalRepository;
 import com.ticketflow1.ticketing.rbac.Role;
 import com.ticketflow1.ticketing.rbac.RoleRepository;
 import com.ticketflow1.ticketing.user.AppUser;
@@ -60,6 +61,8 @@ class TicketControllerIntegrationTest {
     private JdbcTemplate jdbcTemplate;
     @Autowired
     private PasswordEncoder passwordEncoder;
+    @Autowired
+    private ChangeProposalRepository changeProposalRepository;
 
     @BeforeEach
     void ensureClientUsersExist() {
@@ -362,6 +365,41 @@ class TicketControllerIntegrationTest {
                 WHERE t.ticket_key = ?
                 """, Integer.class, ticketKey);
         assertThat(afterCount).isEqualTo(beforeCount);
+    }
+
+    @Test
+    void latestProposalQueryUsesIdAsDeterministicTieBreaker() throws Exception {
+        Cookie clientCookie = login("client-a@demo.test", "client123");
+        String ticketKey = createTicket(clientCookie, """
+                {
+                  "type":"CHANGE_REQUEST",
+                  "title":"Proposal ordering",
+                  "description":"Latest must be deterministic",
+                  "priority":"MEDIUM"
+                }
+                """, "SUBMITTED");
+        Long ticketId = jdbcTemplate.queryForObject(
+                "SELECT id FROM ticket WHERE ticket_key = ?", Long.class, ticketKey);
+        Long creatorId = jdbcTemplate.queryForObject(
+                "SELECT id FROM app_user WHERE email = 'admin@ticketflow1.demo'", Long.class);
+        String insert = """
+                INSERT INTO change_proposal
+                    (ticket_id, description, status, created_by_id, decided_by_id, decided_at,
+                     created_at, updated_at, version)
+                VALUES (?, ?, 'REJECTED', ?, ?, now(), '2026-07-13T10:00:00Z', now(), 0)
+                RETURNING id
+                """;
+        Long firstId = jdbcTemplate.queryForObject(insert, Long.class,
+                ticketId, "First proposal", creatorId, creatorId);
+        Long secondId = jdbcTemplate.queryForObject(insert, Long.class,
+                ticketId, "Second proposal", creatorId, creatorId);
+
+        var latest = changeProposalRepository.findFirstByTicketIdOrderByCreatedAtDescIdDesc(ticketId)
+                .orElseThrow();
+
+        assertThat(secondId).isGreaterThan(firstId);
+        assertThat(latest.getId()).isEqualTo(secondId);
+        assertThat(latest.getDescription()).isEqualTo("Second proposal");
     }
 
     private Cookie login(String email, String password) throws Exception {
