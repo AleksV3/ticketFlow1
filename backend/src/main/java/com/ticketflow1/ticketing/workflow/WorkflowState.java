@@ -70,4 +70,9 @@ public class WorkflowState extends Auditable {
     public int getSortOrder() {
         return sortOrder;
     }
+
+    /** Reordering changes presentation only; state identity and workflow rules stay intact. */
+    public void reorder(int sortOrder) {
+        this.sortOrder = sortOrder;
+    }
 }

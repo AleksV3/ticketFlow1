@@ -755,13 +755,25 @@ class TicketControllerIntegrationTest {
                         "/api/admin/workflows/{id}", workflowId).cookie(internal).contentType("application/json")
                         .content("{\"version\":999,\"transitions\":[]}"))
                 .andExpect(status().isConflict());
-        mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch(
+        MvcResult updated = mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch(
                         "/api/admin/workflows/{id}", workflowId).cookie(internal).contentType("application/json")
                         .content("""
                 {"version":%d,"states":[{"key":"REVIEW","isInitial":false,"isTerminal":false,"sortOrder":2}],
                  "transitions":[{"fromState":"OPEN","toState":"REVIEW","requiredPermission":"TICKET_TRANSITION","operationKind":"STANDARD"},{"fromState":"REVIEW","toState":"CLOSED","requiredPermission":"TICKET_TRANSITION","operationKind":"STANDARD"}]}
                 """.formatted(version))).andExpect(status().isOk())
-                .andExpect(jsonPath("$.states.length()").value(3));
+                .andExpect(jsonPath("$.states.length()").value(3)).andReturn();
+        long reorderedVersion = objectMapper.readTree(updated.getResponse().getContentAsString()).path("version").asLong();
+        mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch(
+                        "/api/admin/workflows/{id}", workflowId).cookie(internal).contentType("application/json")
+                        .content("""
+                {"version":%d,"states":[
+                  {"key":"CLOSED","isInitial":false,"isTerminal":true,"sortOrder":0},
+                  {"key":"REVIEW","isInitial":false,"isTerminal":false,"sortOrder":1},
+                  {"key":"OPEN","isInitial":true,"isTerminal":false,"sortOrder":2}]}
+                """.formatted(reorderedVersion))).andExpect(status().isOk())
+                .andExpect(jsonPath("$.states[0].key").value("CLOSED"))
+                .andExpect(jsonPath("$.states[1].key").value("REVIEW"))
+                .andExpect(jsonPath("$.states[2].key").value("OPEN"));
         mockMvc.perform(get("/api/admin/configuration-audit").cookie(internal).param("organizationId", orgA.toString()))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.totalItems").value(org.hamcrest.Matchers.greaterThanOrEqualTo(3)));
 

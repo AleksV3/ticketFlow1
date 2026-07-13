@@ -40,7 +40,12 @@ public class WorkflowAdminService {
     @Transactional public WorkflowResponse updateWorkflow(AuthPrincipal p,Long id,WorkflowRequests.Update r) {
         Workflow w=visible(p,id); if(r.version()==null||r.version()!=w.getVersion()) throw ApiException.conflict("Workflow was modified by another user.");
         Map<String,WorkflowState> map=states.findByWorkflowIdOrderBySortOrderAsc(id).stream().collect(Collectors.toMap(WorkflowState::getKey,Function.identity()));
-        if(r.states()!=null) for(var s:r.states()) if(!map.containsKey(s.key())) map.put(s.key(),states.save(new WorkflowState(w,s.key(),s.isInitial(),s.isTerminal(),s.sortOrder())));
+        if(r.states()!=null) for(var s:r.states()) {
+            WorkflowState existing=map.get(s.key());
+            if(existing==null) map.put(s.key(),states.save(new WorkflowState(w,s.key(),s.isInitial(),s.isTerminal(),s.sortOrder())));
+            else existing.reorder(s.sortOrder());
+        }
+        if(r.states()!=null) states.flush();
         List<WorkflowRequests.State> resulting=map.values().stream().map(s->new WorkflowRequests.State(s.getKey(),s.isInitial(),s.isTerminal(),s.getSortOrder())).toList();
         List<WorkflowRequests.Transition> defs=r.transitions()==null?List.of():r.transitions(); validateGraph(resulting,defs);
         if(r.transitions()!=null){transitions.deleteByWorkflowId(id);saveTransitions(w,map,r.transitions());}
