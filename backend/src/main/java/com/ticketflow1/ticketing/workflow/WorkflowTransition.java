@@ -47,6 +47,10 @@ public class WorkflowTransition extends Auditable {
     @Column(name = "responsibility_after", length = 12)
     private Responsibility responsibilityAfter;
 
+    @Enumerated(EnumType.STRING)
+    @Column(name = "operation_kind", nullable = false, length = 20)
+    private TransitionOperationKind operationKind = TransitionOperationKind.STANDARD;
+
     protected WorkflowTransition() {
         // JPA
     }
@@ -89,4 +93,6 @@ public class WorkflowTransition extends Auditable {
     public Responsibility getResponsibilityAfter() {
         return responsibilityAfter;
     }
+
+    public TransitionOperationKind getOperationKind() { return operationKind; }
 }

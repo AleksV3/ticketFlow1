@@ -87,4 +87,11 @@ public class ChangeProposal extends Auditable {
     public Instant getDecidedAt() { return decidedAt; }
     public Instant getCreatedAt() { return createdAt; }
     public long getVersion() { return version; }
+
+    public void decide(ProposalStatus decision, AppUser actor, Instant decidedAt) {
+        if (decision == ProposalStatus.PENDING) throw new IllegalArgumentException("Decision cannot be PENDING.");
+        this.status = decision;
+        this.decidedBy = actor;
+        this.decidedAt = decidedAt;
+    }
 }

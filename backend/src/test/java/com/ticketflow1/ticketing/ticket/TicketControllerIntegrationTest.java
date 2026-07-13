@@ -87,6 +87,12 @@ class TicketControllerIntegrationTest {
                     "Client B", Responsibility.CLIENT, role, role.getOrganization());
             appUserRepository.save(user);
         }
+        if (!appUserRepository.existsByEmailIgnoreCase("approver-a@demo.test")) {
+            Role role = roleRepository.findByOrganizationId(orgA.getId()).stream()
+                    .filter(r -> "Client Approver".equals(r.getName())).findFirst().orElseThrow();
+            appUserRepository.save(new AppUser("approver-a@demo.test", passwordEncoder.encode("client123"),
+                    "Client A Approver", Responsibility.CLIENT, role, role.getOrganization()));
+        }
     }
 
     private Organization ensureOrganizationExists(String name) {
@@ -400,6 +406,37 @@ class TicketControllerIntegrationTest {
         assertThat(secondId).isGreaterThan(firstId);
         assertThat(latest.getId()).isEqualTo(secondId);
         assertThat(latest.getDescription()).isEqualTo("Second proposal");
+    }
+
+    @Test
+    void protectedProposalCreateAndApproveCommandsDriveWorkflow() throws Exception {
+        Cookie client = login("client-a@demo.test", "client123");
+        Cookie internal = login("admin@ticketflow1.demo", "admin123");
+        Cookie approver = login("approver-a@demo.test", "client123");
+        String ticketKey = createTicket(client, """
+                {"type":"CHANGE_REQUEST","title":"Protected proposal","description":"Command test","priority":"MEDIUM"}
+                """, "SUBMITTED");
+        mockMvc.perform(post("/api/tickets/{ticketKey}/transition", ticketKey).cookie(internal)
+                        .contentType("application/json").content("{\"toStatus\":\"ANALYSIS\"}"))
+                .andExpect(status().isOk());
+        mockMvc.perform(post("/api/tickets/{ticketKey}/transition", ticketKey).cookie(internal)
+                        .contentType("application/json").content("{\"toStatus\":\"PROPOSAL\"}"))
+                .andExpect(status().isConflict()).andExpect(jsonPath("$.error").value("ILLEGAL_TRANSITION"));
+
+        MvcResult created = mockMvc.perform(post("/api/tickets/{ticketKey}/proposals", ticketKey).cookie(internal)
+                        .contentType("application/json").content("""
+                                {"description":"Deliver protected change","effortEstimate":"5 person-days"}
+                                """))
+                .andExpect(status().isCreated()).andExpect(jsonPath("$.status").value("PENDING")).andReturn();
+        long proposalId = objectMapper.readTree(created.getResponse().getContentAsString()).get("id").asLong();
+        mockMvc.perform(get("/api/tickets/{ticketKey}", ticketKey).cookie(client))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.status").value("PROPOSAL"));
+
+        mockMvc.perform(post("/api/proposals/{id}/approve", proposalId).cookie(approver)
+                        .contentType("application/json").content("{\"comment\":\"Approved\"}"))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.status").value("APPROVED"));
+        mockMvc.perform(get("/api/tickets/{ticketKey}", ticketKey).cookie(client))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.status").value("PROPOSAL_APPROVED"));
     }
 
     private Cookie login(String email, String password) throws Exception {

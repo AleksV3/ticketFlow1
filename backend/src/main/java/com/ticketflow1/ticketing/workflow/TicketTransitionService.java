@@ -49,19 +49,50 @@ public class TicketTransitionService {
     public TicketDetailResponse transition(String ticketKey, String toStateKey, String comment,
             AuthPrincipal principal) {
         Ticket ticket = findVisibleTicket(ticketKey, principal);
-        AppUser actor = appUserRepository.findById(principal.userId())
-                .orElseThrow(() -> ApiException.notFound("Current user no longer exists."));
+        Ticket saved = transitionToState(ticket, toStateKey, TransitionOperationKind.STANDARD, principal);
+        if (comment != null && !comment.isBlank()) {
+            commentService.createForTicket(saved, comment, CommentVisibility.PUBLIC, principal);
+        }
+        return TicketDetailResponse.from(saved, allowedTransitions(saved, principal));
+    }
 
+    @Transactional
+    public Ticket transitionOwned(Ticket ticket, TransitionOperationKind operationKind, AuthPrincipal principal) {
+        List<WorkflowTransition> matches = workflowTransitionRepository
+                .findByWorkflowIdAndFromStateId(ticket.getTicketType().getWorkflow().getId(),
+                        ticket.getCurrentState().getId()).stream()
+                .filter(item -> item.getOperationKind() == operationKind)
+                .toList();
+        if (matches.size() != 1) {
+            throw new com.ticketflow1.ticketing.common.InvalidStateException(
+                    "No " + operationKind + " operation is available from " + ticket.getCurrentState().getKey() + ".");
+        }
+        return apply(ticket, matches.getFirst(), principal);
+    }
+
+    private Ticket transitionToState(Ticket ticket, String toStateKey, TransitionOperationKind operationKind,
+            AuthPrincipal principal) {
         Long workflowId = ticket.getTicketType().getWorkflow().getId();
         WorkflowState fromState = ticket.getCurrentState();
         WorkflowState toState = workflowStateRepository.findByWorkflowIdAndKey(workflowId, toStateKey)
-                .orElseThrow(() -> illegalTransition(ticketKey, fromState.getKey(), toStateKey));
+                .orElseThrow(() -> illegalTransition(ticket.getTicketKey(), fromState.getKey(), toStateKey));
         WorkflowTransition transition = workflowTransitionRepository
                 .findByWorkflowIdAndFromStateIdAndToStateId(workflowId, fromState.getId(), toState.getId())
-                .orElseThrow(() -> illegalTransition(ticketKey, fromState.getKey(), toStateKey));
+                .orElseThrow(() -> illegalTransition(ticket.getTicketKey(), fromState.getKey(), toStateKey));
+        if (transition.getOperationKind() != operationKind || !isAllowed(transition, principal)) {
+            throw illegalTransition(ticket.getTicketKey(), fromState.getKey(), toStateKey);
+        }
 
+        return apply(ticket, transition, principal);
+    }
+
+    private Ticket apply(Ticket ticket, WorkflowTransition transition, AuthPrincipal principal) {
+        AppUser actor = appUserRepository.findById(principal.userId())
+                .orElseThrow(() -> ApiException.notFound("Current user no longer exists."));
+        WorkflowState fromState = ticket.getCurrentState();
+        WorkflowState toState = transition.getToState();
         if (!isAllowed(transition, principal)) {
-            throw illegalTransition(ticketKey, fromState.getKey(), toStateKey);
+            throw illegalTransition(ticket.getTicketKey(), fromState.getKey(), toState.getKey());
         }
 
         ticket.setCurrentState(toState);
@@ -73,11 +104,7 @@ public class TicketTransitionService {
         statusHistoryService.record(saved, fromState, toState, actor.getId());
         auditService.record(saved, actor.getId(), AuditAction.STATUS_CHANGED,
                 "status", fromState.getKey(), toState.getKey());
-        if (comment != null && !comment.isBlank()) {
-            commentService.createForTicket(saved, comment, CommentVisibility.PUBLIC, principal);
-        }
-
-        return TicketDetailResponse.from(saved, allowedTransitions(saved, principal));
+        return saved;
     }
 
     @Transactional(readOnly = true)
@@ -86,6 +113,7 @@ public class TicketTransitionService {
         Long fromStateId = ticket.getCurrentState().getId();
         return workflowTransitionRepository.findByWorkflowIdAndFromStateId(workflowId, fromStateId).stream()
                 .filter(transition -> isAllowed(transition, principal))
+                .filter(transition -> transition.getOperationKind() == TransitionOperationKind.STANDARD)
                 .map(transition -> transition.getToState().getKey())
                 .toList();
     }

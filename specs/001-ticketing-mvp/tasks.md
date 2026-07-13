@@ -129,9 +129,9 @@ one concurrency-safe business command.
 
 - [x] T052 Add `V6__create_change_proposal.sql` with `version` and a partial unique index allowing at most one `PENDING` proposal per ticket
 - [x] T053 [US1] Implement `ChangeProposal` entity/repository and deterministic latest query (`createdAt DESC, id DESC`)
-- [ ] T054 [US1] Implement proposal creation via the protected `PROPOSAL_CREATE` transition in one transaction; reject wrong type/state/party or an existing pending proposal
-- [ ] T055 [US1] Implement approve/reject via protected operation kinds; require `PROPOSAL_APPROVE` + CLIENT party + same org, store rejection reason as PUBLIC comment, and audit atomically
-- [ ] T056 [US1] Implement proposal create/approve/reject controllers per contract and map stale decisions to `409 CONFLICT`
+- [x] T054 [US1] Implement proposal creation via the protected `PROPOSAL_CREATE` transition in one transaction; reject wrong type/state/party or an existing pending proposal
+- [x] T055 [US1] Implement approve/reject via protected operation kinds; require `PROPOSAL_APPROVE` + CLIENT party + same org, store rejection reason as PUBLIC comment, and audit atomically
+- [x] T056 [US1] Implement proposal create/approve/reject controllers per contract and map stale decisions to `409 CONFLICT`
 - [ ] T057 [US1] Extend `TicketDetail` with latest proposal and permitted proposal commands separately from standard `allowedTransitions`
 - [ ] T058 [P] [US1] Test permissions, party/org isolation, duplicate pending proposals, concurrent decisions, and Task/Defect rejection
 - [ ] T059 [P] [US1] Test that generic transitions cannot enter/decide proposal states and that failed proposal persistence rolls back ticket/history/audit/comment changes
