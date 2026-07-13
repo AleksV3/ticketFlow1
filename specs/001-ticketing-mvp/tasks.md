@@ -170,9 +170,9 @@ browser without duplicating authorization/workflow logic.
 - [x] T076 [P] Integration-test all admin mutations, cross-org denial, referenced-state deletion rejection, invalid workflow graphs, and audit entries
 - [x] T077 Implement `frontend/lib/api.ts`: client-side cookie credentials, CSRF header, typed error parsing, and no caching of authenticated reads
 - [x] T078 Implement login/logout/current-user flow using the HttpOnly cookie (existing phase-3 scaffold; CSRF wiring completed in T077)
-- [ ] T079 Implement application shell, permission-aware navigation, route guards, and accessible loading/error/empty states
-- [ ] T080 [P] Implement reusable status/SLA badges, pagination/filter controls, and standard transition buttons driven only by `allowedTransitions`
-- [ ] T081 [US5] Implement dashboard UI against the completed dashboard contract
+- [x] T079 Implement application shell, permission-aware navigation, route guards, and accessible loading/error/empty states
+- [x] T080 [P] Implement reusable status/SLA badges, pagination/filter controls, and standard transition buttons driven only by `allowedTransitions`
+- [x] T081 [US5] Implement dashboard UI against the completed dashboard contract
 - [ ] T082 [P] Implement ticket list and URL-backed filters
 - [ ] T083 [P] [US1][US2][US3] Implement ticket creation using the safe ticket-type reference endpoint
 - [ ] T084 Implement ticket detail core and standard field editing/transition flows
