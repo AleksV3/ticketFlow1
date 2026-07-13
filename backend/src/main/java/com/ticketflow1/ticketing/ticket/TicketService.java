@@ -8,6 +8,10 @@ import com.ticketflow1.ticketing.common.PagedResponse;
 import com.ticketflow1.ticketing.organization.Organization;
 import com.ticketflow1.ticketing.organization.OrganizationRepository;
 import com.ticketflow1.ticketing.proposal.ProposalDetailService;
+import com.ticketflow1.ticketing.sla.SlaCalculator;
+import com.ticketflow1.ticketing.sla.SlaStatus;
+import com.ticketflow1.ticketing.sla.SlaStatusService;
+import com.ticketflow1.ticketing.sla.SlaSpecifications;
 import com.ticketflow1.ticketing.statushistory.StatusHistoryService;
 import com.ticketflow1.ticketing.ticket.dto.CreateTicketRequest;
 import com.ticketflow1.ticketing.ticket.dto.TicketDetailResponse;
@@ -21,6 +25,7 @@ import com.ticketflow1.ticketing.workflow.TicketTransitionService;
 import com.ticketflow1.ticketing.workflow.WorkflowState;
 import com.ticketflow1.ticketing.workflow.WorkflowStateRepository;
 import java.util.List;
+import java.time.Clock;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
@@ -45,6 +50,9 @@ public class TicketService {
     private final StatusHistoryService statusHistoryService;
     private final TicketTransitionService ticketTransitionService;
     private final ProposalDetailService proposalDetailService;
+    private final SlaCalculator slaCalculator;
+    private final SlaStatusService slaStatusService;
+    private final Clock clock;
 
     public TicketService(TicketRepository ticketRepository,
             TicketTypeRepository ticketTypeRepository,
@@ -55,7 +63,10 @@ public class TicketService {
             AuditService auditService,
             StatusHistoryService statusHistoryService,
             TicketTransitionService ticketTransitionService,
-            ProposalDetailService proposalDetailService) {
+            ProposalDetailService proposalDetailService,
+            SlaCalculator slaCalculator,
+            SlaStatusService slaStatusService,
+            Clock clock) {
         this.ticketRepository = ticketRepository;
         this.ticketTypeRepository = ticketTypeRepository;
         this.workflowStateRepository = workflowStateRepository;
@@ -66,6 +77,9 @@ public class TicketService {
         this.statusHistoryService = statusHistoryService;
         this.ticketTransitionService = ticketTransitionService;
         this.proposalDetailService = proposalDetailService;
+        this.slaCalculator = slaCalculator;
+        this.slaStatusService = slaStatusService;
+        this.clock = clock;
     }
 
     @Transactional
@@ -98,6 +112,10 @@ public class TicketService {
                 Responsibility.TICKETFLOW1);
 
         Ticket saved = ticketRepository.saveAndFlush(ticket);
+        if (DEFECT_TYPE_KEY.equals(ticketType.getKey())) {
+            applyDeadlines(saved, saved.getSeverity(), saved.getCreatedAt());
+            saved = ticketRepository.saveAndFlush(saved);
+        }
         auditService.record(saved, actor.getId(), AuditAction.TICKET_CREATED);
         statusHistoryService.record(saved, null, initialState, actor.getId());
         return detail(saved, principal);
@@ -157,6 +175,23 @@ public class TicketService {
             }
         }
 
+        if (request.severity() != null) {
+            requireTicketflow1Party(principal, "severity");
+            if (!DEFECT_TYPE_KEY.equals(ticket.getTicketType().getKey())) {
+                throw ApiException.validation("severity is allowed only when type is DEFECT.");
+            }
+            if (!"ANALYSIS".equals(ticket.getCurrentState().getKey())) {
+                throw ApiException.validation("severity may be changed only while a Defect is in ANALYSIS.");
+            }
+            if (ticket.getSeverity() != request.severity()) {
+                auditService.record(ticket, actor.getId(), AuditAction.SEVERITY_CHANGED,
+                        "severity", ticket.getSeverity().name(), request.severity().name());
+                ticket.setSeverity(request.severity());
+                applyDeadlines(ticket, request.severity(), clock.instant());
+                changed = true;
+            }
+        }
+
         if (request.ticketLeadId() != null) {
             requireTicketflow1Party(principal, "ticketLeadId");
             AppUser ticketLead = appUserRepository.findById(request.ticketLeadId())
@@ -199,10 +234,7 @@ public class TicketService {
     public PagedResponse<TicketSummaryResponse> listTickets(String type, String status, Severity severity,
             Priority priority, String assignedTo, Responsibility responsibility, String slaStatus,
             Long organizationId, String q, int page, int pageSize, AuthPrincipal principal) {
-        if (slaStatus != null && !slaStatus.isBlank()) {
-            // TODO Phase 6: implement slaStatus filter against persisted due-date columns.
-            throw ApiException.validation("slaStatus filter is not available yet.");
-        }
+        SlaStatus requestedSlaStatus = parseSlaStatus(slaStatus);
 
         int size = pageSize <= 0 ? DEFAULT_PAGE_SIZE : Math.min(pageSize, MAX_PAGE_SIZE);
         int pageNumber = Math.max(page, 0);
@@ -247,8 +279,12 @@ public class TicketService {
                     cb.like(cb.lower(root.get("description")), like),
                     cb.like(cb.lower(root.get("ticketKey")), like)));
         }
+        if (requestedSlaStatus != null) {
+            spec = spec.and(SlaSpecifications.hasStatus(requestedSlaStatus, clock.instant(), slaCalculator));
+        }
 
-        return PagedResponse.from(ticketRepository.findAll(spec, pageable), TicketSummaryResponse::from);
+        return PagedResponse.from(ticketRepository.findAll(spec, pageable),
+                ticket -> TicketSummaryResponse.from(ticket, slaStatusService.status(ticket)));
     }
 
     @Transactional(readOnly = true)
@@ -264,7 +300,25 @@ public class TicketService {
 
     private TicketDetailResponse detail(Ticket ticket, AuthPrincipal principal) {
         return TicketDetailResponse.from(ticket, ticketTransitionService.allowedTransitions(ticket, principal),
-                proposalDetailService.detail(ticket, principal));
+                proposalDetailService.detail(ticket, principal), slaStatusService.status(ticket));
+    }
+
+    private void applyDeadlines(Ticket ticket, Severity severity, java.time.Instant updateBase) {
+        SlaCalculator.SlaDeadlines deadlines = slaCalculator.calculate(severity, ticket.getCreatedAt(), updateBase);
+        ticket.setResponseDueAt(deadlines.responseDueAt());
+        ticket.setFirstInfoDueAt(deadlines.firstInfoDueAt());
+        ticket.setNextUpdateDueAt(deadlines.nextUpdateDueAt());
+    }
+
+    private SlaStatus parseSlaStatus(String value) {
+        if (value == null || value.isBlank()) {
+            return null;
+        }
+        try {
+            return SlaStatus.valueOf(value);
+        } catch (IllegalArgumentException exception) {
+            throw ApiException.validation("slaStatus must be OK, DUE_SOON, BREACHED, or NOT_APPLICABLE.");
+        }
     }
 
     private Organization resolveOrganization(AppUser actor, AuthPrincipal principal, Long organizationId) {

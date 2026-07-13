@@ -147,9 +147,9 @@ frontend work begins.
 - [x] T061 [US3] Add `V7__add_defect_sla_events.sql` with `responded_at`, `first_info_at`, and indexes needed by SLA status queries
 - [x] T062 [US3] Implement `SlaCalculator` for all four severities, including the documented Europe/Ljubljana weekday approximation
 - [x] T063 [US3] Implement `SlaStatusService` with exact `NOT_APPLICABLE`/`BREACHED`/`DUE_SOON`/`OK` precedence and an injectable `Clock`
-- [ ] T064 [US3] Calculate deadlines at Defect creation and recompute them on audited severity changes
-- [ ] T065 [US3] Set `respondedAt` on first `REPORTED → ANALYSIS`; set `firstInfoAt` and advance SEV_1/SEV_2 update deadlines from qualifying PUBLIC TicketFlow1 comments
-- [ ] T066 [US3] Add the complete `sla` response block and database predicates for paginated `slaStatus` filters using the same semantics as `SlaStatusService`
+- [x] T064 [US3] Calculate deadlines at Defect creation and recompute them on audited severity changes
+- [x] T065 [US3] Set `respondedAt` on first `REPORTED → ANALYSIS`; set `firstInfoAt` and advance SEV_1/SEV_2 update deadlines from qualifying PUBLIC TicketFlow1 comments
+- [x] T066 [US3] Add the complete `sla` response block and database predicates for paginated `slaStatus` filters using the same semantics as `SlaStatusService`
 - [ ] T067 [P] [US3] Unit-test formulas, weekday boundaries, warning windows, completed milestones, terminal tickets, and severity recomputation
 - [ ] T068 [P] [US3] Integration-test SLA list pagination and status/detail consistency against PostgreSQL
 - [ ] T069 [US5] Implement tenant-scoped `DashboardService` and `GET /api/dashboard`; use terminal metadata for counts and document seeded-only waiting cards

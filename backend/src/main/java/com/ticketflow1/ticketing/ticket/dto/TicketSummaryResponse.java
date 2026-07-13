@@ -1,6 +1,7 @@
 package com.ticketflow1.ticketing.ticket.dto;
 
 import com.ticketflow1.ticketing.ticket.Ticket;
+import com.ticketflow1.ticketing.sla.SlaStatus;
 import java.time.Instant;
 
 public record TicketSummaryResponse(
@@ -19,7 +20,7 @@ public record TicketSummaryResponse(
         Instant createdAt,
         Instant updatedAt) {
 
-    public static TicketSummaryResponse from(Ticket ticket) {
+    public static TicketSummaryResponse from(Ticket ticket, SlaStatus slaStatus) {
         return new TicketSummaryResponse(
                 ticket.getId(),
                 ticket.getTicketKey(),
@@ -32,7 +33,7 @@ public record TicketSummaryResponse(
                 ticket.getBusinessOwner().getDisplayName(),
                 ticket.getTicketLead() == null ? null : ticket.getTicketLead().getDisplayName(),
                 ticket.getCurrentResponsibility().name(),
-                null,
+                slaStatus.name(),
                 ticket.getCreatedAt(),
                 ticket.getUpdatedAt());
     }

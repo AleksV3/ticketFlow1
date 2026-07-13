@@ -58,14 +58,18 @@ class TicketTransitionServiceTest {
     @Mock
     private CommentService commentService;
     @Mock private ProposalDetailService proposalDetailService;
+    private com.ticketflow1.ticketing.sla.SlaStatusService slaStatusService;
 
     private TicketTransitionService ticketTransitionService;
 
     @BeforeEach
     void setUp() {
+        var calculator = new com.ticketflow1.ticketing.sla.SlaCalculator();
+        slaStatusService = new com.ticketflow1.ticketing.sla.SlaStatusService(
+                calculator, java.time.Clock.systemUTC());
         ticketTransitionService = new TicketTransitionService(ticketRepository, workflowStateRepository,
                 workflowTransitionRepository, appUserRepository, auditService, statusHistoryService, commentService,
-                proposalDetailService);
+                proposalDetailService, slaStatusService, java.time.Clock.systemUTC());
     }
 
     @ParameterizedTest

@@ -9,6 +9,7 @@ import com.ticketflow1.ticketing.proposal.ProposalDetailService;
 import com.ticketflow1.ticketing.common.ApiException;
 import com.ticketflow1.ticketing.common.IllegalTransitionException;
 import com.ticketflow1.ticketing.statushistory.StatusHistoryService;
+import com.ticketflow1.ticketing.sla.SlaStatusService;
 import com.ticketflow1.ticketing.ticket.Responsibility;
 import com.ticketflow1.ticketing.ticket.Ticket;
 import com.ticketflow1.ticketing.ticket.TicketRepository;
@@ -16,6 +17,7 @@ import com.ticketflow1.ticketing.ticket.dto.TicketDetailResponse;
 import com.ticketflow1.ticketing.user.AppUser;
 import com.ticketflow1.ticketing.user.AppUserRepository;
 import java.util.List;
+import java.time.Clock;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -30,6 +32,8 @@ public class TicketTransitionService {
     private final StatusHistoryService statusHistoryService;
     private final CommentService commentService;
     private final ProposalDetailService proposalDetailService;
+    private final SlaStatusService slaStatusService;
+    private final Clock clock;
 
     public TicketTransitionService(TicketRepository ticketRepository,
             WorkflowStateRepository workflowStateRepository,
@@ -38,7 +42,9 @@ public class TicketTransitionService {
             AuditService auditService,
             StatusHistoryService statusHistoryService,
             CommentService commentService,
-            ProposalDetailService proposalDetailService) {
+            ProposalDetailService proposalDetailService,
+            SlaStatusService slaStatusService,
+            Clock clock) {
         this.ticketRepository = ticketRepository;
         this.workflowStateRepository = workflowStateRepository;
         this.workflowTransitionRepository = workflowTransitionRepository;
@@ -47,6 +53,8 @@ public class TicketTransitionService {
         this.statusHistoryService = statusHistoryService;
         this.commentService = commentService;
         this.proposalDetailService = proposalDetailService;
+        this.slaStatusService = slaStatusService;
+        this.clock = clock;
     }
 
     @Transactional
@@ -58,7 +66,7 @@ public class TicketTransitionService {
             commentService.createForTicket(saved, comment, CommentVisibility.PUBLIC, principal);
         }
         return TicketDetailResponse.from(saved, allowedTransitions(saved, principal),
-                proposalDetailService.detail(saved, principal));
+                proposalDetailService.detail(saved, principal), slaStatusService.status(saved));
     }
 
     @Transactional
@@ -101,6 +109,12 @@ public class TicketTransitionService {
         }
 
         ticket.setCurrentState(toState);
+        if ("DEFECT".equals(ticket.getTicketType().getKey())
+                && "REPORTED".equals(fromState.getKey())
+                && "ANALYSIS".equals(toState.getKey())
+                && ticket.getRespondedAt() == null) {
+            ticket.setRespondedAt(clock.instant());
+        }
         if (transition.getResponsibilityAfter() != null) {
             ticket.setCurrentResponsibility(transition.getResponsibilityAfter());
         }

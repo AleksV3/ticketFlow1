@@ -36,13 +36,15 @@ class CommentServiceTest {
     @Mock private TicketRepository ticketRepository;
     @Mock private AppUserRepository appUserRepository;
     @Mock private AuditService auditService;
+    @Mock private com.ticketflow1.ticketing.sla.SlaCalculator slaCalculator;
 
     private CommentService commentService;
     private Ticket ticket;
 
     @BeforeEach
     void setUp() {
-        commentService = new CommentService(commentRepository, ticketRepository, appUserRepository, auditService);
+        commentService = new CommentService(commentRepository, ticketRepository, appUserRepository, auditService,
+                slaCalculator, java.time.Clock.systemUTC());
         ticket = mock(Ticket.class);
     }
 

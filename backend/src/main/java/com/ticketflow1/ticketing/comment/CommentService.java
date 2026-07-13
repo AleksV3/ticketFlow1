@@ -9,9 +9,11 @@ import com.ticketflow1.ticketing.common.ApiException;
 import com.ticketflow1.ticketing.ticket.Responsibility;
 import com.ticketflow1.ticketing.ticket.Ticket;
 import com.ticketflow1.ticketing.ticket.TicketRepository;
+import com.ticketflow1.ticketing.sla.SlaCalculator;
 import com.ticketflow1.ticketing.user.AppUser;
 import com.ticketflow1.ticketing.user.AppUserRepository;
 import java.util.List;
+import java.time.Clock;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -25,13 +27,18 @@ public class CommentService {
     private final TicketRepository ticketRepository;
     private final AppUserRepository appUserRepository;
     private final AuditService auditService;
+    private final SlaCalculator slaCalculator;
+    private final Clock clock;
 
     public CommentService(CommentRepository commentRepository, TicketRepository ticketRepository,
-            AppUserRepository appUserRepository, AuditService auditService) {
+            AppUserRepository appUserRepository, AuditService auditService,
+            SlaCalculator slaCalculator, Clock clock) {
         this.commentRepository = commentRepository;
         this.ticketRepository = ticketRepository;
         this.appUserRepository = appUserRepository;
         this.auditService = auditService;
+        this.slaCalculator = slaCalculator;
+        this.clock = clock;
     }
 
     @Transactional(readOnly = true)
@@ -64,9 +71,27 @@ public class CommentService {
         AppUser author = appUserRepository.findById(principal.userId())
                 .orElseThrow(() -> ApiException.notFound("Current user no longer exists."));
         Comment saved = commentRepository.saveAndFlush(new Comment(ticket, author, body.trim(), visibility));
+        applySlaUpdate(ticket, author, visibility);
         auditService.record(ticket, author.getId(), AuditAction.COMMENT_ADDED,
                 "comment", visibility.name(), saved.getId().toString());
         return CommentResponse.from(saved);
+    }
+
+    private void applySlaUpdate(Ticket ticket, AppUser author, CommentVisibility visibility) {
+        if (visibility != CommentVisibility.PUBLIC
+                || author.getParty() != Responsibility.TICKETFLOW1
+                || !"DEFECT".equals(ticket.getTicketType().getKey())) {
+            return;
+        }
+        java.time.Instant now = clock.instant();
+        if (ticket.getFirstInfoAt() == null) {
+            ticket.setFirstInfoAt(now);
+        }
+        java.time.Duration updateDuration = slaCalculator.nextUpdateDuration(ticket.getSeverity());
+        if (updateDuration != null) {
+            ticket.setNextUpdateDueAt(now.plus(updateDuration));
+        }
+        ticketRepository.save(ticket);
     }
 
     private Ticket findVisibleTicket(String ticketKey, AuthPrincipal principal) {

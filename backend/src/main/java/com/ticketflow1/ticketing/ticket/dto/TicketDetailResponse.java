@@ -8,6 +8,7 @@ import java.time.Instant;
 import java.util.List;
 import com.ticketflow1.ticketing.proposal.ProposalDetailService.ProposalDetail;
 import com.ticketflow1.ticketing.proposal.dto.ChangeProposalResponse;
+import com.ticketflow1.ticketing.sla.SlaStatus;
 
 @JsonInclude(JsonInclude.Include.NON_NULL)
 public record TicketDetailResponse(
@@ -32,7 +33,8 @@ public record TicketDetailResponse(
         ChangeProposalResponse latestProposal,
         List<String> proposalCommands) {
 
-    public static TicketDetailResponse from(Ticket ticket, List<String> allowedTransitions, ProposalDetail proposal) {
+    public static TicketDetailResponse from(Ticket ticket, List<String> allowedTransitions, ProposalDetail proposal,
+            SlaStatus slaStatus) {
         return new TicketDetailResponse(
                 ticket.getId(),
                 ticket.getTicketKey(),
@@ -50,7 +52,7 @@ public record TicketDetailResponse(
                 ticket.getCreatedAt(),
                 ticket.getUpdatedAt(),
                 ticket.getClosedAt(),
-                null,
+                "DEFECT".equals(ticket.getTicketType().getKey()) ? SlaRef.from(ticket, slaStatus) : null,
                 allowedTransitions,
                 proposal == null ? null : proposal.latestProposal(),
                 proposal == null ? List.of() : proposal.permittedCommands());
@@ -75,6 +77,12 @@ public record TicketDetailResponse(
             Instant responseDueAt,
             Instant firstInfoDueAt,
             Instant nextUpdateDueAt,
+            Instant respondedAt,
+            Instant firstInfoAt,
             String status) {
+        public static SlaRef from(Ticket ticket, SlaStatus status) {
+            return new SlaRef(ticket.getResponseDueAt(), ticket.getFirstInfoDueAt(),
+                    ticket.getNextUpdateDueAt(), ticket.getRespondedAt(), ticket.getFirstInfoAt(), status.name());
+        }
     }
 }

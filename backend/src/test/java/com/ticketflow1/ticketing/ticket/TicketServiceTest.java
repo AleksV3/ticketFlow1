@@ -60,14 +60,20 @@ class TicketServiceTest {
     @Mock
     private TicketTransitionService ticketTransitionService;
     @Mock private ProposalDetailService proposalDetailService;
+    private com.ticketflow1.ticketing.sla.SlaCalculator slaCalculator;
+    private com.ticketflow1.ticketing.sla.SlaStatusService slaStatusService;
 
     private TicketService ticketService;
 
     @BeforeEach
     void setUp() {
+        slaCalculator = new com.ticketflow1.ticketing.sla.SlaCalculator();
+        slaStatusService = new com.ticketflow1.ticketing.sla.SlaStatusService(
+                slaCalculator, java.time.Clock.systemUTC());
         ticketService = new TicketService(ticketRepository, ticketTypeRepository, workflowStateRepository,
                 appUserRepository, organizationRepository, ticketKeyGenerator, auditService,
-                statusHistoryService, ticketTransitionService, proposalDetailService);
+                statusHistoryService, ticketTransitionService, proposalDetailService,
+                slaCalculator, slaStatusService, java.time.Clock.systemUTC());
     }
 
     @ParameterizedTest
@@ -107,7 +113,7 @@ class TicketServiceTest {
         TicketDetailResponse response = ticketService.createTicket(request, principal);
 
         ArgumentCaptor<Ticket> ticketCaptor = ArgumentCaptor.forClass(Ticket.class);
-        verify(ticketRepository).saveAndFlush(ticketCaptor.capture());
+        verify(ticketRepository, org.mockito.Mockito.atLeastOnce()).saveAndFlush(ticketCaptor.capture());
         Ticket savedTicket = ticketCaptor.getValue();
         assertThat(savedTicket.getTicketKey()).isEqualTo("TF-1001");
         assertThat(savedTicket.getTicketType().getKey()).isEqualTo(typeKey);
