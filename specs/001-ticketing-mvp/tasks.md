@@ -150,9 +150,9 @@ frontend work begins.
 - [x] T064 [US3] Calculate deadlines at Defect creation and recompute them on audited severity changes
 - [x] T065 [US3] Set `respondedAt` on first `REPORTED → ANALYSIS`; set `firstInfoAt` and advance SEV_1/SEV_2 update deadlines from qualifying PUBLIC TicketFlow1 comments
 - [x] T066 [US3] Add the complete `sla` response block and database predicates for paginated `slaStatus` filters using the same semantics as `SlaStatusService`
-- [ ] T067 [P] [US3] Unit-test formulas, weekday boundaries, warning windows, completed milestones, terminal tickets, and severity recomputation
-- [ ] T068 [P] [US3] Integration-test SLA list pagination and status/detail consistency against PostgreSQL
-- [ ] T069 [US5] Implement tenant-scoped `DashboardService` and `GET /api/dashboard`; use terminal metadata for counts and document seeded-only waiting cards
+- [x] T067 [P] [US3] Unit-test formulas, weekday boundaries, warning windows, completed milestones, terminal tickets, and severity recomputation
+- [x] T068 [P] [US3] Integration-test SLA list pagination and status/detail consistency against PostgreSQL
+- [x] T069 [US5] Implement tenant-scoped `DashboardService` and `GET /api/dashboard`; use terminal metadata for counts and document seeded-only waiting cards
 - [ ] T070 [P] [US5] Test dashboard counts/lists for empty data, two organizations, active/terminal tickets, assignment, and SLA states
 - [ ] T071 **Verify**: backdate SLA milestones without a debug endpoint, confirm each status and dashboard/list/detail agreement
 

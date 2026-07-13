@@ -150,6 +150,39 @@ class TicketServiceTest {
                 .hasMessageContaining("severity is allowed only when type is DEFECT");
     }
 
+    @Test
+    void updateTicket_recomputesAndAuditsSeverityFromOriginalCreationTime() {
+        Organization organization = organization(7L, "Client A");
+        AppUser actor = appUser(11L, "admin@ticketflow1.demo", "Admin", Responsibility.TICKETFLOW1, null);
+        Workflow workflow = workflow(21L, "Defect workflow");
+        TicketType type = ticketType(31L, "DEFECT", workflow, organization, false);
+        WorkflowState analysis = workflowState(41L, workflow, "ANALYSIS", false);
+        Ticket ticket = new Ticket("TF-1002", type, analysis, Priority.HIGH, Severity.SEV_1,
+                "Defect", "Description", organization, actor, Responsibility.TICKETFLOW1);
+        Instant createdAt = Instant.parse("2026-07-13T08:00:00Z");
+        ReflectionTestUtils.setField(ticket, "id", 501L);
+        ReflectionTestUtils.setField(ticket, "createdAt", createdAt);
+        ReflectionTestUtils.setField(ticket, "updatedAt", createdAt);
+        AuthPrincipal principal = new AuthPrincipal(actor.getId(), Responsibility.TICKETFLOW1, null,
+                Set.of("TICKET_UPDATE", "TICKET_READ"));
+
+        when(ticketRepository.findByTicketKey("TF-1002")).thenReturn(java.util.Optional.of(ticket));
+        when(appUserRepository.findById(actor.getId())).thenReturn(java.util.Optional.of(actor));
+        when(ticketRepository.save(ticket)).thenReturn(ticket);
+        when(ticketTransitionService.allowedTransitions(ticket, principal)).thenReturn(List.of());
+
+        ticketService.updateTicket("TF-1002",
+                new com.ticketflow1.ticketing.ticket.dto.UpdateTicketRequest(
+                        null, null, null, null, Severity.SEV_3, null, null), principal);
+
+        assertThat(ticket.getSeverity()).isEqualTo(Severity.SEV_3);
+        assertThat(ticket.getResponseDueAt()).isEqualTo(createdAt.plusSeconds(60 * 60));
+        assertThat(ticket.getFirstInfoDueAt()).isEqualTo(createdAt.plusSeconds(90 * 60));
+        assertThat(ticket.getNextUpdateDueAt()).isNull();
+        verify(auditService).record(ticket, actor.getId(), AuditAction.SEVERITY_CHANGED,
+                "severity", "SEV_1", "SEV_3");
+    }
+
     private static Organization organization(Long id, String name) {
         Organization organization = new Organization(name);
         ReflectionTestUtils.setField(organization, "id", id);

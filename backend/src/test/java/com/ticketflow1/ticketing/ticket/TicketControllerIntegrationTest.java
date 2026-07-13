@@ -624,6 +624,45 @@ class TicketControllerIntegrationTest {
         assertThat(java.util.List.of(first.get(), second.get())).containsExactlyInAnyOrder(true, false);
     }
 
+    @Test
+    void slaFiltersArePaginatedTenantScopedAndConsistentWithDetail() throws Exception {
+        Cookie clientA = login("client-a@demo.test", "client123");
+        Cookie clientB = login("client-b@demo.test", "client123");
+        String breachedA = createTicket(clientA, """
+                {"type":"DEFECT","title":"Breached A","description":"SLA filter","priority":"HIGH","severity":"SEV_1"}
+                """, "REPORTED");
+        String breachedA2 = createTicket(clientA, """
+                {"type":"DEFECT","title":"Breached A2","description":"SLA pagination","priority":"HIGH","severity":"SEV_1"}
+                """, "REPORTED");
+        String dueSoonA = createTicket(clientA, """
+                {"type":"DEFECT","title":"Due soon A","description":"SLA consistency","priority":"HIGH","severity":"SEV_1"}
+                """, "REPORTED");
+        String breachedB = createTicket(clientB, """
+                {"type":"DEFECT","title":"Breached B","description":"Other tenant","priority":"HIGH","severity":"SEV_1"}
+                """, "REPORTED");
+
+        jdbcTemplate.update("UPDATE ticket SET response_due_at=now()-interval '1 minute', first_info_due_at=now()+interval '1 hour', next_update_due_at=NULL WHERE ticket_key IN (?, ?, ?)",
+                breachedA, breachedA2, breachedB);
+        jdbcTemplate.update("UPDATE ticket SET response_due_at=now()+interval '2 minutes', first_info_due_at=now()+interval '1 hour', next_update_due_at=NULL WHERE ticket_key=?",
+                dueSoonA);
+
+        mockMvc.perform(get("/api/tickets").param("slaStatus", "BREACHED")
+                        .param("pageSize", "1").cookie(clientA))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.items.length()").value(1))
+                .andExpect(jsonPath("$.totalItems").value(2))
+                .andExpect(jsonPath("$.totalPages").value(2))
+                .andExpect(jsonPath("$.items[0].slaStatus").value("BREACHED"));
+        mockMvc.perform(get("/api/tickets").param("slaStatus", "DUE_SOON").cookie(clientA))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.totalItems").value(1))
+                .andExpect(jsonPath("$.items[0].ticketKey").value(dueSoonA))
+                .andExpect(jsonPath("$.items[0].slaStatus").value("DUE_SOON"));
+        mockMvc.perform(get("/api/tickets/{ticketKey}", dueSoonA).cookie(clientA))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.sla.status").value("DUE_SOON"));
+    }
+
     private void transition(String key, String to, Cookie cookie, org.springframework.test.web.servlet.ResultMatcher expected) throws Exception {
         mockMvc.perform(post("/api/tickets/{ticketKey}/transition", key).cookie(cookie)
                 .contentType("application/json").content("{\"toStatus\":\"" + to + "\"}")).andExpect(expected);
