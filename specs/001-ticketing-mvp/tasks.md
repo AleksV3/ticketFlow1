@@ -179,9 +179,9 @@ browser without duplicating authorization/workflow logic.
 - [x] T085 [P] [US4] Add comments, attachment references, and privacy-safe audit/history sections to ticket detail
 - [x] T086 [P] [US1] Add proposal create/approve/reject UI driven by proposal commands from the API
 - [x] T087 [US6] Implement user administration using assignable-role references
-- [ ] T088 [US7] Implement role editor and explain that edits affect the next token issuance
-- [ ] T089 [US8] Implement additive ticket-type/workflow editor with protected proposal kinds unavailable for custom workflows
-- [ ] T090 [P] Add focused frontend tests for API/CSRF handling, auth redirects, permission navigation, transition rendering, and form validation
+- [x] T088 [US7] Implement role editor and explain that edits affect the next token issuance
+- [x] T089 [US8] Implement additive ticket-type/workflow editor with protected proposal kinds unavailable for custom workflows
+- [x] T090 [P] Add focused frontend tests for API/CSRF handling, auth redirects, permission navigation, transition rendering, and form validation
 - [ ] T091 Add end-to-end smoke coverage for login → ticket creation → transition → comment and proposal approval
 - [ ] T092 Verify responsive layout, keyboard operation, labels/focus, and no console errors
 - [ ] T093 Verify all five seeded roles see only permitted navigation/actions and both Organizations remain isolated
