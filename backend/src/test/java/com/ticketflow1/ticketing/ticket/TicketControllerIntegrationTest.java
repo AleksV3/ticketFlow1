@@ -196,6 +196,102 @@ class TicketControllerIntegrationTest {
                 .andExpect(jsonPath("$[1].newValue").value("ANALYSIS"));
     }
 
+    @Test
+    void commentsAndAttachments_enforceVisibilityTenantScopeAndValidationLimits() throws Exception {
+        Cookie clientACookie = login("client-a@demo.test", "client123");
+        Cookie clientBCookie = login("client-b@demo.test", "client123");
+        Cookie internalCookie = login("admin@ticketflow1.demo", "admin123");
+        String ticketKey = createTicket(clientACookie, """
+                {
+                  "type":"TASK",
+                  "title":"Phase 4 integration",
+                  "description":"Comment and attachment boundaries",
+                  "priority":"MEDIUM"
+                }
+                """, "SUBMITTED");
+
+        mockMvc.perform(post("/api/tickets/{ticketKey}/comments", ticketKey)
+                        .cookie(clientACookie)
+                        .contentType("application/json")
+                        .content("""
+                                {"body":"Visible to both parties","visibility":"PUBLIC"}
+                                """))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.visibility").value("PUBLIC"));
+
+        mockMvc.perform(post("/api/tickets/{ticketKey}/comments", ticketKey)
+                        .cookie(internalCookie)
+                        .contentType("application/json")
+                        .content("""
+                                {"body":"Internal investigation detail","visibility":"INTERNAL"}
+                                """))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.visibility").value("INTERNAL"));
+
+        mockMvc.perform(get("/api/tickets/{ticketKey}/comments", ticketKey).cookie(clientACookie))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(1))
+                .andExpect(jsonPath("$[0].body").value("Visible to both parties"));
+
+        mockMvc.perform(get("/api/tickets/{ticketKey}/comments", ticketKey).cookie(internalCookie))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(2))
+                .andExpect(jsonPath("$[1].body").value("Internal investigation detail"));
+
+        mockMvc.perform(get("/api/tickets/{ticketKey}/comments", ticketKey).cookie(clientBCookie))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.error").value("NOT_FOUND"));
+
+        mockMvc.perform(post("/api/tickets/{ticketKey}/comments", ticketKey)
+                        .cookie(clientACookie)
+                        .contentType("application/json")
+                        .content("""
+                                {"body":"Not allowed","visibility":"INTERNAL"}
+                                """))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.error").value("FORBIDDEN"));
+
+        mockMvc.perform(post("/api/tickets/{ticketKey}/comments", ticketKey)
+                        .cookie(clientACookie)
+                        .contentType("application/json")
+                        .content("""
+                                {"body":"   ","visibility":"PUBLIC"}
+                                """))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error").value("VALIDATION_FAILED"));
+
+        mockMvc.perform(post("/api/tickets/{ticketKey}/attachments", ticketKey)
+                        .cookie(clientACookie)
+                        .contentType("application/json")
+                        .content("""
+                                {"fileName":"screen.png","contentType":"image/png","sizeBytes":245678}
+                                """))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.fileName").value("screen.png"));
+
+        mockMvc.perform(get("/api/tickets/{ticketKey}/attachments", ticketKey).cookie(clientBCookie))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.error").value("NOT_FOUND"));
+
+        mockMvc.perform(post("/api/tickets/{ticketKey}/attachments", ticketKey)
+                        .cookie(clientACookie)
+                        .contentType("application/json")
+                        .content("""
+                                {"fileName":"bad.bin","contentType":"not-a-mime","sizeBytes":1}
+                                """))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error").value("VALIDATION_FAILED"));
+
+        mockMvc.perform(post("/api/tickets/{ticketKey}/attachments", ticketKey)
+                        .cookie(clientACookie)
+                        .contentType("application/json")
+                        .content("""
+                                {"fileName":"too-large.zip","contentType":"application/zip","sizeBytes":104857601}
+                                """))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error").value("VALIDATION_FAILED"));
+    }
+
     private Cookie login(String email, String password) throws Exception {
         MvcResult result = mockMvc.perform(post("/api/auth/login")
                         .contentType("application/json")
