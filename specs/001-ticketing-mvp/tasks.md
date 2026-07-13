@@ -1,5 +1,7 @@
 # Tasks: TicketFlow1 Ticketing Tool — MVP
 
+**Last revised**: 2026-07-10 · **Current gate**: Phase 3 completion hardening (T036–T042)
+
 **Input**: Design documents from `specs/001-ticketing-mvp/` (spec.md, plan.md,
 research.md, data-model.md, contracts/, quickstart.md)
 
@@ -10,7 +12,8 @@ mandated for every CRUD endpoint — see individual phase notes.
 
 **Organization**: Tasks are grouped by the constitution's build order (backend
 foundation + RBAC → configuration model + ticket core → workflow engine →
-comments/attachments → change proposals → defect SLA → frontend → polish/demo),
+hardening gate → comments/attachment references → change proposals →
+defect SLA/dashboard backend → admin backend/frontend → release/demo),
 **not** by user story priority. Each user story from spec.md is labeled
 (`[US1]`–`[US8]`) wherever a task serves it specifically.
 
@@ -33,19 +36,19 @@ security, the seeded permission catalog + default roles, and a bootstrap admin.
 
 - [x] T001 Create `backend/` Spring Boot 3.x project (Java 21, Maven wrapper) with dependencies: Spring Web, Spring Data JPA, Spring Security, Flyway, PostgreSQL driver, springdoc-openapi, jjwt (plan.md Technical Context)
 - [x] T002 [P] Create `frontend/` Next.js (App Router) + TypeScript + Tailwind scaffold — no pages yet beyond the default
-- [x] T003 [P] Create root `docker-compose.yml` with a `postgres` service (Postgres 16, named volume, exposed on 5432) and a `.env.example` documenting `POSTGRES_DB`/`POSTGRES_USER`/`POSTGRES_PASSWORD`/`JWT_SECRET`
+- [x] T003 [P] Create root `docker-compose.yml` with a `postgres` service (Postgres 16, named volume, host port 5433) and a `.env.example` documenting `POSTGRES_DB`/`POSTGRES_USER`/`POSTGRES_PASSWORD`/`JWT_SECRET`
 - [x] T004 Configure `backend/src/main/resources/application.yml`: datasource pointing at the Compose Postgres, `spring.flyway.enabled=true`, `spring.jpa.hibernate.ddl-auto=validate` (schema truth lives in Flyway)
-- [x] T005 Add Flyway migration `db/migration/V1__create_rbac.sql`: `permission`, `role`, `role_permission`, `organization`, `app_user` tables per data-model.md (bigint identity PKs; `party` as TEXT+CHECK). Seed the permission catalog, the five default **role templates** (`ADMIN`, `CLIENT_USER`, `CLIENT_APPROVER`, `TICKETFLOW1_USER`, `TICKETFLOW1_MANAGER`) with their `role_permission` mappings, a bootstrap `ADMIN` user (BCrypt demo password), and 2 demo Organizations so login can be verified this phase
+- [x] T005 Add Flyway migration `db/migration/V1__create_rbac.sql`: `permission`, `role`, `role_permission`, `organization`, `app_user` tables per data-model.md (bigint identity PKs; `party` as TEXT+CHECK). Seed the permission catalog, five default role templates/mappings, and a temporary bootstrap admin for early local verification (removed from deployable profiles by T036/T040)
 - [x] T006 [P] Implement the permission-catalog constants and `Permission`, `Role`, `RolePermission` JPA entities + repositories in `backend/src/main/java/com/ticketflow1/ticketing/rbac/`
 - [x] T007 [P] Implement `Organization` entity + `OrganizationRepository` in `organization/`
 - [x] T008 [P] Implement `AppUser` entity (`party`, `role_id` FK), `AppUserRepository`, and a service-layer check that `organizationId` is required when `party = CLIENT` and null when `party = TICKETFLOW1`, in `user/` (data-model.md validation rules)
-- [x] T009 Implement JWT issuing/parsing (`JwtService`) and a `OncePerRequestFilter` that validates `Authorization: Bearer` and populates `SecurityContext` with the user's **permission authorities** (resolved from its role's permissions) plus `party` and `organizationId` claims, in `auth/` (research.md Authentication decision)
+- [x] T009 Implement JWT issuing/parsing (`JwtService`) and a `OncePerRequestFilter` that accepts the HttpOnly auth cookie (and Bearer token for non-browser clients) and populates `SecurityContext` with permission, party, and Organization claims
 - [x] T010 Configure method security so `@PreAuthorize("hasAuthority('<PERMISSION_KEY>')")` gates endpoints, and implement global exception handling (`@RestControllerAdvice`, `ApiExceptionHandler`) producing the standard error shape/codes from contracts/README.md (`VALIDATION_FAILED`, `UNAUTHENTICATED`, `FORBIDDEN`, `NOT_FOUND`, `INTERNAL_ERROR`; `ILLEGAL_TRANSITION`/`INVALID_STATE` added in Phase 3)
-- [x] T011 Implement `POST /api/auth/login` and `GET /api/users/me` in `auth/AuthController.java` per contracts/auth.md (the `me` response includes the caller's permission set for the frontend)
+- [x] T011 Implement login, logout, and current-user endpoints per contracts/auth.md; login sets the HttpOnly auth cookie and `me` includes permissions for UI capability rendering
 - [x] T012 [P] [US6] Implement `GET/POST/PATCH /api/admin/organizations` in `organization/OrganizationAdminController.java` per contracts/admin.md, gated `hasAuthority('USER_MANAGE')`
 - [x] T013 [P] [US6] Implement `GET/POST /api/admin/users` in `user/UserAdminController.java` per contracts/admin.md, gated `USER_MANAGE`, enforcing the party/org rule from T008
 - [x] T014 [P] [US7] Implement `GET /api/admin/permissions`, `GET/POST/PATCH /api/admin/roles` in `rbac/RoleAdminController.java` per contracts/admin.md, gated `ROLE_MANAGE` — create/edit a role as a bundle of catalog permissions
-- [x] T015 **Verify**: `docker compose up -d postgres`, start backend, confirm Flyway applies `V1`, Swagger UI loads, `POST /api/auth/login` for the bootstrap admin returns a JWT, and a `USER_MANAGE`-gated endpoint returns `403` for a token whose role lacks it
+- [x] T015 **Verify**: start Postgres/backend, confirm V1 and Swagger, verify bootstrap login sets the auth cookie, and confirm a `USER_MANAGE` endpoint returns `403` for a caller lacking it
 
 ---
 
@@ -63,7 +66,7 @@ first ticket.
 - [x] T020 [P] Implement `AuditLog` entity, repo, and `AuditService.record(...)` (single audit call site) in `audit/`
 - [x] T021 [P] Implement `StatusHistory` entity, repo, and `StatusHistoryService.record(...)` in `statushistory/`
 - [x] T022 Implement ticket key generation (`TF-<sequence>`) — a Postgres sequence + `TicketKeyGenerator` in `ticket/`
-- [x] T023 [US1][US2][US3] Implement `TicketService.createTicket(...)`: resolves the org's `TicketType`, sets `current_state` to that type's workflow initial state, inherits `organizationId` from the business owner, requires `severity` only when the type is Defect (FR-004), writes a `TICKET_CREATED` audit entry + initial `StatusHistory` row (`from_state=null`) in one transaction, in `ticket/TicketService.java`
+- [x] T023 [US1][US2][US3] Implement `TicketService.createTicket(...)`: resolves the Organization's type/initial state; CLIENT callers inherit their Organization while TICKETFLOW1 callers select one; enforce Defect severity and atomically write ticket/audit/initial history
 - [x] T024 [US1][US2][US3] Implement `POST /api/tickets` and `GET /api/tickets/{ticketKey}` in `ticket/TicketController.java` per contracts/tickets.md, with DTOs in `ticket/dto/` — org-scoping enforced (CLIENT-party callers filtered to their own org; cross-org access returns `404`, not `403`)
 - [x] T025 [US5] Implement `GET /api/tickets` list with pagination and the filters from contracts/tickets.md (`type`, `status`, `severity`, `priority`, `assignedTo=me`, `responsibility`, `slaStatus`, `organizationId`, `q`) — leave a `// TODO Phase 6` for `slaStatus`, don't stub incorrect behavior
 - [x] T026 [P] Unit test `TicketService.createTicket`: correct initial state per type, org inheritance, severity rule, audit + history rows written
@@ -76,7 +79,7 @@ first ticket.
 Goal: the core differentiator — validated, config-driven, permission-gated
 transitions (constitution Principle I).
 
-- [x] T028 [US1][US2][US3] Implement `workflow/TicketTransitionService.transition(ticketKey, toStateKey, actor)`: loads the ticket's type → workflow → the `WorkflowTransition` rows out of the current state; accepts the move only if a matching transition exists **and** the actor holds its `required_permission` **and** matches `required_party` (when set), else throws `IllegalTransitionException` (→ `409 ILLEGAL_TRANSITION`); on success updates `current_state`, applies `responsibility_after`, writes a `StatusHistory` row + `STATUS_CHANGED` audit entry, and optionally stores a `comment` as a `PUBLIC` comment (direct repo call now; refactored to `CommentService` in Phase 4)
+- [x] T028 [US1][US2][US3] Implement `workflow/TicketTransitionService.transition(ticketKey, toStateKey, actor)`: loads the ticket's type → workflow → the `WorkflowTransition` rows out of the current state; accepts the move only if a matching transition exists **and** the actor holds its `required_permission` **and** matches `required_party` (when set), else throws `IllegalTransitionException` (→ `409 ILLEGAL_TRANSITION`); on success updates `current_state`, applies `responsibility_after`, and writes a `StatusHistory` row + `STATUS_CHANGED` audit entry. Until Phase 4 provides `CommentService`, a non-blank transition comment is rejected instead of silently discarded.
 - [x] T029 [US1][US2][US3] Implement `POST /api/tickets/{ticketKey}/transition` in `TicketController` per contracts/tickets.md, mapping `IllegalTransitionException` to `409`
 - [x] T030 [US1][US2][US3] Add `allowedTransitions` (pre-filtered to the caller's permissions + party) to the `TicketDetail` response — the frontend never computes transition legality itself
 - [x] T031 [P] Implement `GET /api/tickets/{ticketKey}/status-history` in `statushistory/StatusHistoryController.java` per contracts/audit-and-history.md
@@ -87,98 +90,131 @@ transitions (constitution Principle I).
 
 ---
 
-## Phase 4: Comments & Attachments
+## Phase 3 completion gate: hardening
 
-Goal: doc 02's "all documentation and communication in one place."
+Goal: close cross-phase correctness/security gaps before comments and proposals
+build on the transition engine.
 
-- [ ] T036 Add Flyway migration `db/migration/V4__create_comment_and_attachment.sql`: `comment` and `attachment` tables per data-model.md, including `updated_at`/`updated_by_id` audit columns
-- [ ] T037 [P] [US4] Implement `Comment` entity, repo, `CommentService` (visibility filtering: `INTERNAL` returned only to callers holding the internal-read permission, per FR-012) in `comment/`
-- [ ] T038 [P] [US4] Implement `GET/POST /api/tickets/{ticketKey}/comments` in `CommentController` per contracts/comments.md, rejecting `visibility=INTERNAL` from callers lacking `COMMENT_INTERNAL_WRITE` with `403`, writing a `COMMENT_ADDED` audit entry
-- [ ] T039 Refactor T028's inline transition-comment persistence to call `CommentService`
-- [ ] T040 [P] Implement `Attachment` entity, repo, `AttachmentService` (metadata-only per spec Assumptions) in `attachment/`
-- [ ] T041 [P] Implement `GET/POST /api/tickets/{ticketKey}/attachments` per contracts/attachments.md, writing an `ATTACHMENT_ADDED` audit entry
-- [ ] T042 [P] [US4] Test: an `INTERNAL` comment is invisible to a CLIENT caller; a caller lacking `COMMENT_INTERNAL_WRITE` posting `visibility=INTERNAL` gets `403`
-- [ ] T043 **Verify**: post one `INTERNAL` and one `PUBLIC` comment as a TICKETFLOW1 user, confirm a CLIENT caller's `GET .../comments` returns only the public one; post an attachment, confirm it appears in `GET .../attachments`
+- [ ] T036 Add `V4__phase3_hardening.sql`: optimistic-lock versions for ticket/role/workflow, transition `operation_kind`, `configuration_audit_log`, fixed `COMMENT_INTERNAL_READ` granted to default TicketFlow1 roles, removal of legacy `CONFIG_CHANGED` from ticket audit, and deactivation of the known-password bootstrap user; mark seeded proposal transitions with protected operation kinds
+- [ ] T037 Implement optimistic locking for `Ticket` and map stale writes to `409 CONFLICT`; set/clear `closedAt` when entering/leaving terminal states
+- [ ] T038 Restrict the generic transition command and `allowedTransitions` to `operationKind=STANDARD`; expose an internal transition method for an owning domain service
+- [ ] T039 Implement `ConfigurationAuditService` and record existing organization/role mutations with tenant scope and bounded old/new summaries
+- [ ] T040 Harden cookie auth: CSRF cookie/header support, environment-configured CORS origins, `Secure` cookies outside local development, and optional local/demo bootstrap credentials supplied only through environment configuration
+- [ ] T041 [P] Test protected-transition rejection, optimistic-lock conflicts, terminal `closedAt`, configuration-audit persistence/scoping, CSRF, and production cookie attributes
+- [ ] T042 **Verify**: run the full backend suite and manually confirm a direct generic `ANALYSIS → PROPOSAL` request is rejected without changing ticket/history/audit state
+
+---
+
+## Phase 4: Comments & Attachment References
+
+Goal: public/internal communication with tenant-safe visibility; attachment
+records are metadata references only.
+
+- [ ] T043 Add `V5__create_comment_and_attachment.sql` with validation constraints and indexes by `(ticket_id, created_at)`
+- [ ] T044 [P] [US4] Implement `Comment` entity/repository and `CommentService`; resolve the visible parent ticket first and filter INTERNAL reads by `COMMENT_INTERNAL_READ`
+- [ ] T045 [P] [US4] Implement `GET/POST /api/tickets/{ticketKey}/comments`; enforce public/internal write permissions and write privacy-safe `COMMENT_ADDED` audit entries
+- [ ] T046 Replace T028's temporary transition-comment rejection with atomic PUBLIC-comment persistence through `CommentService`
+- [ ] T047 [P] Implement attachment-reference entity/repository/service with filename, MIME, size bounds, and parent-ticket organization scoping
+- [ ] T048 [P] Implement `GET/POST /api/tickets/{ticketKey}/attachments` and privacy-safe `ATTACHMENT_ADDED` audit entries
+- [ ] T049 [P] [US4] Test public/internal visibility, cross-org 404s, and comment/attachment validation limits
+- [ ] T050 [P] [US4] Test privacy-safe comment audit feeds and transactional rollback when audit persistence fails
+- [ ] T051 **Verify**: compare TicketFlow1 and CLIENT comment/audit responses and confirm no INTERNAL body or event leaks; verify attachment reference isolation
 
 ---
 
 ## Phase 5: Change Proposals
 
-Goal: the Change Request approval gate — spec.md's highest-priority
-differentiator (User Story 1).
+Goal: proposal creation/decision and its protected workflow transition commit as
+one concurrency-safe business command.
 
-- [ ] T044 Add Flyway migration `db/migration/V5__create_change_proposal.sql`: `change_proposal` table per data-model.md, including `updated_at`/`updated_by_id` audit columns
-- [ ] T045 [US1] Implement `ChangeProposal` entity, repo, `ChangeProposalService` in `proposal/` — `createProposal` rejects tickets whose type has `requires_proposal = false`, tickets not in the proposal-eligible state, or an existing `PENDING` proposal (`409 INVALID_STATE`), and transitions the ticket into `PROPOSAL` (flipping responsibility to CLIENT) via `TicketTransitionService` in the same transaction (no duplicated transition logic)
-- [ ] T046 [US1] Implement `approve`/`reject` in `ChangeProposalService`: gated on `PROPOSAL_APPROVE` **and** CLIENT party in the ticket's own org; `reject` requires a non-empty comment; both transition the ticket (`PROPOSAL_APPROVED`/`PROPOSAL_REJECTED`) and write the matching audit entries
-- [ ] T047 [US1] Implement `POST /api/tickets/{ticketKey}/proposals`, `POST /api/proposals/{proposalId}/approve`, `POST /api/proposals/{proposalId}/reject` in `proposal/ChangeProposalController.java` per contracts/proposals.md
-- [ ] T048 [US1] Extend `TicketDetail` to include the current (most recent) proposal for proposal-enabled types
-- [ ] T049 [P] [US1] Unit test: approve/reject succeeds only for `PROPOSAL_APPROVE` + CLIENT party in the ticket's org; a second `PENDING` proposal is blocked; a Task/Defect ticket rejects proposal creation (spec US2 Scenario 2)
-- [ ] T050 **Verify**: a Change Request from `SUBMITTED` through `PROPOSAL_APPROVED` including one rejection-and-resubmission cycle, confirming the full audit trail (spec SC-001, SC-002)
-
----
-
-## Phase 6: Defect SLA
-
-Goal: severity-driven SLA deadlines and status — User Story 3.
-
-- [ ] T051 [US3] Implement `sla/SlaCalculator`: pure function computing `responseDueAt`/`firstInfoDueAt`/`nextUpdateDueAt` from `severity` + `createdAt` per doc 02 §4 formulas
-- [ ] T052 [US3] Implement `sla/SlaStatusService.computeStatus(ticket, now)` returning `OK`/`DUE_SOON`/`BREACHED`/`NOT_APPLICABLE` at read time (research.md — not persisted, not a scheduled job)
-- [ ] T053 [US3] Wire severity assignment (via the `PATCH` from T033) to call `SlaCalculator` and persist the due-date fields, writing a `SEVERITY_CHANGED` audit entry (old/new), including the recompute-on-downgrade edge case from spec.md
-- [ ] T054 [US3] Add the `sla` block (computed `status` + three due dates) to `TicketDetail` for Defect-type tickets; wire the `slaStatus` list filter (deferred TODO from T025) to a repository query against the due-date columns
-- [ ] T055 [P] [US3] Unit test `SlaCalculator` for all 4 severities against doc 02 §4; unit test `SlaStatusService` for the `OK`/`DUE_SOON`/`BREACHED` boundaries
-- [ ] T056 **Verify**: create a `SEV_1` defect, confirm `responseDueAt = createdAt + 15m` and `slaStatus = OK`; via an integration test with a backdated `createdAt`, confirm `slaStatus` flips to `BREACHED` with no manual recalculation (spec SC-003)
+- [ ] T052 Add `V6__create_change_proposal.sql` with `version` and a partial unique index allowing at most one `PENDING` proposal per ticket
+- [ ] T053 [US1] Implement `ChangeProposal` entity/repository and deterministic latest query (`createdAt DESC, id DESC`)
+- [ ] T054 [US1] Implement proposal creation via the protected `PROPOSAL_CREATE` transition in one transaction; reject wrong type/state/party or an existing pending proposal
+- [ ] T055 [US1] Implement approve/reject via protected operation kinds; require `PROPOSAL_APPROVE` + CLIENT party + same org, store rejection reason as PUBLIC comment, and audit atomically
+- [ ] T056 [US1] Implement proposal create/approve/reject controllers per contract and map stale decisions to `409 CONFLICT`
+- [ ] T057 [US1] Extend `TicketDetail` with latest proposal and permitted proposal commands separately from standard `allowedTransitions`
+- [ ] T058 [P] [US1] Test permissions, party/org isolation, duplicate pending proposals, concurrent decisions, and Task/Defect rejection
+- [ ] T059 [P] [US1] Test that generic transitions cannot enter/decide proposal states and that failed proposal persistence rolls back ticket/history/audit/comment changes
+- [ ] T060 **Verify**: complete one rejection/resubmission/approval cycle and inspect the proposal, public reason, ticket audit, and status history
 
 ---
 
-## Phase 7: Frontend
+## Phase 6: Defect SLA & Dashboard Backend
 
-Goal: every backend capability becomes usable through a browser, for all five
-seeded roles, with the admin configuration surfaces (spec US1–US8 made visible).
+Goal: event-aware SLA deadlines/status plus a fully tested dashboard API before
+frontend work begins.
 
-- [ ] T057 Implement `frontend/lib/api.ts` (typed fetch client, base URL, `credentials: 'include'`, error-shape parsing per contracts/README.md) and `frontend/lib/auth.ts` (cookie-aware auth helpers + current-user fetch)
-- [x] T058 [P] Implement `frontend/app/login/page.tsx` calling `POST /api/auth/login`, relying on the backend's `HttpOnly` auth cookie, redirecting to `/dashboard`
-- [ ] T059 [P] Implement shared components in `frontend/components/`: `StatusBadge`, `SlaBadge`, `TransitionButtons` (renders exactly `ticket.allowedTransitions` from the API, never computes legality client-side)
-- [ ] T060 [US5] Implement `frontend/app/dashboard/page.tsx` + the backend `dashboard/DashboardService` and `GET /api/dashboard` (contracts/dashboard.md): active/closed counts, by-type, by-status, defects-by-severity, SLA breached/due-soon, waiting-for-approval, waiting-for-confirmation, my-assigned
-- [ ] T061 [P] Implement `frontend/app/tickets/page.tsx`: list view with the filters from contracts/tickets.md
-- [ ] T062 [P] [US1][US2][US3] Implement `frontend/app/tickets/new/page.tsx`: creation form driven by the org's configured ticket types (severity field only when the chosen type is Defect)
-- [ ] T063 [US1][US2][US3][US4] Implement `frontend/app/tickets/[ticketKey]/page.tsx`: detail view — status/type/severity/SLA, business owner/ticket lead, comments (internal toggle for permitted users), attachments, proposal section (proposal-enabled types), audit/history timeline, transition buttons
-- [ ] T064 [US6] Implement `frontend/app/admin/users/page.tsx`: list + create user, org + role assignment, calling `GET/POST /api/admin/users`, `GET /api/admin/organizations`, `GET /api/admin/roles`
-- [ ] T065 [US7][US8] Implement `frontend/app/admin/config/page.tsx`: manage roles (permission bundles) and ticket types + workflows (states/transitions), calling the `/api/admin/roles`, `/api/admin/ticket-types`, `/api/admin/workflows` endpoints
-- [ ] T066 **Verify**: log in as each of the 5 seeded default roles in separate sessions, confirm dashboard/list/detail render without console errors and only permitted transition buttons appear
-
----
-
-## Phase 8: Polish / Demo
-
-Goal: the tool is demoable, per doc 02 §12/§13.
-
-- [ ] T067 Add Flyway migration `db/migration/V6__seed_demo_data.sql`: 2 Organizations (each with client roles/types cloned from the templates), one user per default role, and sample tickets spanning multiple statuses/severities so the dashboard has real data on first run; seed consistent `updated_at`/`updated_by_id` values
-- [ ] T068 [P] Write the `README.md` setup section: prerequisites, `docker compose up`, backend/frontend run commands, seeded demo credentials
-- [ ] T069 [P] Write a demo script following doc 02 §12's steps, with the exact seeded accounts for each step
-- [ ] T070 **Verify**: time a full demo run end to end — under 10 minutes (spec SC-006) — and run the two-Organization isolation check (spec SC-008) in the same pass
+- [ ] T061 [US3] Add `V7__add_defect_sla_events.sql` with `responded_at`, `first_info_at`, and indexes needed by SLA status queries
+- [ ] T062 [US3] Implement `SlaCalculator` for all four severities, including the documented Europe/Ljubljana weekday approximation
+- [ ] T063 [US3] Implement `SlaStatusService` with exact `NOT_APPLICABLE`/`BREACHED`/`DUE_SOON`/`OK` precedence and an injectable `Clock`
+- [ ] T064 [US3] Calculate deadlines at Defect creation and recompute them on audited severity changes
+- [ ] T065 [US3] Set `respondedAt` on first `REPORTED → ANALYSIS`; set `firstInfoAt` and advance SEV_1/SEV_2 update deadlines from qualifying PUBLIC TicketFlow1 comments
+- [ ] T066 [US3] Add the complete `sla` response block and database predicates for paginated `slaStatus` filters using the same semantics as `SlaStatusService`
+- [ ] T067 [P] [US3] Unit-test formulas, weekday boundaries, warning windows, completed milestones, terminal tickets, and severity recomputation
+- [ ] T068 [P] [US3] Integration-test SLA list pagination and status/detail consistency against PostgreSQL
+- [ ] T069 [US5] Implement tenant-scoped `DashboardService` and `GET /api/dashboard`; use terminal metadata for counts and document seeded-only waiting cards
+- [ ] T070 [P] [US5] Test dashboard counts/lists for empty data, two organizations, active/terminal tickets, assignment, and SLA states
+- [ ] T071 **Verify**: backdate SLA milestones without a debug endpoint, confirm each status and dashboard/list/detail agreement
 
 ---
 
-## Dependencies
+## Phase 7: Admin Backend & Frontend
 
-Phases are sequential; each depends on the previous phase's tables/services.
+Goal: finish all backend APIs first, then expose every capability through the
+browser without duplicating authorization/workflow logic.
 
-- Phase 1 → Phase 2: tickets attribute creation to an actor and reference the seeded types/roles.
-- Phase 2 → Phase 3: transitions operate on tickets and load the workflow rows seeded in Phase 2.
-- Phase 3 → Phase 5: proposal approval reuses `TicketTransitionService`.
-- Phase 3 → Phase 6: severity change is the `PATCH` from Phase 3; the Defect confirmation transitions come from the Phase 2 seed.
-- Phases 1–6 → Phase 7: the frontend has nothing to call before the endpoints exist.
-- Phase 4 is independent of Phases 5/6 and can run in parallel if split across two developers.
+- [ ] T072 [US8] Implement tenant-scoped ticket-type/workflow admin services and controllers, additive workflow editing, reference integrity checks, optimistic locking, and configuration audit
+- [ ] T073 [P] [US6][US7] Enforce CLIENT admin scope across user/role/type/workflow services; TICKETFLOW1 admins retain cross-org management
+- [ ] T074 [P] Implement safe reference endpoints for visible ticket types, active Organizations, active TicketFlow1 leads, and assignable roles
+- [ ] T075 [P] Implement paginated `GET /api/admin/configuration-audit` with permission and organization scoping
+- [ ] T076 [P] Integration-test all admin mutations, cross-org denial, referenced-state deletion rejection, invalid workflow graphs, and audit entries
+- [ ] T077 Implement `frontend/lib/api.ts`: client-side cookie credentials, CSRF header, typed error parsing, and no caching of authenticated reads
+- [x] T078 Implement login/logout/current-user flow using the HttpOnly cookie (existing phase-3 scaffold; CSRF wiring completed in T077)
+- [ ] T079 Implement application shell, permission-aware navigation, route guards, and accessible loading/error/empty states
+- [ ] T080 [P] Implement reusable status/SLA badges, pagination/filter controls, and standard transition buttons driven only by `allowedTransitions`
+- [ ] T081 [US5] Implement dashboard UI against the completed dashboard contract
+- [ ] T082 [P] Implement ticket list and URL-backed filters
+- [ ] T083 [P] [US1][US2][US3] Implement ticket creation using the safe ticket-type reference endpoint
+- [ ] T084 Implement ticket detail core and standard field editing/transition flows
+- [ ] T085 [P] [US4] Add comments, attachment references, and privacy-safe audit/history sections to ticket detail
+- [ ] T086 [P] [US1] Add proposal create/approve/reject UI driven by proposal commands from the API
+- [ ] T087 [US6] Implement user administration using assignable-role references
+- [ ] T088 [US7] Implement role editor and explain that edits affect the next token issuance
+- [ ] T089 [US8] Implement additive ticket-type/workflow editor with protected proposal kinds unavailable for custom workflows
+- [ ] T090 [P] Add focused frontend tests for API/CSRF handling, auth redirects, permission navigation, transition rendering, and form validation
+- [ ] T091 Add end-to-end smoke coverage for login → ticket creation → transition → comment and proposal approval
+- [ ] T092 Verify responsive layout, keyboard operation, labels/focus, and no console errors
+- [ ] T093 Verify all five seeded roles see only permitted navigation/actions and both Organizations remain isolated
 
-## Parallel execution notes
+---
 
-- The two developers can split Phase 1 (T002/T003 scaffold vs. T005–T014 backend RBAC), and after Phase 3 lands, split Phase 4 (comments/attachments) against Phase 5 (proposals).
-- Within any phase, `[P]` tasks touch different files and are safe to run at once.
+## Phase 8: Release Hardening & Demo
+
+Goal: a clean install is secure, reproducible, and demoable in under ten minutes.
+
+- [ ] T094 Create demo-only Flyway location/profile `db/demo-migration/V8__seed_demo_data.sql`; never include fixed demo credentials in production migrations
+- [ ] T095 [P] Complete Docker Compose for Postgres + backend and document frontend startup/environment variables in `.env.example`
+- [ ] T096 [P] Replace the placeholder README with prerequisites, profiles, secrets, migration, run, test, and troubleshooting instructions
+- [ ] T097 [P] Write the exact seeded-account demo script and expected results for every step
+- [ ] T098 Run dependency/security review, verify CSRF/CORS/cookie settings, and confirm bootstrap/demo credentials are disabled outside demo profile
+- [ ] T099 Verify a clean database migrates production V1–V7, demo profile applies V8 separately, and backend tests + frontend lint/test/build all pass
+- [ ] T100 Verify two-Organization isolation across tickets, comments, proposals, dashboard, admin configuration, and audit endpoints
+- [ ] T101 Time the complete 13-step demo under ten minutes and record the result
+- [ ] T102 Document basic backup/restore and known MVP limitations
+
+---
+
+## Dependencies and parallel work
+
+- The Phase 3 completion gate blocks Phase 4/5 because both depend on protected transitions, concurrency handling, configuration audit, and security defaults.
+- Phase 4 blocks proposal rejection comments and SLA first-info/update event hooks.
+- Phase 5 and the pure SLA calculator can otherwise progress independently after Phase 4.
+- Dashboard and all admin/reference APIs must be complete before their frontend screens.
+- `[P]` means different files and no unfinished schema/service dependency; it does not override the phase gates above.
 
 ## Implementation strategy
 
-**MVP scope** if time runs short before Phase 8: Phases 1–3 plus Phase 6 deliver
-the two most distinctive capabilities (validated configurable lifecycles + SLA)
-with a working backend. Phase 5 (proposals) and Phase 7 (frontend) are next; the
-admin configuration UI (T065) is the lowest-priority screen since the seeded
-defaults already make the app fully demoable without it.
+The core demo path is hardening → comments → proposals → SLA/dashboard →
+ticket-facing frontend. If time runs short, defer attachment references and the
+custom workflow editor UI before weakening lifecycle validation, audit,
+organization isolation, proposal gates, SLA correctness, or security checks.

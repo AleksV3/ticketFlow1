@@ -43,6 +43,13 @@ public class TicketTransitionService {
     @Transactional
     public TicketDetailResponse transition(String ticketKey, String toStateKey, String comment,
             AuthPrincipal principal) {
+        // Transition comments belong to Phase 4, where CommentService can persist
+        // the comment and its audit entry in this same transaction. Reject them for
+        // now instead of accepting user input and silently discarding it.
+        if (comment != null && !comment.isBlank()) {
+            throw ApiException.validation("Transition comments are not available until Phase 4.");
+        }
+
         Ticket ticket = findVisibleTicket(ticketKey, principal);
         AppUser actor = appUserRepository.findById(principal.userId())
                 .orElseThrow(() -> ApiException.notFound("Current user no longer exists."));
@@ -68,10 +75,6 @@ public class TicketTransitionService {
         statusHistoryService.record(saved, fromState, toState, actor.getId());
         auditService.record(saved, actor.getId(), AuditAction.STATUS_CHANGED,
                 "status", fromState.getKey(), toState.getKey());
-
-        if (comment != null && !comment.isBlank()) {
-            comment = comment.trim();
-        }
 
         return TicketDetailResponse.from(saved, allowedTransitions(saved, principal));
     }

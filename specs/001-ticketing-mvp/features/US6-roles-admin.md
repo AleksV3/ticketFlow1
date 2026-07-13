@@ -43,15 +43,16 @@ partitioned by client.
 Access is enforced by **permission**, not by role name. The permission
 catalog is fixed in code (e.g. `TICKET_READ`, `TICKET_CREATE`,
 `TICKET_UPDATE`, `TICKET_TRANSITION`, `PROPOSAL_APPROVE`, `COMMENT_PUBLIC_WRITE`,
-`COMMENT_INTERNAL_WRITE`, `USER_MANAGE`, `ROLE_MANAGE`, `TYPE_MANAGE`,
+`COMMENT_INTERNAL_READ`, `COMMENT_INTERNAL_WRITE`, `USER_MANAGE`, `ROLE_MANAGE`, `TYPE_MANAGE`,
 `WORKFLOW_MANAGE`). Roles are configurable **bundles of permissions**, seeded
 from default templates: `ADMIN`, `CLIENT_USER`, `CLIENT_APPROVER`,
 `TICKETFLOW1_USER`, `TICKETFLOW1_MANAGER`. The **party axis** (`CLIENT` vs
-`TICKETFLOW1`) is a fixed structural attribute of every Organization and user;
+`TICKETFLOW1`) is a fixed structural attribute of every user; Organizations
+represent CLIENT tenants;
 no role can grant cross-party visibility. See
 [data-model.md § AppUser](../data-model.md#appuser) for the
 org-required-for-client-side-users rule, and
-[research.md § Authorization](../research.md#authorization-method-level-security--service-layer-transition-guard)
+[research.md § Authorization](../research.md#authorization-permission-authorities--config-driven-transition-engine)
 for how permission checks are implemented (coarse `@PreAuthorize` on
 permission authorities + fine-grained transition/org checks in the service
 layer — never UI-only).
@@ -85,16 +86,17 @@ for the shared convention (cross-org access returns `404`, not `403`).
 
 - Phase 1 (Backend Foundation — dedicated to this story's admin surface):
   T012, T013
-- Phase 7 (Frontend — admin users page): T064
+- Phase 3 hardening: T039–T041
+- Phase 7 (admin scope and UI): T073–T079, T087, T093
 
 Full task text: [tasks.md](../tasks.md). Like US4, most of this story's
 actual enforcement work is threaded through every other phase (every
 endpoint's permission/org check), not concentrated in one phase —
-T012/T013/T064 are just the admin-management *screens*, not the whole story.
+T012/T013/T087 are just the concentrated admin-management tasks, not the whole story.
 
 Verify gate: none dedicated — permission enforcement is checked throughout
 (e.g. T034 asserts an actor lacking the required permission gets `409`/`403`);
-org isolation is specifically verified in T027 (Phase 2) and T070 (Phase 8,
+org isolation is specifically verified in T027 (Phase 2) and T100 (Phase 8,
 full two-Organization check against SC-008).
 
 ## Success criteria

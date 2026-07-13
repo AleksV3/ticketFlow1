@@ -113,7 +113,7 @@
 <body>
 <header>
   <h1>TicketFlow1 Ticketing Tool — Project Dashboard</h1>
-  <div class="sub">Process-based Change &amp; Defect Management · Java 21 / Spring Boot + Next.js · derived from the spec-kit spec, plan &amp; 69-task breakdown</div>
+  <div class="sub">Legacy visual tracker for the original pre-hardening task breakdown</div>
   <div class="overall">
     <div class="bar"><span id="overallBar"></span></div>
     <div class="pct"><b id="overallDone">0</b> / <span id="overallTotal">69</span> tasks · <b id="overallPct">0%</b></div>
@@ -123,7 +123,7 @@
     <button class="act" onclick="expandAll(false)">Collapse all</button>
     <button class="act" onclick="resetProgress()">Reset progress</button>
   </div>
-  <div class="note">Checkbox state is saved in this browser only (localStorage). It is not committed to git — it's your personal progress tracker. For a narrative per-feature writeup (story + diagram + API + tasks in one page), see <a href="../specs/001-ticketing-mvp/features/">specs/001-ticketing-mvp/features/</a>.</div>
+  <div class="note"><b>Archived:</b> task ids/counts below are retained only to preserve existing browser-local progress. They are not authoritative after the 2026-07-10 phase 4–8 revision. Use <a href="../specs/001-ticketing-mvp/tasks.md">tasks.md</a> for T001–T102 and <a href="../specs/001-ticketing-mvp/features/">feature docs</a> for current mappings.</div>
 </header>
 
 <div class="wrap">
@@ -224,7 +224,7 @@ stateDiagram-v2
   </section>
 
   <section>
-    <h2>Build plan — 8 phases, 69 tasks</h2>
+    <h2>Archived build plan — original 69-task view</h2>
     <div id="phases"></div>
     <div class="note">Phases are sequential (each depends on the prior one's tables/services). <span class="badge b-p">P</span> = parallelizable · <span class="badge b-us">US#</span> = serves that user story · <span class="badge b-verify">VERIFY</span> = run this before starting the next phase. Full detail: <code>specs/001-ticketing-mvp/tasks.md</code>.</div>
   </section>

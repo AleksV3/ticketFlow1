@@ -6,7 +6,7 @@ Comment visibility is a fixed set: `INTERNAL` or `PUBLIC`.
 
 Requires `TICKET_READ`. **Response `200`**: array of `Comment`, ordered by
 `createdAt` ascending. `INTERNAL` comments are silently omitted from the
-response for callers who lack `COMMENT_INTERNAL_WRITE` (FR-012) — not returned
+response for callers who lack `COMMENT_INTERNAL_READ` (FR-012) — not returned
 with a redaction marker, simply absent, so the frontend never has to remember
 to hide them. Client-side default roles do not hold that permission.
 
@@ -39,3 +39,5 @@ permission, so they may only post `PUBLIC`.
 
 **Response `201`**: created `Comment`. Writes a `COMMENT_ADDED` audit log
 entry (FR-013).
+The audit entry records the comment id and visibility, never the comment body;
+an INTERNAL comment event is omitted from client-visible audit feeds.

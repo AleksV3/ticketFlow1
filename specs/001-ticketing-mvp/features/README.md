@@ -16,13 +16,14 @@ source file wins — treat that as a bug in this index, not in the source.
 | US4 | Comments & audit trail | P2 | 3, 4, 7 | [US4-comments-audit.md](US4-comments-audit.md) |
 | US5 | Dashboard overview | P2 | 2, 7 | [US5-dashboard.md](US5-dashboard.md) |
 | US6 | Permission-based access & admin | P1 | 1, 7 | [US6-roles-admin.md](US6-roles-admin.md) |
+| US7 | Configurable roles | P2 | 1, 7 | [US7-configurable-roles.md](US7-configurable-roles.md) |
+| US8 | Configurable ticket types & workflows | P3 | 2, 3, 7 | [US8-configurable-workflows.md](US8-configurable-workflows.md) |
 
 Cross-cutting docs these pages don't replace:
 
-- [spec.md](../spec.md) — full requirements, all 22 FRs, edge cases, assumptions
+- [spec.md](../spec.md) — full requirements, all 23 FRs, edge cases, assumptions
 - [plan.md](../plan.md) — architecture, Constitution Check, project structure
 - [data-model.md](../data-model.md) — ERD and every entity's fields
 - [contracts/](../contracts/) — full request/response shapes for every endpoint
-- [tasks.md](../tasks.md) — all 69 tasks with dependencies
-- [../../../docs/dashboard.html](../../../docs/dashboard.html) — visual, checkbox-tracked progress across all phases
-- [../../../docs/mockups/](../../../docs/mockups/) — AI-generated frontend visual references for Phase 7 (login, dashboard, ticket list/detail, admin). Reference only — the README there lists 4 known bugs versus this spec, don't build components by eyeballing the images directly.
+- [tasks.md](../tasks.md) — T001–T102 with phase gates and dependencies
+- [../../../docs/dashboard.html](../../../docs/dashboard.html) — archived visual tracker for the original task numbering; `tasks.md` is authoritative

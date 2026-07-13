@@ -1,5 +1,7 @@
 # Phase 0 Research: TicketFlow1 Ticketing Tool — MVP
 
+**Last revised**: 2026-07-10 after Phase 3 architecture/security review
+
 All technology choices are fixed by the [constitution](../../.specify/memory/constitution.md)
 (Java 21/Spring Boot/PostgreSQL backend, Next.js/TypeScript/Tailwind frontend).
 This document resolves the *how*, not the *what* — the specific patterns and
@@ -31,6 +33,14 @@ frontend JavaScript via `localStorage` or an in-memory bearer-token pattern was
 rejected because the token should not be script-readable when a secure
 `HttpOnly` delivery path is available.
 
+**Security details**: Browser mutations use a CSRF token cookie plus matching
+request header; CORS uses an explicit environment-configured origin allowlist.
+The auth cookie is `Secure` outside the local-development profile. Permissions
+embedded in an eight-hour JWT are a snapshot: role changes take effect on the
+user's next login/token issuance, not their next request. Immediate revocation
+is deferred beyond MVP; deactivating a user prevents new login and existing
+tokens expire naturally.
+
 ## Authorization: permission authorities + config-driven transition engine
 
 **Decision**: Access is enforced by **permission**, never by role name.
@@ -44,6 +54,13 @@ actor holds and whose `required_party` (when set) matches, throwing a typed
 `IllegalTransitionException` (HTTP 409) otherwise. Organization scoping
 (FR-020/FR-021) is enforced by an org filter at the repository/query layer for
 CLIENT-party callers, never trusted from client-supplied parameters.
+
+Workflow transitions carry an `operation_kind`. The public generic transition
+command accepts only `STANDARD`; proposal create/approve/reject kinds are
+invoked only by `ChangeProposalService`. This keeps configurable state machines
+without allowing a permission-bearing caller to skip the required proposal
+record or decision. Mutable aggregate roots use optimistic version columns and
+return `409 CONFLICT` when a stale concurrent command loses the race.
 
 **Rationale**: Checking permissions (not role names) is what lets an admin
 create or rename a role without a code change (FR-009). Loading transition
@@ -101,15 +118,26 @@ control). Native `ENUM` types for the fixed sets — not used, because a single
 `CHECK` evolves a fixed set more simply and the configurable sets are lookup
 tables anyway.
 
-## SLA calculation: computed at read time, not a scheduled job
+## SLA calculation: event-aware and computed at read time
 
-**Decision**: `responseDueAt`, `firstInfoDueAt`, `nextUpdateDueAt` are
-persisted columns, set at severity-assignment time (and recalculated if
-severity changes, per spec Edge Cases). `slaStatus`
-(`OK`/`DUE_SOON`/`BREACHED`/`NOT_APPLICABLE`) is NOT persisted — it's computed
-in the service layer at read time by comparing `Instant.now()` against the
-stored deadlines, with a `DUE_SOON` window of 25% of the remaining interval to
-the next deadline (simple, explainable; tunable later).
+**Decision**: `responseDueAt`, `firstInfoDueAt`, and the initial
+`nextUpdateDueAt` are persisted when the required creation-time severity is
+set (and recalculated if severity changes). `respondedAt` is set on the first
+`REPORTED → ANALYSIS` transition; `firstInfoAt` is set on the first PUBLIC
+comment authored by a TICKETFLOW1 user; that comment and each later qualifying
+PUBLIC update advance `nextUpdateDueAt` for SEV_1/SEV_2. `slaStatus`
+(`OK`/`DUE_SOON`/`BREACHED`/`NOT_APPLICABLE`) is NOT persisted. It is computed
+from unmet deadlines:
+
+- `NOT_APPLICABLE`: non-Defect or terminal ticket.
+- `BREACHED`: at least one applicable deadline is past and its completion
+  timestamp is absent.
+- `DUE_SOON`: no breach, but an unmet deadline is inside the final 25% of its
+  original SLA duration (minimum warning window five minutes).
+- `OK`: otherwise.
+
+For SEV_3/SEV_4, "next business day" means 08:00 in `Europe/Ljubljana` on the
+next Monday–Friday; public holidays are intentionally ignored for MVP.
 
 **Rationale**: A persisted `slaStatus` would require a scheduled job ticking
 every N minutes to flip it, adding infra complexity (Principle VI) for a value
@@ -118,8 +146,18 @@ cheap to compute on read and always consistent. Doc 02 explicitly asks for a
 
 **Alternatives considered**: A `@Scheduled` job recalculating and persisting
 `slaStatus` — rejected for MVP; adds a moving part with no correctness benefit.
-The dashboard's "SLA breached" card queries the due-date columns directly (see
-data-model.md), not a filter over the computed value.
+The dashboard and ticket-list filter query the due/completion columns using the
+same predicates as `SlaStatusService`, so pagination and detail responses cannot
+disagree.
+
+## Audit stores: ticket events vs. configuration events
+
+**Decision**: `audit_log` remains ticket-scoped. A separate append-only
+`configuration_audit_log` records organization, role, ticket-type, and workflow
+mutations with `organization_id`, target type/id, actor, action, and old/new
+JSON summaries. This avoids fake/null ticket references and gives admin changes
+correct tenant scoping. Ticket audit entries for INTERNAL comments never store
+the body and are hidden from callers who cannot see the source comment.
 
 ## Testing strategy
 
@@ -127,8 +165,9 @@ data-model.md), not a filter over the computed value.
 engine and SLA-calculation logic covered by fast unit tests (no Spring
 context), and Testcontainers-backed `@SpringBootTest` integration tests for the
 repository/controller layers against a real PostgreSQL container (not H2).
-Frontend testing is deferred past MVP (Principle VI) — manual verification via
-the running dev server is acceptable for Phase 7.
+Frontend coverage stays deliberately narrow: component tests for auth/API and
+permission-driven rendering, one end-to-end smoke flow, and manual
+accessibility/responsive verification.
 
 **Rationale**: Doc 02 §8 lists Testcontainers as optional; making it the
 integration-test backend (rather than H2) costs little extra setup and teaches
@@ -142,10 +181,12 @@ schema) drifts enough from H2 to produce false confidence.
 ## Frontend data fetching
 
 **Decision**: Plain `fetch` wrapped in a small typed API client
-(`lib/api.ts`), no TanStack Query for MVP. Server components for read-heavy
-pages (ticket list, dashboard) where Next.js's own caching/revalidation is
-sufficient; client components only where interactivity is required (forms,
-transition buttons, comment box).
+(`lib/api.ts`), no TanStack Query for MVP. Authenticated MVP pages use client
+fetches with `credentials: 'include'`; a Server Component does not automatically
+forward the browser's HttpOnly cookie to the separately hosted Spring API.
+Public layout/static content may remain Server Components. A same-origin Next.js
+backend-for-frontend can be introduced later if server rendering becomes a
+real requirement.
 
 **Rationale**: Doc 02 marks TanStack Query optional. Given the 30-day timeline
 and that backend workflow logic is the priority (Principle IV), a client-state

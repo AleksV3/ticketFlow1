@@ -1,5 +1,11 @@
 # AI Coding Agent Specification: Ticketing Application
 
+> **Archived input, not implementation guidance.** This early generic draft
+> proposes a Node/Express stack and predates the approved TicketFlow1
+> constitution. The authoritative requirements and Java/Spring architecture are
+> in `specs/001-ticketing-mvp/`; when this file conflicts, the Spec Kit artifacts
+> win. It is retained only for provenance.
+
 ## Project Name
 
 Ticketing Application

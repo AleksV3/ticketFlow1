@@ -1,9 +1,9 @@
 <!--
 Sync Impact Report
-- Version change: 1.0.0 → 1.1.0
-- Modified principles: Core Principles
-- Added sections: Core Principles (VIII), Technology Stack, Development
-  Workflow, Governance
+- Version change: 1.1.0 → 1.2.0
+- Modified principles: I (protected business transitions), II (audit target and
+  visibility), VIII (CSRF/cookies/demo isolation/admin tenant scope)
+- Added sections: none
 - Removed sections: none
 - Templates requiring updates:
   - .specify/templates/plan-template.md ✅ compatible (generic Constitution
@@ -11,7 +11,7 @@ Sync Impact Report
   - .specify/templates/spec-template.md ✅ compatible
   - .specify/templates/tasks-template.md ✅ compatible
   - .specify/templates/checklist-template.md ✅ compatible
-- Follow-up TODOs: none
+- Follow-up TODOs: none; the active plan/tasks were synchronized in the same change
 -->
 
 # TicketFlow1 Ticketing Tool Constitution
@@ -26,6 +26,11 @@ transitions are never inferred implicitly from a generic `PATCH`; they go throug
 a dedicated transition operation that validates current-state → target-state
 legality before applying it.
 
+Transitions coupled to a business record or decision (for example creating,
+approving, or rejecting a Change Proposal) MUST NOT be invokable through the
+generic transition endpoint. Their owning domain service performs the state
+change in the same transaction as the required business record and audit entry.
+
 Lifecycles MAY be defined as configuration data (per organization and ticket
 type) rather than hard-coded in Java — but the validation guarantee is absolute:
 the transition engine loads the state machine from its definition and enforces
@@ -35,18 +40,24 @@ does not weaken enforcement and does not erase type distinctions — a Change
 Request's proposal-approval step remains a real, distinct part of its workflow,
 not an option that quietly disappears.
 
-### II. Audit Everything (NON-NEGOTIABLE)
-Every status change, field change (assignee, severity, responsibility), comment,
-and proposal decision MUST write an audit log entry recording actor, action,
-old/new value, and timestamp. Audit logging is not optional polish and is never
-deferred or skipped to save time. If a feature changes ticket state and has no
+### II. Audit Every Business Mutation (NON-NEGOTIABLE)
+Every business-significant mutation—including status and tracked field changes,
+comments, proposal decisions, and configuration changes—MUST write an audit
+entry recording actor, action, target, relevant old/new value, and timestamp.
+Ticket events and configuration events MAY use separate append-only stores when
+their target shapes differ. Audit logging is not optional polish and is never
+deferred or skipped to save time. If a feature mutates business state and has no
 corresponding audit entry, the feature is incomplete.
+
+Audit responses MUST respect the same organization and visibility boundaries as
+their source data. In particular, a client-visible audit feed must never reveal
+the body or existence of an INTERNAL comment.
 
 ### III. Permission-Based Access Is Core Business Value (NON-NEGOTIABLE)
 Actions are gated by **permission**, enforced server-side, not just hidden in the
 UI. Authorization checks MUST test permissions (e.g. `PROPOSAL_APPROVE`,
-`TICKET_TRANSITION`, `COMMENT_INTERNAL_WRITE`, `USER_MANAGE`) — they MUST NEVER
-branch on role *names*. Roles are configurable bundles of permissions (data, per
+`TICKET_TRANSITION`, `COMMENT_INTERNAL_READ`, `COMMENT_INTERNAL_WRITE`,
+`USER_MANAGE`) — they MUST NEVER branch on role *names*. Roles are configurable bundles of permissions (data, per
 organization, seeded from defaults); a role that is renamed, added, or
 re-scoped by an administrator must work without any code change, which is only
 possible if code never references a role by name.
@@ -54,8 +65,8 @@ possible if code never references a role by name.
 The **permission catalog is fixed in code** (developer-owned); only the
 role→permission mapping is data. Two domain facts remain non-configurable:
 
-- **Party axis** — every organization and user is either CLIENT or TICKETFLOW1.
-  This is structural: it drives org-scoping, INTERNAL-comment visibility, and
+- **Party axis** — every user is either CLIENT or TICKETFLOW1; an Organization
+  represents a client tenant. This is structural: it drives org-scoping, INTERNAL-comment visibility, and
   `currentResponsibility`. A client can never become a provider by role
   reassignment.
 - **Proposal approval gate** — approving or rejecting a change proposal requires
@@ -124,6 +135,12 @@ until the relevant threat is called out and the mitigation is visible in code,
 tests, or review notes. "It should be fine" is not an acceptable security
 argument.
 
+Cookie-carried authentication MUST include CSRF protection for state-changing
+browser requests. Production cookies MUST be `Secure`; demo credentials and
+demo data MUST be isolated from production migrations/configuration. Tenant
+scoping applies to administration and configuration endpoints as well as ticket
+queries.
+
 ## Technology Stack
 
 Fixed for this project; do not introduce alternative frameworks or swap
@@ -187,4 +204,4 @@ Constitution Check against these principles before task breakdown begins. Any
 violation must be justified explicitly in that plan's Complexity Tracking
 section or the plan must be revised.
 
-**Version**: 1.1.0 | **Ratified**: 2026-07-02 | **Last Amended**: 2026-07-08
+**Version**: 1.2.0 | **Ratified**: 2026-07-02 | **Last Amended**: 2026-07-10

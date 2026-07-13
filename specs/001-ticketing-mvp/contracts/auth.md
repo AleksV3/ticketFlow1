@@ -33,9 +33,16 @@ The backend also sets an `HttpOnly` auth cookie containing the JWT. The
 frontend must authenticate subsequent requests with `credentials: 'include'`,
 not by storing or attaching the token in JavaScript.
 
+The backend also issues a readable CSRF cookie. The frontend copies that value
+to `X-XSRF-TOKEN` for POST/PATCH/DELETE requests. The auth cookie is `Secure` in
+non-local profiles.
+
 The `permissions` array is the resolved permission set the client uses to show
 or hide controls; the server independently enforces the same permissions on
 every request, so a hidden control is never the only guard.
+
+Permissions are a token snapshot. A role edit affects assigned users when they
+next log in/receive a token; it does not rewrite already-issued JWTs.
 
 **Errors**: `400 VALIDATION_FAILED` (missing fields), `401 UNAUTHENTICATED`
 (bad credentials or inactive account — same message for both, standard

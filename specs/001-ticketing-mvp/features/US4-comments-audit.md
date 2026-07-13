@@ -29,8 +29,8 @@ lifecycle diagram of its own.
 ## Comment visibility (fixed)
 
 Comment visibility is a fixed set — `INTERNAL` or `PUBLIC`. Writing an
-`INTERNAL` comment requires `COMMENT_INTERNAL_WRITE`; reading one requires the
-corresponding internal-read permission. Writing a `PUBLIC` comment requires
+`INTERNAL` comment requires `COMMENT_INTERNAL_WRITE`; reading one requires
+`COMMENT_INTERNAL_READ`. Writing a `PUBLIC` comment requires
 `COMMENT_PUBLIC_WRITE`. The seeded client-side role templates hold neither
 internal permission, so `INTERNAL` comments never surface to the client.
 
@@ -64,16 +64,16 @@ append-only with no update/delete operations exposed anywhere in the API.
 ## Tasks
 
 - Phase 3 (Workflow/Transitions — audit/history read endpoints): T031, T032
-- Phase 4 (Comments & Attachments — dedicated to this story): T036–T043
-- Phase 7 (Frontend): T063
+- Phase 4 (Comments & Attachment References): T043–T051
+- Phase 7 (Frontend): T085
 
 Full task text: [tasks.md](../tasks.md). Note `AuditLog`/`StatusHistory`
 *entities* are actually introduced earlier, in Phase 2 (T020, T021) — every
 service writes to them from the moment tickets can be created, per
-constitution Principle II ("Audit Everything"). This story's own phase
+constitution Principle II ("Audit Every Business Mutation"). This story's own phase
 (4) is specifically about comments/attachments and their audit entries.
 
-Verify gate: **T043** — post one `INTERNAL` and one `PUBLIC` comment as a
+Verify gate: **T051** — post one `INTERNAL` and one `PUBLIC` comment as a
 TicketFlow1 user, confirm a client user's `GET .../comments` only returns the
 public one; post an attachment and confirm it appears.
 

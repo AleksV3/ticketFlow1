@@ -4,7 +4,9 @@
 
 **Created**: 2026-07-02
 
-**Status**: Draft
+**Last revised**: 2026-07-10 after Phase 3 review
+
+**Status**: In progress — Phases 1–3 implemented; completion hardening pending
 
 **Input**: User description: "A process-based internal ticketing tool for Change Management and Defect Management. It tracks Change Requests, Tasks, and Defects — each with its own validated lifecycle — requires client proposal approval for Change Requests, tracks defect severity and SLA deadlines, assigns current responsibility (CLIENT/TICKETFLOW1), and gives dashboards, comments, and an audit trail. Ticket types, their workflows, and roles are configuration each client company can adapt (seeded with sensible defaults), while access is enforced by permission server-side. Derived from docs/02-product-requirements-and-build-brief.md."
 
@@ -37,8 +39,9 @@ rejected.
    Change Request, **Then** the ticket is created with status `SUBMITTED`,
    type `CHANGE_REQUEST`, and `currentResponsibility = TICKETFLOW1`.
 2. **Given** a Change Request in `SUBMITTED`, **When** a TicketFlow1 ticket lead
-   moves it to `ANALYSIS` then creates a proposal, **Then** the ticket status
-   becomes `PROPOSAL` and `currentResponsibility` switches to `CLIENT`.
+   moves it to `ANALYSIS` then creates a proposal, **Then** the proposal and
+   ticket transition are committed together, the ticket status becomes
+   `PROPOSAL`, and `currentResponsibility` switches to `CLIENT`.
 3. **Given** a proposal in `PENDING`, **When** a user with the `PROPOSAL_APPROVE`
    permission on the client side approves it, **Then** the proposal status
    becomes `APPROVED`, the ticket status becomes `PROPOSAL_APPROVED` (then
@@ -54,6 +57,10 @@ rejected.
 6. **Given** a client contributor whose role does not grant `PROPOSAL_APPROVE`,
    **When** they attempt to approve a proposal, **Then** the system rejects the
    action — approval requires the `PROPOSAL_APPROVE` permission and CLIENT party.
+7. **Given** a user calls the generic ticket-transition endpoint, **When** they
+   request `ANALYSIS → PROPOSAL` or a proposal approve/reject transition,
+   **Then** the system rejects the operation — those transitions are available
+   only as part of the corresponding proposal command.
 
 ---
 
@@ -85,8 +92,9 @@ object is ever created or required.
 
 ### User Story 3 - Defect reporting with severity and SLA tracking (Priority: P1)
 
-A client user reports a defect. The ticket lead triages it and assigns a
-severity (`SEV_1`–`SEV_4`). The system calculates response, first-info, and
+A client user reports a defect and selects an initial severity
+(`SEV_1`–`SEV_4`). The ticket lead validates or revises it during triage. The
+system calculates response, first-info, and
 next-update deadlines from that severity and continuously reflects whether the
 ticket is `OK`, `DUE_SOON`, or `BREACHED`. Once fixed, the client confirms
 resolution before the ticket closes.
@@ -103,11 +111,11 @@ manual recalculation trigger.
 
 **Acceptance Scenarios**:
 
-1. **Given** a new Defect ticket, **When** a ticket lead sets severity to
+1. **Given** a new Defect ticket, **When** it is created with severity
    `SEV_1`, **Then** `responseDueAt = createdAt + 15m`,
    `firstInfoDueAt = createdAt + 45m`, and `slaStatus = OK`.
-2. **Given** a `SEV_1` defect whose `responseDueAt` has passed with no
-   response recorded, **When** the ticket or dashboard is viewed, **Then**
+2. **Given** a `SEV_1` defect whose `responseDueAt` has passed while
+   `respondedAt` is absent, **When** the ticket or dashboard is viewed, **Then**
    `slaStatus` shows `BREACHED`.
 3. **Given** a defect approaching (but not past) its next update deadline,
    **When** the ticket or dashboard is viewed, **Then** `slaStatus` shows
@@ -233,8 +241,8 @@ approve, or see internal comments — verified by direct action attempts.
    chosen subset of permissions and assigns it to a user, **Then** that user's
    allowed actions match exactly the chosen permissions.
 2. **Given** an existing role is renamed or has a permission added/removed by an
-   admin, **When** an assigned user next acts, **Then** their access reflects
-   the change immediately, with no deployment.
+   admin, **When** an assigned user next authenticates or receives a newly
+   issued token, **Then** their access reflects the change with no deployment.
 3. **Given** any role configuration, **When** an admin attempts to grant a
    permission that is not in the fixed catalog, **Then** the system rejects it —
    the catalog is fixed; only role→permission mappings are editable.
@@ -299,6 +307,9 @@ ticket of that type; confirm `OPEN → CLOSED` is rejected (undefined) while
   that the edit removes? (Default: out of scope for MVP — workflow edits are
   assumed additive during a ticket's life; migration of in-flight tickets across
   breaking workflow changes is deferred past MVP.)
+- What happens when two users transition or decide the same ticket/proposal at
+  the same time? (Default: optimistic locking rejects the stale operation with
+  `409 CONFLICT`; the caller reloads the latest state before retrying.)
 - What happens when a TicketFlow1 ticket lead is assigned a ticket from an
   Organization they haven't worked with before? (Default: no restriction —
   TICKETFLOW1-party users are not partitioned by client.)
@@ -320,15 +331,16 @@ ticket of that type; confirm `OPEN → CLOSED` is rejected (undefined) while
   step; the seeded `CHANGE_REQUEST` workflow includes one, and a
   `CHANGE_REQUEST` MUST NOT proceed from `PROPOSAL` to `DEVELOPMENT` without an
   approved proposal. The seeded `TASK` and `DEFECT` workflows MUST NOT include a
-  proposal step.
+  proposal step. Proposal-create/approve/reject transitions MUST be protected
+  operations that cannot be invoked through the generic transition endpoint.
 - **FR-004**: System MUST require a severity (`SEV_1`–`SEV_4`) on every
   `DEFECT` ticket and MUST calculate `responseDueAt`, `firstInfoDueAt`, and
   `nextUpdateDueAt` from that severity per the formulas in doc 02 §4. Severity
   is a **fixed** set (it drives the SLA formulas) and is not configurable.
 - **FR-005**: System MUST expose a computed `slaStatus`
   (`OK`/`DUE_SOON`/`BREACHED`/`NOT_APPLICABLE`) for every `DEFECT` ticket,
-  derived from current time vs. the calculated deadlines, without requiring a
-  manual recalculation step.
+  derived from current time, calculated deadlines, recorded response/info/update
+  timestamps, and terminal state, without requiring a manual recalculation step.
 - **FR-006**: System MUST track `currentResponsibility` (`CLIENT` or `TICKETFLOW1`)
   on every ticket and update it automatically on relevant status transitions
   (e.g. switches to `CLIENT` while a proposal is pending approval or a defect
@@ -341,7 +353,7 @@ ticket of that type; confirm `OPEN → CLOSED` is rejected (undefined) while
 - **FR-008**: System MUST provide a **fixed permission catalog** defined in
   code (e.g. `TICKET_READ`, `TICKET_CREATE`, `TICKET_UPDATE`,
   `TICKET_TRANSITION`, `PROPOSAL_APPROVE`, `COMMENT_PUBLIC_WRITE`,
-  `COMMENT_INTERNAL_WRITE`, `USER_MANAGE`, `ROLE_MANAGE`, `TYPE_MANAGE`,
+  `COMMENT_INTERNAL_READ`, `COMMENT_INTERNAL_WRITE`, `USER_MANAGE`, `ROLE_MANAGE`, `TYPE_MANAGE`,
   `WORKFLOW_MANAGE`). New
   permission keys are added only in code; they cannot be invented at runtime.
 - **FR-009**: System MUST support **roles as configurable bundles of
@@ -361,10 +373,12 @@ ticket of that type; confirm `OPEN → CLOSED` is rejected (undefined) while
   `INTERNAL` or `PUBLIC` (a fixed set). Reading or writing `INTERNAL` comments
   MUST require the corresponding permission, which client-side default roles do
   not hold.
-- **FR-013**: System MUST record an audit log entry (actor, action, old/new
+- **FR-013**: System MUST record an audit entry (actor, action, target, old/new
   value, timestamp) for every status transition, field change (assignee,
   severity, responsibility), comment addition, proposal decision, and
-  configuration change (role/type/workflow edits).
+  configuration change (organization/role/type/workflow edits). Ticket audit
+  and configuration audit MAY use separate append-only stores; both MUST obey
+  organization and visibility scoping.
 - **FR-014**: System MUST record a status-history entry for every status
   transition on a ticket, viewable as a timeline on that ticket.
 - **FR-015**: System MUST support filtering the ticket list by type, status,
@@ -375,13 +389,13 @@ ticket of that type; confirm `OPEN → CLOSED` is rejected (undefined) while
   severity, SLA-breached defects, SLA-due-soon defects, tickets waiting for
   client approval, tickets waiting for client confirmation, and the current
   user's assigned tickets.
-- **FR-017**: System MUST allow attaching supporting documentation to a
-  ticket, at minimum as file metadata (name, type, size) associated with the
-  ticket and uploader.
+- **FR-017**: System MUST record attachment references on a ticket as metadata
+  (name, type, size, uploader). Storing or serving file bytes is outside MVP.
 - **FR-018**: System MUST authenticate users before granting access to any
   ticket data or action, using a stateless token (JWT) issued at login and
   presented on subsequent requests via an `HttpOnly` cookie — no server-side
-  session store.
+  session store. Browser state-changing requests MUST be protected against CSRF,
+  and production authentication cookies MUST be `Secure`.
 - **FR-019**: Every ticket MUST carry a priority field with values `LOW` /
   `MEDIUM` / `HIGH` / `CRITICAL` (a fixed set), settable by TICKETFLOW1-party users,
   shown on the ticket list/detail, and filterable. Priority is informational
@@ -391,13 +405,16 @@ ticket of that type; confirm `OPEN → CLOSED` is rejected (undefined) while
   and dashboard data belonging to their own Organization. TICKETFLOW1-party users
   are not bound to a single Organization and MUST be able to see and act across
   all Organizations, since TicketFlow1 is the vendor serving all of them.
-- **FR-021**: Every ticket MUST belong to exactly one Organization, inherited
-  from its business owner's Organization at creation time and immutable
-  thereafter.
+- **FR-021**: Every ticket MUST belong to exactly one Organization and remain in
+  it for its lifetime. A CLIENT creator inherits their own Organization; a
+  TICKETFLOW1 creator MUST explicitly choose the client Organization.
 - **FR-022**: Configurable definitions (roles, ticket types, workflows) MUST be
   seeded from default **templates** and, for client-scoped definitions, cloned
   per Organization so each Organization can customize its own without affecting
   others. TICKETFLOW1-party roles are global to the vendor.
+- **FR-023**: Concurrent mutations of a ticket, proposal, role, or workflow MUST
+  not silently overwrite one another. A stale mutation MUST fail with a stable
+  `409 CONFLICT` response.
 
 ### Key Entities
 
@@ -490,7 +507,10 @@ ticket of that type; confirm `OPEN → CLOSED` is rejected (undefined) while
   (create/rename/deactivate) requires `USER_MANAGE`/admin; org self-service
   signup is out of scope for MVP.
 - Workflow edits during MVP are assumed additive relative to in-flight tickets;
-  migrating tickets across breaking workflow changes is deferred past MVP.
+  deleting a state referenced by an existing ticket is rejected. Migrating
+  tickets across breaking workflow changes is deferred past MVP.
+- Demo users and fixed demo passwords exist only in a demo-specific migration
+  profile/location and MUST NOT be applied in production environments.
 - Ticket numbering/keys and pagination/page-size defaults are left to the
   implementation plan as standard patterns, not called out here since they
   don't materially change scope or user experience.

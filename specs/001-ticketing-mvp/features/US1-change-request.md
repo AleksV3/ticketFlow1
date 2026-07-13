@@ -23,10 +23,10 @@ stateDiagram-v2
     [*] --> SUBMITTED: create (TICKET_CREATE)
     SUBMITTED --> ANALYSIS: start analysis (TICKET_TRANSITION)
     SUBMITTED --> CANCELLED: cancel (TICKET_TRANSITION)
-    ANALYSIS --> PROPOSAL: create proposal (TICKET_TRANSITION)
+    ANALYSIS --> PROPOSAL: protected proposal-create operation
     ANALYSIS --> CANCELLED: cancel (TICKET_TRANSITION)
-    PROPOSAL --> PROPOSAL_APPROVED: approve proposal (PROPOSAL_APPROVE + CLIENT party)
-    PROPOSAL --> PROPOSAL_REJECTED: reject proposal (PROPOSAL_APPROVE + CLIENT party)
+    PROPOSAL --> PROPOSAL_APPROVED: protected approve operation (PROPOSAL_APPROVE + CLIENT)
+    PROPOSAL --> PROPOSAL_REJECTED: protected reject operation (PROPOSAL_APPROVE + CLIENT)
     PROPOSAL_REJECTED --> ANALYSIS: revise & resubmit (TICKET_TRANSITION)
     PROPOSAL_REJECTED --> CANCELLED: cancel (TICKET_TRANSITION)
     PROPOSAL_APPROVED --> DEVELOPMENT: start development (TICKET_TRANSITION)
@@ -39,13 +39,16 @@ stateDiagram-v2
     CLOSED --> [*]
 ```
 
-Each transition carries a required permission. Ordinary lifecycle moves
+Each transition carries a required permission and operation kind. Ordinary lifecycle moves
 require `TICKET_TRANSITION`; the proposal decision additionally requires
 `PROPOSAL_APPROVE` **and** CLIENT party — the seeded `CLIENT_APPROVER` role
 template holds that permission. `currentResponsibility` flips to `CLIENT` on
 entering `PROPOSAL` and back to `TICKETFLOW1` on entering `PROPOSAL_APPROVED` or
 `PROPOSAL_REJECTED`; `TICKETFLOW1` for every other state. Full diagram + all
-three default lifecycles: [plan.md § Workflow State Machines](../plan.md#workflow-state-machines).
+three default lifecycles: [plan.md § Workflow engine](../plan.md#workflow-engine).
+
+Protected proposal transitions are never returned in standard
+`allowedTransitions` and cannot be invoked through the generic transition API.
 
 ## Acceptance scenarios
 
@@ -99,11 +102,11 @@ FR-001, FR-002, FR-003, FR-006, FR-007, FR-011, FR-018 — full text in
 
 - Phase 2 (Ticket Core): T023, T024
 - Phase 3 (Workflow/Transitions): T028, T029, T030
-- Phase 5 (Change Proposals — dedicated to this story): T044–T050
-- Phase 7 (Frontend): T062, T063
+- Phase 5 (Change Proposals — dedicated to this story): T052–T060
+- Phase 7 (Frontend): T083, T084, T086
 
 Full task text: [tasks.md](../tasks.md). Verify gates for this feature: T027
-(ticket core), T035 (transitions), **T050** (full CR flow end-to-end,
+(ticket core), T035 (standard transitions), **T060** (full CR flow end-to-end,
 including one rejection-and-resubmission cycle — the definitive check for
 this story).
 

@@ -4,8 +4,8 @@
 
 ## Story
 
-A client user reports a defect. The ticket lead triages it and assigns a
-severity (`SEV_1`–`SEV_4`). The system calculates response, first-info, and
+A client user reports a defect with an initial severity (`SEV_1`–`SEV_4`). The
+ticket lead validates or revises it during triage. The system calculates response, first-info, and
 next-update deadlines from that severity and continuously reflects whether
 the ticket is `OK`, `DUE_SOON`, or `BREACHED`. Once fixed, the client
 confirms resolution before the ticket closes.
@@ -33,8 +33,8 @@ stateDiagram-v2
 
 Every transition requires the `TICKET_TRANSITION` permission; the two client
 confirmation moves are additionally restricted to CLIENT party. Severity is a
-**fixed** set (`SEV_1`–`SEV_4`) — it drives the SLA deadline fields and is set
-at creation or during `ANALYSIS`; it does not gate any transition directly.
+**fixed** set (`SEV_1`–`SEV_4`) — it is required at creation, may be revised
+during `ANALYSIS`, and does not gate any transition directly.
 `currentResponsibility` is `TICKETFLOW1` through `FIX_IN_PROGRESS`, flips to
 `CLIENT` on entering `CLIENT_CONFIRMATION`.
 
@@ -48,17 +48,23 @@ at creation or during `ANALYSIS`; it does not gate any transition directly.
 | SEV_4 | next business day | — | — |
 
 `slaStatus` (`OK`/`DUE_SOON`/`BREACHED`/`NOT_APPLICABLE`) is **computed at
-read time**, not persisted or job-driven — see [research.md § SLA calculation](../research.md#sla-calculation-computed-at-read-time-not-a-scheduled-job)
+read time**, not persisted or job-driven — see [research.md § SLA calculation](../research.md#sla-calculation-event-aware-and-computed-at-read-time)
 for why. Full field definitions: [data-model.md § Ticket](../data-model.md#ticket).
+The response obligation completes when the ticket first enters `ANALYSIS`
+(`respondedAt`); the first-info obligation completes on the first public
+TicketFlow1 comment (`firstInfoAt`). Each later public TicketFlow1 update
+advances `nextUpdateDueAt`. Completed obligations no longer contribute to the
+current status. `DUE_SOON` means the active deadline is within the final 25%
+of its window, with a minimum five-minute warning window.
 
 ## Acceptance scenarios
 
-1. **Given** a new Defect ticket, **when** a ticket lead sets severity to
+1. **Given** a new Defect ticket, **when** it is created with severity
    `SEV_1`, **then** `responseDueAt = createdAt + 15m`,
    `firstInfoDueAt = createdAt + 45m`, and `slaStatus = OK`.
-2. **Given** a `SEV_1` defect whose `responseDueAt` has passed with no
-   response recorded, **when** the ticket or dashboard is viewed, **then**
-   `slaStatus` shows `BREACHED`.
+2. **Given** a `SEV_1` defect whose `responseDueAt` has passed while
+   `respondedAt` is absent, **when** the ticket or dashboard is viewed,
+   **then** `slaStatus` shows `BREACHED`.
 3. **Given** a defect approaching (but not past) its next update deadline,
    **when** the ticket or dashboard is viewed, **then** `slaStatus` shows
    `DUE_SOON`.
@@ -102,10 +108,10 @@ history).
 - Phase 2 (Ticket Core): T023, T024, T025 (`slaStatus` filter stubbed here,
   wired in Phase 6)
 - Phase 3 (Workflow/Transitions): T028, T029, T030
-- Phase 6 (Defect SLA — dedicated to this story): T051–T056
-- Phase 7 (Frontend): T062, T063
+- Phase 6 (Defect SLA): T061–T068, T071
+- Phase 7 (Frontend): T080, T083–T085
 
-Full task text: [tasks.md](../tasks.md). Verify gate: **T056** — create a
+Full task text: [tasks.md](../tasks.md). Verify gate: **T071** — create a
 `SEV_1` defect, confirm due-dates are immediate; via a backdated-`createdAt`
 integration test, confirm `slaStatus` flips to `BREACHED` with no manual
 recalculation call.

@@ -4,16 +4,20 @@ The mutating endpoints here are gated by configuration permissions —
 `USER_MANAGE` (users, organizations), `ROLE_MANAGE` (roles, permission
 catalog), `TYPE_MANAGE` (ticket types), `WORKFLOW_MANAGE` (workflows). The
 `GET` list endpoints are broader — see each. Every config mutation writes a
-`CONFIG_CHANGED` audit entry (FR-013). Client-scoped configuration (roles,
+configuration-audit entry (FR-013). Client-scoped configuration (roles,
 ticket types, workflows) is cloned per Organization from the seeded templates,
 so an edit affects only the Organization that owns the row (FR-022).
 
+A CLIENT-party administrator is always restricted to their authenticated
+Organization, even if a request supplies another id. TICKETFLOW1-party
+administrators may manage any client Organization. Out-of-scope targets return
+`404`.
+
 ## `GET /api/admin/users`
 
-Any TICKETFLOW1-party user may call this (it populates the ticket-lead picker
-for the 002-ticket-master-detail flow); the same widening `GET
-/api/admin/organizations` has for the ticket-creation org picker. Managing
-users (create/edit) still requires `USER_MANAGE`.
+Requires `USER_MANAGE`. Ticket-lead and other ordinary forms use the minimal
+reference endpoints at the end of this contract rather than receiving full
+user records/emails.
 
 **Query params**: `organizationId` (optional filter), `roleId` (optional
 filter), `page`/`pageSize`.
@@ -66,7 +70,8 @@ rules).
 
 ## `GET /api/admin/organizations`
 
-Any TICKETFLOW1-party user may call this.
+Requires `USER_MANAGE`. Ticket creation uses the minimal Organization reference
+endpoint instead.
 
 **Response `200`**: array of `Organization`:
 
@@ -103,8 +108,8 @@ lifecycle op needed for MVP demo purposes).
 The permission catalog is fixed and code-owned — it can be listed but not
 edited at runtime (FR-008). Roles are configurable bundles of catalog
 permissions (FR-009): an admin holding `ROLE_MANAGE` can create a role and
-edit its name and permission set, and the change takes effect on the assigned
-users' next request with no code deployment. A role's `party` (`CLIENT` vs
+edit its name and permission set, and the change takes effect when assigned
+users next authenticate/receive a token, with no code deployment. A role's `party` (`CLIENT` vs
 `TICKETFLOW1`) is structural and fixed at creation — it can never be changed to
 grant cross-party visibility (FR-010).
 
@@ -127,7 +132,8 @@ so the role editor can present the full set of grantable permissions.
   { "id": 8, "key": "USER_MANAGE" },
   { "id": 9, "key": "ROLE_MANAGE" },
   { "id": 10, "key": "TYPE_MANAGE" },
-  { "id": 11, "key": "WORKFLOW_MANAGE" }
+  { "id": 11, "key": "WORKFLOW_MANAGE" },
+  { "id": 13, "key": "COMMENT_INTERNAL_READ" }
 ]
 ```
 
@@ -159,7 +165,7 @@ filter, `CLIENT` | `TICKETFLOW1`).
     "party": "TICKETFLOW1",
     "organizationId": null,
     "isTemplate": true,
-    "permissions": ["TICKET_READ", "TICKET_CREATE", "TICKET_UPDATE", "TICKET_TRANSITION", "COMMENT_PUBLIC_WRITE", "COMMENT_INTERNAL_WRITE", "USER_MANAGE"]
+    "permissions": ["TICKET_READ", "TICKET_CREATE", "TICKET_UPDATE", "TICKET_TRANSITION", "COMMENT_PUBLIC_WRITE", "COMMENT_INTERNAL_READ", "COMMENT_INTERNAL_WRITE", "USER_MANAGE"]
   }
 ]
 ```
@@ -217,8 +223,7 @@ supplied `permissions` array replaces the role's grants wholesale. `party` and
 ```
 
 **Response `200`**: updated role, same shape as `POST`. The change applies to
-every assigned user on their next request. Writes a `CONFIG_CHANGED` audit
-entry.
+assigned users on their next token issuance. Writes a configuration-audit entry.
 
 **Errors**: `400 VALIDATION_FAILED` (unknown permission key); `404 NOT_FOUND`
 (no such role, or it belongs to another Organization the caller cannot manage).
@@ -283,13 +288,13 @@ workflow.
 ```
 
 `workflowId` must reference a workflow owned by the same Organization (or a
-global template). `requiresProposal` may be `true` only if the referenced
-workflow contains a proposal step.
+global template). Custom types must use `requiresProposal=false` in MVP;
+proposal semantics belong to clones of the seeded Change Request template.
 
 **Response `201`**: created ticket type (same shape as the list items above).
 
 **Errors**: `400 VALIDATION_FAILED` (duplicate `key` within the Organization,
-or `requiresProposal = true` against a workflow with no proposal step);
+or `requiresProposal = true` on a custom type);
 `404 NOT_FOUND` (`workflowId` not visible to the caller).
 
 ## `GET /api/admin/workflows`
@@ -317,10 +322,10 @@ the required party and the responsibility the ticket takes on afterward.
       { "id": 404, "key": "CANCELLED", "isInitial": false, "isTerminal": true, "sortOrder": 5 }
     ],
     "transitions": [
-      { "id": 700, "fromStateId": 400, "toStateId": 401, "requiredPermission": "TICKET_TRANSITION", "requiredParty": "TICKETFLOW1", "responsibilityAfter": null },
-      { "id": 701, "fromStateId": 401, "toStateId": 402, "requiredPermission": "TICKET_TRANSITION", "requiredParty": "TICKETFLOW1", "responsibilityAfter": null },
-      { "id": 702, "fromStateId": 402, "toStateId": 403, "requiredPermission": "TICKET_TRANSITION", "requiredParty": "TICKETFLOW1", "responsibilityAfter": null },
-      { "id": 703, "fromStateId": 400, "toStateId": 404, "requiredPermission": "TICKET_TRANSITION", "requiredParty": "TICKETFLOW1", "responsibilityAfter": null }
+      { "id": 700, "fromStateId": 400, "toStateId": 401, "requiredPermission": "TICKET_TRANSITION", "requiredParty": "TICKETFLOW1", "responsibilityAfter": null, "operationKind": "STANDARD" },
+      { "id": 701, "fromStateId": 401, "toStateId": 402, "requiredPermission": "TICKET_TRANSITION", "requiredParty": "TICKETFLOW1", "responsibilityAfter": null, "operationKind": "STANDARD" },
+      { "id": 702, "fromStateId": 402, "toStateId": 403, "requiredPermission": "TICKET_TRANSITION", "requiredParty": "TICKETFLOW1", "responsibilityAfter": null, "operationKind": "STANDARD" },
+      { "id": 703, "fromStateId": 400, "toStateId": 404, "requiredPermission": "TICKET_TRANSITION", "requiredParty": "TICKETFLOW1", "responsibilityAfter": null, "operationKind": "STANDARD" }
     ]
   }
 ]
@@ -345,8 +350,8 @@ request and names the permission that gates it.
     { "key": "CLOSED", "isInitial": false, "isTerminal": true, "sortOrder": 3 }
   ],
   "transitions": [
-    { "fromState": "OPEN", "toState": "GRANTED", "requiredPermission": "TICKET_TRANSITION", "requiredParty": "TICKETFLOW1", "responsibilityAfter": null },
-    { "fromState": "GRANTED", "toState": "CLOSED", "requiredPermission": "TICKET_TRANSITION", "requiredParty": "TICKETFLOW1", "responsibilityAfter": null }
+    { "fromState": "OPEN", "toState": "GRANTED", "requiredPermission": "TICKET_TRANSITION", "requiredParty": "TICKETFLOW1", "responsibilityAfter": null, "operationKind": "STANDARD" },
+    { "fromState": "GRANTED", "toState": "CLOSED", "requiredPermission": "TICKET_TRANSITION", "requiredParty": "TICKETFLOW1", "responsibilityAfter": null, "operationKind": "STANDARD" }
   ]
 }
 ```
@@ -354,30 +359,34 @@ request and names the permission that gates it.
 **Response `201`**: created workflow with server-assigned integer ids for the
 workflow, its states, and its transitions (same shape as the list items above).
 
+Only the seeded Change Request template may use proposal operation kinds in MVP;
+custom workflows use `STANDARD`. This prevents inventing an incomplete custom
+proposal protocol through configuration alone.
+
 **Errors**: `400 VALIDATION_FAILED` (no initial state, more than one initial
 state, no terminal state, a transition referencing an unknown state key, or a
 `requiredPermission` not in the catalog).
 
 ## `PATCH /api/admin/workflows/{id}`
 
-Requires `WORKFLOW_MANAGE`. Edits a workflow's states and transitions. A
-supplied `states`/`transitions` array replaces that collection wholesale;
-omitted collections are left unchanged. The one-initial / at-least-one-terminal
-rules are re-checked on the resulting definition.
+Requires `WORKFLOW_MANAGE`. Edits a workflow additively. Existing state ids are
+preserved by key; new states may be added and transition sets may be replaced.
+A state referenced by a ticket cannot be removed or renamed in MVP. The
+one-initial / at-least-one-terminal rules are re-checked on the result.
 
 **Request** (add a `GRANTED → OPEN` re-open transition):
 
 ```json
 {
   "transitions": [
-    { "fromState": "OPEN", "toState": "GRANTED", "requiredPermission": "TICKET_TRANSITION", "requiredParty": "TICKETFLOW1", "responsibilityAfter": null },
-    { "fromState": "GRANTED", "toState": "CLOSED", "requiredPermission": "TICKET_TRANSITION", "requiredParty": "TICKETFLOW1", "responsibilityAfter": null },
-    { "fromState": "GRANTED", "toState": "OPEN", "requiredPermission": "TICKET_TRANSITION", "requiredParty": "TICKETFLOW1", "responsibilityAfter": null }
+    { "fromState": "OPEN", "toState": "GRANTED", "requiredPermission": "TICKET_TRANSITION", "requiredParty": "TICKETFLOW1", "responsibilityAfter": null, "operationKind": "STANDARD" },
+    { "fromState": "GRANTED", "toState": "CLOSED", "requiredPermission": "TICKET_TRANSITION", "requiredParty": "TICKETFLOW1", "responsibilityAfter": null, "operationKind": "STANDARD" },
+    { "fromState": "GRANTED", "toState": "OPEN", "requiredPermission": "TICKET_TRANSITION", "requiredParty": "TICKETFLOW1", "responsibilityAfter": null, "operationKind": "STANDARD" }
   ]
 }
 ```
 
-**Response `200`**: updated workflow. Writes a `CONFIG_CHANGED` audit entry.
+**Response `200`**: updated workflow. Writes a configuration-audit entry.
 The new transition set takes effect immediately for new moves; tickets already
 mid-flow keep their current state (workflow edits are assumed additive for MVP
 per spec Assumptions).
@@ -386,3 +395,19 @@ per spec Assumptions).
 initial/terminal rules, references an unknown state key, or names a permission
 outside the catalog); `404 NOT_FOUND` (no such workflow, or it belongs to an
 Organization the caller cannot manage).
+
+---
+
+# Safe reference data for forms
+
+These endpoints expose only the minimum data needed by non-admin forms and do
+not grant configuration access.
+
+- `GET /api/reference/ticket-types`: requires `TICKET_CREATE`; returns active
+  types visible for the caller/selected Organization.
+- `GET /api/reference/organizations`: requires `TICKET_CREATE` and TICKETFLOW1
+  party; returns active Organization ids/names only.
+- `GET /api/reference/ticket-leads`: requires `TICKET_UPDATE` and TICKETFLOW1
+  party; returns active TICKETFLOW1 user ids/display names only.
+- `GET /api/reference/assignable-roles`: requires `USER_MANAGE`; returns role
+  ids/names/party for the Organization the caller may manage.

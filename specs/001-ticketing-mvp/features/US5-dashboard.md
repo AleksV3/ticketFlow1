@@ -53,17 +53,17 @@ Read-only aggregation over `Ticket` — no new entity of its own.
 ## Tasks
 
 - Phase 2 (Ticket Core — list/filter endpoint): T025
-- Phase 7 (Frontend — dashboard page): T060
+- Phase 6 (Backend dashboard): T069–T070
+- Phase 7 (Frontend dashboard): T081
 
 Full task text: [tasks.md](../tasks.md). This story has the fewest
 dedicated tasks because it's an aggregation view over data every other
 story already produces — most of the "work" for US5 is making sure US1/US3/US6
 write correct, queryable data, not net-new dashboard logic.
 
-Verify gate: none dedicated — covered by T066 (Phase 7 frontend verify,
-log in as different users and confirm dashboard renders) and the
-org-isolation check in T070 (Phase 8, confirms a TicketFlow1 manager sees both
-orgs' tickets in one dashboard view).
+Verify gates: T070 for the backend, T093 for role-aware frontend behavior, and
+T100 for the full two-Organization check confirming a TicketFlow1 manager sees
+both organizations while each client sees only its own data.
 
 ## Success criteria
 

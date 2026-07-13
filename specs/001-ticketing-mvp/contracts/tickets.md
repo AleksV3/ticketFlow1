@@ -12,7 +12,7 @@ this cannot be overridden by query params.
 |---|---|---|
 | `type` | a ticket type key (seeded defaults `CHANGE_REQUEST` \| `TASK` \| `DEFECT`, plus any admin-defined type) | |
 | `status` | a workflow state key for the matching type's workflow (e.g. `ANALYSIS`) | states come from the type's configured workflow, not a fixed list |
-| `severity` | `SEV_1`..`SEV_4` | ignored/no-op combined with non-DEFECT `type` |
+| `severity` | `SEV_1`..`SEV_4` | `400` when combined with an explicitly non-DEFECT `type` |
 | `priority` | `LOW`..`CRITICAL` | |
 | `assignedTo` | `me` \| `unassigned` | `me` resolves to caller's user id as `ticketLeadId`; `unassigned` matches tickets with no `ticketLead` set (added by 002-ticket-master-detail for the "Unassigned" saved view) |
 | `responsibility` | `CLIENT` \| `TICKETFLOW1` | maps to `currentResponsibility` |
@@ -101,6 +101,8 @@ row (`fromStatus=null`) are written in the same transaction.
     "responseDueAt": "2026-07-01T09:15:00Z",
     "firstInfoDueAt": "2026-07-01T09:45:00Z",
     "nextUpdateDueAt": "2026-07-02T11:00:00Z",
+    "respondedAt": "2026-07-01T09:10:00Z",
+    "firstInfoAt": null,
     "status": "DUE_SOON"
   },
   "allowedTransitions": ["FIX_IN_PROGRESS", "CANCELLED"]
@@ -111,7 +113,9 @@ row (`fromStatus=null`) are written in the same transaction.
 `allowedTransitions` is pre-filtered by the workflow engine to the moves the
 caller may actually fire from the current state — those defined in the type's
 workflow whose `required_permission` the caller holds (and whose
-`required_party` matches). The frontend renders exactly these as buttons,
+`required_party` matches) and whose `operationKind` is `STANDARD`. Proposal
+commands are exposed separately in the proposal portion of `TicketDetail`.
+The frontend renders exactly these standard moves as buttons,
 never computing legality client-side (constitution Principle I/III).
 
 **Errors**: `404 NOT_FOUND` (nonexistent, or exists but outside caller's org).
@@ -147,7 +151,7 @@ on a defect requires the caller be CLIENT party).
 **Request**:
 
 ```json
-{ "toStatus": "PROPOSAL_APPROVED", "comment": "Approved, proceed to dev." }
+{ "toStatus": "ANALYSIS", "comment": "Beginning triage." }
 ```
 
 `comment` is optional; if present, it's stored as a `PUBLIC` comment in the
@@ -159,4 +163,9 @@ same transaction as the transition.
 transition from the current state to `toStatus` (an undefined move);
 `403 FORBIDDEN` if the transition exists but the caller lacks its
 `required_permission` or `required_party` (see plan.md state diagrams, which
-annotate each transition `PERMISSION [party]`).
+annotate each transition `PERMISSION [party]`); `409 INVALID_STATE` if the
+matching transition is a protected proposal operation that must be performed
+through the proposal endpoint; `409 CONFLICT` for a stale concurrent update.
+
+Entering a terminal state sets `closedAt`; a configured reopen transition clears
+it. A supplied comment and the state/history/audit mutation commit atomically.

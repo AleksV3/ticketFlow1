@@ -5,11 +5,13 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import com.ticketflow1.ticketing.audit.AuditAction;
 import com.ticketflow1.ticketing.audit.AuditService;
 import com.ticketflow1.ticketing.auth.AuthPrincipal;
+import com.ticketflow1.ticketing.common.ApiException;
 import com.ticketflow1.ticketing.common.IllegalTransitionException;
 import com.ticketflow1.ticketing.organization.Organization;
 import com.ticketflow1.ticketing.rbac.Permission;
@@ -139,6 +141,20 @@ class TicketTransitionServiceTest {
                 .isInstanceOf(IllegalTransitionException.class)
                 .hasMessageContaining("SUBMITTED")
                 .hasMessageContaining("DEVELOPMENT");
+    }
+
+    @Test
+    void transitionComment_isRejectedUntilCommentPersistenceExists() {
+        AuthPrincipal principal = new AuthPrincipal(1L, Responsibility.TICKETFLOW1, null,
+                Set.of("TICKET_TRANSITION"));
+
+        assertThatThrownBy(() -> ticketTransitionService.transition(
+                "TF-1000", "ANALYSIS", "Please investigate", principal))
+                .isInstanceOf(ApiException.class)
+                .hasMessageContaining("not available until Phase 4");
+
+        verifyNoInteractions(ticketRepository, workflowStateRepository, workflowTransitionRepository,
+                appUserRepository, auditService, statusHistoryService);
     }
 
     private void stubSuccessPath(Fixture fixture, AuthPrincipal principal, String toKey) {

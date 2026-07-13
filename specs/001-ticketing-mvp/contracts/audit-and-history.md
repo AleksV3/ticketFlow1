@@ -47,4 +47,14 @@ endpoints — entries are only ever created as a side effect of other actions
 
 Both endpoints are visible to anyone who can view the ticket itself
 (`TICKET_READ`) — unlike comments, there is no internal/public split for audit
-or history (these are procedural facts, not communication).
+or history for ordinary procedural facts. `COMMENT_ADDED` entries associated
+with INTERNAL comments are omitted for callers lacking `COMMENT_INTERNAL_READ`,
+and comment bodies are never stored in audit values.
+
+## `GET /api/admin/configuration-audit`
+
+Requires one of `USER_MANAGE`, `ROLE_MANAGE`, `TYPE_MANAGE`, or
+`WORKFLOW_MANAGE`. Returns a paginated, newest-first feed from
+`configuration_audit_log`. CLIENT-party administrators are restricted to their
+authenticated Organization; TICKETFLOW1 administrators may filter by
+`organizationId`, `targetType`, and `targetId`.

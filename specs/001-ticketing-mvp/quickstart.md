@@ -31,20 +31,23 @@ cd backend
 ./mvnw spring-boot:run   # or ./gradlew bootRun, per whichever build tool Phase 1 picks
 ```
 
-Verify: Flyway logs show `V1`..`V6` applied with no errors; Swagger UI loads
-at `http://localhost:8081/swagger-ui.html`; demo users from `V6__seed_demo_data.sql`
-exist (one per role, at least two Organizations).
+Verify: the normal profile applies production migrations `V1`..`V7` with no
+errors and Swagger UI loads at `http://localhost:8081/swagger-ui.html`. The demo
+profile additionally enables `db/demo-migration/V8__seed_demo_data.sql` and
+creates one user per role across at least two Organizations.
 
 ## 3. Validate the Change Request flow end-to-end (User Story 1)
 
 ```bash
-# Login as a client contributor, capture the token
-TOKEN=$(curl -s -X POST localhost:8081/api/auth/login \
+# Login as a client contributor and store auth/CSRF cookies
+curl -s -c /tmp/tf1-cookies -X POST localhost:8081/api/auth/login \
   -H 'Content-Type: application/json' \
-  -d '{"email":"contributor@clientco.demo","password":"demo"}' | jq -r .token)
+  -d '{"email":"contributor@clientco.demo","password":"demo"}'
 
 # Create a Change Request
-curl -s -X POST localhost:8081/api/tickets -H "Authorization: Bearer $TOKEN" \
+XSRF=$(awk '$6 == "XSRF-TOKEN" {print $7}' /tmp/tf1-cookies)
+curl -s -b /tmp/tf1-cookies -X POST localhost:8081/api/tickets \
+  -H "X-XSRF-TOKEN: $XSRF" \
   -H 'Content-Type: application/json' \
   -d '{"type":"CHANGE_REQUEST","title":"Add SSO","description":"...","priority":"MEDIUM"}'
 ```
@@ -99,4 +102,5 @@ client-computed).
 ## 8. Full demo script
 
 Once all phases are complete, run doc 02 §12's 13-step demo story end to
-end and time it — target under 10 minutes (spec SC-006).
+end and time it — target under 10 minutes (spec SC-006). Also run the clean
+migration, security, and two-Organization release gates T098–T101.

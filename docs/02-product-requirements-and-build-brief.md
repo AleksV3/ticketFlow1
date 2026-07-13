@@ -1,5 +1,9 @@
 # TicketFlow1 Ticketing Tool — Product Requirements & Build Brief
 
+> **Source brief.** This document preserves the mentor-derived product context.
+> The constitution and `specs/001-ticketing-mvp/` are the current authoritative
+> requirements, architecture, contracts, and task status.
+
 ## Purpose of this document
 
 This document gives a second AI/coding agent the product and technical brief for Gregor and Aleks's TicketFlow1 summer project.

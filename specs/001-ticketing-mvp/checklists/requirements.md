@@ -6,7 +6,8 @@
 
 ## Content Quality
 
-- [x] No implementation details (languages, frameworks, APIs)
+- [x] Product behavior is technology-agnostic except FR-018's explicitly
+      accepted authentication/security architecture constraint
 - [x] Focused on user value and business needs
 - [x] Written for non-technical stakeholders
 - [x] All mandatory sections completed
@@ -27,13 +28,18 @@
 
 ## Feature Readiness
 
-- [x] All functional requirements have clear acceptance criteria
+- [x] All 23 functional requirements have clear acceptance criteria or a
+      cross-cutting verification task
 - [x] User scenarios cover primary flows (all 8 user stories independently testable)
 - [x] Feature meets measurable outcomes defined in Success Criteria
-- [x] No implementation details leak into specification
+- [x] Any implementation-specific constraint is explicitly identified and justified
+- [x] Protected proposal transitions cannot be bypassed through the generic API
+- [x] SLA completion events and `DUE_SOON` boundaries are defined
+- [x] Configuration audit has a valid non-ticket target model
+- [x] Concurrent stale mutations have a defined `409 CONFLICT` outcome
 
 ## Notes
 
 - Items marked incomplete require spec updates before `/speckit-clarify` or `/speckit-plan`.
-- All content-quality and feature-readiness items pass on first pass; only the
-  3 explicit clarification markers block progression.
+- Checklist revalidated on 2026-07-10 after the phase 4–8 consistency revision;
+  no clarification marker blocks the next phase.

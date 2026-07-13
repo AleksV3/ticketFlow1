@@ -76,7 +76,7 @@ implementation track:
 
 - Phase 2 (Ticket Core): T023, T024
 - Phase 3 (Workflow/Transitions): T028, T029, T030
-- Phase 7 (Frontend): T062, T063
+- Phase 7 (Frontend): T083, T084
 
 Full task text: [tasks.md](../tasks.md). Verify gate: T035 (transitions
 phase) covers the illegal-transition rejection this story depends on.

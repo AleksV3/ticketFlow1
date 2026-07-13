@@ -2,6 +2,8 @@
 
 **Branch**: `001-ticketing-mvp` | **Date**: 2026-07-02 | **Spec**: [spec.md](spec.md)
 
+**Last revised**: 2026-07-10 after Phase 3 review
+
 **Input**: Feature specification from `specs/001-ticketing-mvp/spec.md`
 
 ## Summary
@@ -29,8 +31,9 @@ Flyway, springdoc-openapi (Swagger UI), jjwt (JWT signing/parsing); Next.js
 identity primary keys; fixed value sets as `TEXT` + `CHECK`; configurable sets
 (ticket type, workflow state, role) as lookup tables (data-model.md)
 
-**Testing**: JUnit 5 + Spring Boot Test, Testcontainers (PostgreSQL) for
-integration tests; manual verification for frontend (see research.md)
+**Testing**: JUnit 5 + Spring Boot Test, Testcontainers/PostgreSQL integration
+tests; focused frontend component tests plus one end-to-end smoke flow and
+manual accessibility verification (see research.md)
 
 **Target Platform**: Linux container (Docker Compose locally; deployment
 target not decided — out of scope for MVP)
@@ -53,12 +56,13 @@ not designed for production multi-thousand-user scale.
 | Principle | Check | Status |
 |---|---|---|
 | I. Typed lifecycles, validated transitions | `TicketTransitionService` loads each type's workflow (states + transitions) from the DB and rejects any move not defined for the ticket's current state; no generic PATCH-to-any-status path. Seeded and custom workflows validate identically | PASS |
-| II. Audit everything | Every mutating endpoint contract (tickets, comments, proposals, attachments, config) specifies its audit log entry (contracts/), including `CONFIG_CHANGED` for role/type/workflow edits | PASS |
+| II. Audit every business mutation | Ticket mutations use ticket-scoped `audit_log`; configuration mutations use a separate organization-scoped `configuration_audit_log`, because they have no ticket target. Internal-comment details are never exposed through client-visible audit responses | PASS |
 | III. Permission-based access is core value | Authorization checks permission authorities (`@PreAuthorize` + service-layer party/org/transition checks), never role names; the party axis and proposal gate stay fixed | PASS |
 | IV. Backend before UI polish | Task breakdown follows constitution build order: RBAC/config foundation → ticket core → workflow engine → comments → proposals → SLA → frontend → polish | PASS |
 | V. Small verified steps | App runs on seeded defaults at every step; testing strategy (research.md) enables per-slice verification; no big-bang generation | PASS |
 | VI. Bounded configurability, no overengineering | Types/workflows/roles are data within a fixed schema; permission catalog, party axis, and severity stay fixed. Rejected Spring Statemachine, scheduled SLA jobs, TanStack Query, per-tenant code — justified in research.md | PASS |
 | VII. Teach, don't just deliver | Out of scope for this document — enforced during implementation per constitution | N/A |
+| VIII. Secure by default | Cookie authentication includes CSRF protection for browser mutations, production `Secure` cookies, tenant-scoped admin services, demo-only credentials outside production migrations, and focused security tests before release | PASS |
 
 No violations requiring Complexity Tracking justification.
 
@@ -107,12 +111,14 @@ backend/
 │   ├── comment/
 │   ├── attachment/
 │   ├── audit/                # AuditLog entity + AuditService (used by other services)
+│   ├── configaudit/          # ConfigurationAuditLog for org/role/type/workflow mutations
 │   ├── statushistory/
 │   ├── sla/                  # SLA calculation service (research.md)
 │   ├── dashboard/
 │   └── common/               # error handling (@ControllerAdvice), pagination envelope
 ├── src/main/resources/
-│   ├── db/migration/         # Flyway V1__..V6__ (data-model.md)
+│   ├── db/migration/         # production Flyway V1__..V7__ (data-model.md)
+│   ├── db/demo-migration/    # demo-only V8 seed, enabled by demo profile
 │   └── application.yml
 └── src/test/java/...         # unit tests (transition engine, SLA calc) + Testcontainers integration tests
 
@@ -153,6 +159,14 @@ the actor holds the transition's `required_permission` (and matches
 serves seeded and custom workflows — the validation guarantee is identical
 (constitution Principle I).
 
+Each transition also has an `operation_kind`. `STANDARD` transitions may be
+called through `POST .../transition`; `PROPOSAL_CREATE`, `PROPOSAL_APPROVE`,
+and `PROPOSAL_REJECT` transitions are callable only by `ChangeProposalService`
+while it writes the corresponding proposal record/decision in the same
+transaction. The generic endpoint therefore cannot bypass a business gate.
+Tickets and proposals use optimistic locking; stale concurrent mutations return
+`409 CONFLICT` rather than overwriting a newer decision.
+
 The diagrams below document the three **seeded default** workflows (stored as
 `workflow`/`workflow_state`/`workflow_transition` rows, cloned per Organization).
 Each transition is annotated `PERMISSION [party]` — the `required_permission`
@@ -165,10 +179,10 @@ stateDiagram-v2
     [*] --> SUBMITTED: TICKET_CREATE [CLIENT]
     SUBMITTED --> ANALYSIS: TICKET_TRANSITION [TICKETFLOW1]
     SUBMITTED --> CANCELLED: TICKET_TRANSITION [TICKETFLOW1]
-    ANALYSIS --> PROPOSAL: TICKET_TRANSITION [TICKETFLOW1]
+    ANALYSIS --> PROPOSAL: PROPOSAL_CREATE / TICKET_TRANSITION [TICKETFLOW1]
     ANALYSIS --> CANCELLED: TICKET_TRANSITION [TICKETFLOW1]
-    PROPOSAL --> PROPOSAL_APPROVED: PROPOSAL_APPROVE [CLIENT]
-    PROPOSAL --> PROPOSAL_REJECTED: PROPOSAL_APPROVE [CLIENT]
+    PROPOSAL --> PROPOSAL_APPROVED: PROPOSAL_APPROVE operation [CLIENT]
+    PROPOSAL --> PROPOSAL_REJECTED: PROPOSAL_REJECT operation [CLIENT]
     PROPOSAL_REJECTED --> ANALYSIS: TICKET_TRANSITION [TICKETFLOW1]
     PROPOSAL_REJECTED --> CANCELLED: TICKET_TRANSITION [TICKETFLOW1]
     PROPOSAL_APPROVED --> DEVELOPMENT: TICKET_TRANSITION [TICKETFLOW1]
@@ -225,7 +239,8 @@ stateDiagram-v2
     CLOSED --> [*]
 ```
 
-Severity (`SEV_1`–`SEV_4`) is set at creation or during `ANALYSIS` and drives
+Severity (`SEV_1`–`SEV_4`) is required at creation and may be revised during
+`ANALYSIS`; it drives
 the SLA deadline fields (data-model.md); it does not gate any transition
 directly. `responsibility_after = CLIENT` on the transition into
 `CLIENT_CONFIRMATION`; `TICKETFLOW1` through `FIX_IN_PROGRESS`.

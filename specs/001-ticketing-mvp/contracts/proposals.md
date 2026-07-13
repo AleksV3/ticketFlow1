@@ -4,6 +4,11 @@ Only exist for tickets whose type has `requiresProposal = true` — the seeded
 `CHANGE_REQUEST` type (FR-003). Proposal status is a fixed set: `PENDING`,
 `APPROVED`, `REJECTED`.
 
+The three proposal-related workflow transitions are protected operation kinds.
+They cannot be called through the generic ticket-transition endpoint; only
+`ChangeProposalService` may invoke them while persisting the proposal mutation
+in the same transaction.
+
 ## `POST /api/tickets/{ticketKey}/proposals`
 
 Requires `TICKET_TRANSITION` and TICKETFLOW1 party — creating the proposal
@@ -58,6 +63,7 @@ ticket status becomes `PROPOSAL_APPROVED`, `currentResponsibility` switches
 to `TICKETFLOW1`.
 
 **Errors**: `409 INVALID_STATE` if proposal isn't `PENDING`.
+`409 CONFLICT` is returned if another decision wins a concurrent race.
 
 ## `POST /api/proposals/{proposalId}/reject`
 
@@ -70,7 +76,8 @@ Requires `PROPOSAL_APPROVE` and CLIENT party, same org constraint as approve.
 ```
 
 `comment` required on reject (not optional like approve) — a rejection
-without a reason is not useful to the ticket lead.
+without a reason is not useful to the ticket lead. The reason is stored as a
+PUBLIC comment in the same transaction.
 
 **Response `200`**: updated `ChangeProposal` (`status=REJECTED`). Writes
 `PROPOSAL_REJECTED` audit log entry; ticket status becomes

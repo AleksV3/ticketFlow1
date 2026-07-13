@@ -18,7 +18,7 @@ design. Each entry: the decision, the artifact it shaped, and the rationale.
 | Specification and planning **before** implementation | constitution, `specs/` | Agree the design first; no code ahead of an approved spec. |
 | **Task-driven** build — follow the generated, dependency-ordered task list | `tasks.md` | A planned build order beats ad-hoc generation. |
 | **Small, verified steps** — each phase ends runnable and checked | constitution (Principle V), `tasks.md` | Catch problems early; always demoable. |
-| **Human-in-the-loop** visual task tracker | `docs/dashboard.html` | Keep the humans oriented across 70 tasks. |
+| **Human-in-the-loop** task tracking | `tasks.md`; archived `docs/dashboard.html` | Keep task status reviewable; after the hardening revision, Markdown is authoritative for T001–T102. |
 | **Per-feature documentation** — one page per user story | `specs/001-ticketing-mvp/features/` | Each story stitches its own scenarios, API and tasks. |
 | **Onboarding docs vault** for fast context | `ticketflow1-docs` | New sessions and teammates get architecture context quickly. |
 | **Feature-first** presentation, deep tech/SQL second | doc ordering | Stakeholders review user value before implementation detail. |
@@ -40,6 +40,9 @@ design. Each entry: the decision, the artifact it shaped, and the rationale.
 | **Flexible value representation over static DB enums** — fixed sets are `TEXT` + `CHECK` | `data-model.md` | A `CHECK` evolves with one migration; static enums get hard to change as the codebase and tenant needs grow. |
 | **Configurable ticket types & workflows** per client company | `spec.md` US8, config-driven transition engine (`plan.md`) | Different companies have different processes; a fixed three would not fit all. |
 | **Configurable roles via permission-based access** — roles are permission bundles seeded with defaults; code checks permissions, never role names | `spec.md` US6/US7, FR-007/008/009 | An admin can add or rename a role without a code change. |
+| **Protected business transitions** — proposal state changes are owned by `ChangeProposalService`, not the generic transition API | constitution I, `plan.md`, proposal contract | A configured transition must not bypass the business record/decision it represents. |
+| **Separate configuration audit** from ticket audit | `data-model.md`, admin contract | Configuration changes have no ticket target and still need correct tenant scope. |
+| **JWT permissions are a snapshot** | auth contract, `research.md` | Role edits take effect at next token issuance; MVP avoids pretending issued stateless tokens update themselves. |
 | **Integer (`bigint`) primary keys, not UUID** | `data-model.md` | For a single-database internal tool, sequential keys are simpler and sufficient; access is guarded by authorization, not id opacity. |
 | **Versioned schema migrations (Flyway)** retained even with one database | `db/migration/` | Schema changes stay reviewable and reproducible. |
 | **Product name only** — all artifacts use "TicketFlow1", no client/company name | all docs | Neutral, shippable branding. |

@@ -1,9 +1,14 @@
 # API Contracts: TicketFlow1 Ticketing Tool — MVP
 
+**Last revised**: 2026-07-10
+
 Base path: `/api`. All request/response bodies are JSON. All endpoints
 except `POST /api/auth/login` rely on the auth JWT presented via an
 `HttpOnly` cookie. Browser clients should call the API with
 `credentials: 'include'`.
+
+State-changing browser requests also send the CSRF token from the readable
+CSRF cookie in the `X-XSRF-TOKEN` header.
 
 Files in this directory, grouped by resource:
 
@@ -25,8 +30,9 @@ and party (`CLIENT` | `TICKETFLOW1`), plus (for CLIENT-party callers)
 `organizationId`, inside the JWT claims carried by the auth cookie. The
 permission set comes from the role assigned to the user; the server authorizes
 each action against the required **permission**, never against a role's name.
-The server never trusts an `organizationId` supplied in a request body/query
-for scoping — it is always read from the JWT claims. See
+The server never trusts an `organizationId` supplied by a CLIENT caller for
+scoping. CLIENT scope comes from the authenticated principal; TICKETFLOW1
+callers may explicitly select an organization where the contract allows it. See
 [data-model.md](../data-model.md) validation rules and FR-007/FR-018/FR-020.
 
 Each endpoint below states the **permission** it requires (e.g.
@@ -77,6 +83,7 @@ Every 4xx/5xx response body:
 | 404 | `NOT_FOUND` | resource doesn't exist, or exists but is outside caller's org scope (never distinguish the two — see below) |
 | 409 | `ILLEGAL_TRANSITION` | the workflow engine has no transition from the ticket's current state to the requested one (undefined move) |
 | 409 | `INVALID_STATE` | e.g. approving a proposal that's already decided |
+| 409 | `CONFLICT` | optimistic-lock conflict; the resource changed since the caller loaded it |
 | 500 | `INTERNAL_ERROR` | unexpected server error |
 
 **Org-scoping returns 404, not 403, for out-of-org resources.** A CLIENT-party
