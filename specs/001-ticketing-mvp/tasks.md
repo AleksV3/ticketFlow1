@@ -118,7 +118,7 @@ records are metadata references only.
 - [x] T048 [P] Implement `GET/POST /api/tickets/{ticketKey}/attachments` and privacy-safe `ATTACHMENT_ADDED` audit entries
 - [x] T049 [P] [US4] Test public/internal visibility, cross-org 404s, and comment/attachment validation limits
 - [x] T050 [P] [US4] Test privacy-safe comment audit feeds and transactional rollback when audit persistence fails
-- [ ] T051 **Verify**: compare TicketFlow1 and CLIENT comment/audit responses and confirm no INTERNAL body or event leaks; verify attachment reference isolation
+- [x] T051 **Verify**: compare TicketFlow1 and CLIENT comment/audit responses and confirm no INTERNAL body or event leaks; verify attachment reference isolation
 
 ---
 
