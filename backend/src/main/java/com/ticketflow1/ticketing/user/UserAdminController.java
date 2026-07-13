@@ -12,6 +12,8 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseStatus;
+import com.ticketflow1.ticketing.auth.AuthPrincipal;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
@@ -30,18 +32,19 @@ public class UserAdminController {
      * mirrors the same override on OrganizationAdminController.list().
      */
     @GetMapping
-    @PreAuthorize("principal.party() == T(com.ticketflow1.ticketing.ticket.Responsibility).TICKETFLOW1")
     public PagedResponse<UserResponse> list(
             @RequestParam(required = false) Long organizationId,
             @RequestParam(required = false) Long roleId,
             @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "20") int pageSize) {
-        return userService.list(organizationId, roleId, page, pageSize);
+            @RequestParam(defaultValue = "20") int pageSize,
+            @AuthenticationPrincipal AuthPrincipal principal) {
+        return userService.list(organizationId, roleId, page, pageSize, principal);
     }
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
-    public UserResponse create(@Valid @RequestBody CreateUserRequest request) {
-        return userService.create(request);
+    public UserResponse create(@Valid @RequestBody CreateUserRequest request,
+            @AuthenticationPrincipal AuthPrincipal principal) {
+        return userService.create(request, principal);
     }
 }

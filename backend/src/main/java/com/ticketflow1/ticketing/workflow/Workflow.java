@@ -13,6 +13,7 @@ import jakarta.persistence.ManyToOne;
 import jakarta.persistence.OneToMany;
 import jakarta.persistence.OrderBy;
 import jakarta.persistence.Table;
+import jakarta.persistence.Version;
 import java.util.LinkedHashSet;
 import java.util.Set;
 
@@ -23,6 +24,9 @@ public class Workflow extends Auditable {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
+
+    @Version
+    private long version;
 
     @Column(nullable = false, length = 100)
     private String name;
@@ -50,6 +54,7 @@ public class Workflow extends Auditable {
     public Long getId() {
         return id;
     }
+    public long getVersion() { return version; }
 
     public String getName() {
         return name;

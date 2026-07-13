@@ -33,7 +33,8 @@ public class RoleAdminService {
     }
 
     @Transactional(readOnly = true)
-    public List<RoleResponse> list(Long organizationId) {
+    public List<RoleResponse> list(AuthPrincipal principal, Long organizationId) {
+        if (principal.party() == Responsibility.CLIENT) organizationId = principal.organizationId();
         List<Role> roles = organizationId == null
                 ? roleRepository.findByTemplateTrue()
                 : roleRepository.findByOrganizationId(organizationId);
@@ -42,6 +43,11 @@ public class RoleAdminService {
 
     @Transactional
     public RoleResponse create(AuthPrincipal principal, CreateRoleRequest request) {
+        if (principal.party() == Responsibility.CLIENT
+                && (request.party() != Responsibility.CLIENT
+                    || !principal.organizationId().equals(request.organizationId()))) {
+            throw ApiException.notFound("Organization not found: " + request.organizationId());
+        }
         if (request.party() == Responsibility.CLIENT) {
             if (request.organizationId() == null) {
                 throw ApiException.validation("organizationId is required for a CLIENT-party role.");
@@ -65,6 +71,11 @@ public class RoleAdminService {
     public RoleResponse update(AuthPrincipal principal, Long roleId, UpdateRoleRequest request) {
         Role role = roleRepository.findById(roleId)
                 .orElseThrow(() -> ApiException.notFound("Role not found: " + roleId));
+        if (principal.party() == Responsibility.CLIENT
+                && (role.getOrganization() == null
+                    || !principal.organizationId().equals(role.getOrganization().getId()))) {
+            throw ApiException.notFound("Role not found: " + roleId);
+        }
         if (role.isTemplate()) {
             throw ApiException.validation(
                     "Template roles cannot be edited directly — edit an organization's cloned copy.");

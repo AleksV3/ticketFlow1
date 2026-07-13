@@ -163,9 +163,9 @@ frontend work begins.
 Goal: finish all backend APIs first, then expose every capability through the
 browser without duplicating authorization/workflow logic.
 
-- [ ] T072 [US8] Implement tenant-scoped ticket-type/workflow admin services and controllers, additive workflow editing, reference integrity checks, optimistic locking, and configuration audit
-- [ ] T073 [P] [US6][US7] Enforce CLIENT admin scope across user/role/type/workflow services; TICKETFLOW1 admins retain cross-org management
-- [ ] T074 [P] Implement safe reference endpoints for visible ticket types, active Organizations, active TicketFlow1 leads, and assignable roles
+- [x] T072 [US8] Implement tenant-scoped ticket-type/workflow admin services and controllers, additive workflow editing, reference integrity checks, optimistic locking, and configuration audit
+- [x] T073 [P] [US6][US7] Enforce CLIENT admin scope across user/role/type/workflow services; TICKETFLOW1 admins retain cross-org management
+- [x] T074 [P] Implement safe reference endpoints for visible ticket types, active Organizations, active TicketFlow1 leads, and assignable roles
 - [ ] T075 [P] Implement paginated `GET /api/admin/configuration-audit` with permission and organization scoping
 - [ ] T076 [P] Integration-test all admin mutations, cross-org denial, referenced-state deletion rejection, invalid workflow graphs, and audit entries
 - [ ] T077 Implement `frontend/lib/api.ts`: client-side cookie credentials, CSRF header, typed error parsing, and no caching of authenticated reads

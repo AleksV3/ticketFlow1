@@ -2,6 +2,7 @@ package com.ticketflow1.ticketing.user;
 
 import com.ticketflow1.ticketing.common.ApiException;
 import com.ticketflow1.ticketing.common.PagedResponse;
+import com.ticketflow1.ticketing.auth.AuthPrincipal;
 import com.ticketflow1.ticketing.organization.Organization;
 import com.ticketflow1.ticketing.organization.OrganizationRepository;
 import com.ticketflow1.ticketing.rbac.Role;
@@ -60,7 +61,11 @@ public class UserService {
     }
 
     @Transactional
-    public UserResponse create(CreateUserRequest request) {
+    public UserResponse create(CreateUserRequest request, AuthPrincipal principal) {
+        if (principal.party() == Responsibility.CLIENT
+                && !principal.organizationId().equals(request.organizationId())) {
+            throw ApiException.notFound("Organization not found: " + request.organizationId());
+        }
         Role role = roleRepository.findById(request.roleId())
                 .orElseThrow(() -> ApiException.validation("Role not found: " + request.roleId()));
         validateRoleAndOrganization(role, request.organizationId());
@@ -87,15 +92,18 @@ public class UserService {
     }
 
     @Transactional(readOnly = true)
-    public PagedResponse<UserResponse> list(Long organizationId, Long roleId, int page, int pageSize) {
+    public PagedResponse<UserResponse> list(Long organizationId, Long roleId, int page, int pageSize,
+            AuthPrincipal principal) {
+        Long scopedOrganizationId = principal.party() == Responsibility.CLIENT
+                ? principal.organizationId() : organizationId;
         int size = pageSize <= 0 ? DEFAULT_PAGE_SIZE : Math.min(pageSize, MAX_PAGE_SIZE);
         int pageNumber = Math.max(page, 0);
         Pageable pageable = PageRequest.of(pageNumber, size, Sort.by("createdAt").descending());
 
         Specification<AppUser> spec = Specification.where(null);
-        if (organizationId != null) {
+        if (scopedOrganizationId != null) {
             spec = spec.and((root, query, cb) ->
-                    cb.equal(root.get("organization").get("id"), organizationId));
+                    cb.equal(root.get("organization").get("id"), scopedOrganizationId));
         }
         if (roleId != null) {
             spec = spec.and((root, query, cb) -> cb.equal(root.get("role").get("id"), roleId));

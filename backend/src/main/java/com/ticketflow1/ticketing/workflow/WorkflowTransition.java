@@ -66,6 +66,13 @@ public class WorkflowTransition extends Auditable {
         this.responsibilityAfter = responsibilityAfter;
     }
 
+    public WorkflowTransition(Workflow workflow, WorkflowState fromState, WorkflowState toState,
+            Permission requiredPermission, Responsibility requiredParty,
+            Responsibility responsibilityAfter, TransitionOperationKind operationKind) {
+        this(workflow, fromState, toState, requiredPermission, requiredParty, responsibilityAfter);
+        this.operationKind = operationKind;
+    }
+
     public Long getId() {
         return id;
     }

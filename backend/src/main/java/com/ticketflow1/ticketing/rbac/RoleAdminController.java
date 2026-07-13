@@ -32,8 +32,9 @@ public class RoleAdminController {
 
     /** No organizationId: the global TICKETFLOW1-party role templates. */
     @GetMapping
-    public List<RoleResponse> list(@RequestParam(required = false) Long organizationId) {
-        return roleAdminService.list(organizationId);
+    public List<RoleResponse> list(@AuthenticationPrincipal AuthPrincipal principal,
+            @RequestParam(required = false) Long organizationId) {
+        return roleAdminService.list(principal, organizationId);
     }
 
     @PostMapping
