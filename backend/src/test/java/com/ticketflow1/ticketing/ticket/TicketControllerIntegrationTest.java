@@ -523,6 +523,74 @@ class TicketControllerIntegrationTest {
     }
 
     @Test
+    void rejectedProposalCanBeResubmittedAndApprovedWithCompleteEvidence() throws Exception {
+        Cookie client = login("client-a@demo.test", "client123");
+        Cookie internal = login("admin@ticketflow1.demo", "admin123");
+        Cookie approver = login("approver-a@demo.test", "client123");
+        String ticketKey = createTicket(client, """
+                {"type":"CHANGE_REQUEST","title":"Proposal lifecycle","description":"Phase 5 verification","priority":"MEDIUM"}
+                """, "SUBMITTED");
+        transition(ticketKey, "ANALYSIS", internal, status().isOk());
+
+        long rejectedId = objectMapper.readTree(createProposal(
+                ticketKey, internal, "First proposal", status().isCreated())
+                .getResponse().getContentAsString()).get("id").asLong();
+        mockMvc.perform(post("/api/proposals/{id}/reject", rejectedId).cookie(approver)
+                        .contentType("application/json")
+                        .content("{\"comment\":\"Please reduce the delivery risk\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("REJECTED"));
+
+        transition(ticketKey, "ANALYSIS", internal, status().isOk());
+        mockMvc.perform(get("/api/tickets/{ticketKey}", ticketKey).cookie(internal))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("ANALYSIS"))
+                .andExpect(jsonPath("$.latestProposal.id").value(rejectedId))
+                .andExpect(jsonPath("$.latestProposal.status").value("REJECTED"))
+                .andExpect(jsonPath("$.proposalCommands[0]").value("CREATE"));
+
+        long approvedId = objectMapper.readTree(createProposal(
+                ticketKey, internal, "Safer revised proposal", status().isCreated())
+                .getResponse().getContentAsString()).get("id").asLong();
+        mockMvc.perform(post("/api/proposals/{id}/approve", approvedId).cookie(approver)
+                        .contentType("application/json").content("{}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("APPROVED"));
+
+        assertThat(approvedId).isGreaterThan(rejectedId);
+        mockMvc.perform(get("/api/tickets/{ticketKey}", ticketKey).cookie(client))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("PROPOSAL_APPROVED"))
+                .andExpect(jsonPath("$.latestProposal.id").value(approvedId))
+                .andExpect(jsonPath("$.latestProposal.status").value("APPROVED"))
+                .andExpect(jsonPath("$.proposalCommands").isEmpty());
+        mockMvc.perform(get("/api/tickets/{ticketKey}/comments", ticketKey).cookie(client))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].body").value("Please reduce the delivery risk"))
+                .andExpect(jsonPath("$[0].visibility").value("PUBLIC"));
+
+        MvcResult audit = mockMvc.perform(get("/api/tickets/{ticketKey}/audit-log", ticketKey)
+                        .cookie(internal))
+                .andExpect(status().isOk()).andReturn();
+        assertThat(countActions(audit, "PROPOSAL_CREATED")).isEqualTo(2);
+        assertThat(countActions(audit, "PROPOSAL_REJECTED")).isEqualTo(1);
+        assertThat(countActions(audit, "PROPOSAL_APPROVED")).isEqualTo(1);
+
+        mockMvc.perform(get("/api/tickets/{ticketKey}/status-history", ticketKey).cookie(internal))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].toStatus").value("SUBMITTED"))
+                .andExpect(jsonPath("$[1].toStatus").value("ANALYSIS"))
+                .andExpect(jsonPath("$[2].toStatus").value("PROPOSAL"))
+                .andExpect(jsonPath("$[3].toStatus").value("PROPOSAL_REJECTED"))
+                .andExpect(jsonPath("$[4].toStatus").value("ANALYSIS"))
+                .andExpect(jsonPath("$[5].toStatus").value("PROPOSAL"))
+                .andExpect(jsonPath("$[6].toStatus").value("PROPOSAL_APPROVED"));
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT count(*) FROM change_proposal p JOIN ticket t ON t.id=p.ticket_id WHERE t.ticket_key=?",
+                Integer.class, ticketKey)).isEqualTo(2);
+    }
+
+    @Test
     void concurrentProposalDecisionsUseOptimisticLocking() throws Exception {
         Cookie client = login("client-a@demo.test", "client123");
         Cookie internal = login("admin@ticketflow1.demo", "admin123");

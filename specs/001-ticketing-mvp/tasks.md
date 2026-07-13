@@ -135,7 +135,7 @@ one concurrency-safe business command.
 - [x] T057 [US1] Extend `TicketDetail` with latest proposal and permitted proposal commands separately from standard `allowedTransitions`
 - [x] T058 [P] [US1] Test permissions, party/org isolation, duplicate pending proposals, concurrent decisions, and Task/Defect rejection
 - [x] T059 [P] [US1] Test that generic transitions cannot enter/decide proposal states and that failed proposal persistence rolls back ticket/history/audit/comment changes
-- [ ] T060 **Verify**: complete one rejection/resubmission/approval cycle and inspect the proposal, public reason, ticket audit, and status history
+- [x] T060 **Verify**: complete one rejection/resubmission/approval cycle and inspect the proposal, public reason, ticket audit, and status history
 
 ---
 
