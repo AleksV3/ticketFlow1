@@ -173,9 +173,9 @@ browser without duplicating authorization/workflow logic.
 - [x] T079 Implement application shell, permission-aware navigation, route guards, and accessible loading/error/empty states
 - [x] T080 [P] Implement reusable status/SLA badges, pagination/filter controls, and standard transition buttons driven only by `allowedTransitions`
 - [x] T081 [US5] Implement dashboard UI against the completed dashboard contract
-- [ ] T082 [P] Implement ticket list and URL-backed filters
-- [ ] T083 [P] [US1][US2][US3] Implement ticket creation using the safe ticket-type reference endpoint
-- [ ] T084 Implement ticket detail core and standard field editing/transition flows
+- [x] T082 [P] Implement ticket list and URL-backed filters
+- [x] T083 [P] [US1][US2][US3] Implement ticket creation using the safe ticket-type reference endpoint
+- [x] T084 Implement ticket detail core and standard field editing/transition flows
 - [ ] T085 [P] [US4] Add comments, attachment references, and privacy-safe audit/history sections to ticket detail
 - [ ] T086 [P] [US1] Add proposal create/approve/reject UI driven by proposal commands from the API
 - [ ] T087 [US6] Implement user administration using assignable-role references
