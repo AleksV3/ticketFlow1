@@ -1,4 +1,4 @@
 export type TicketSummary={ticketKey:string;type:string;status:string;priority:string;severity:string|null;title:string;organizationName:string;slaStatus:string;updatedAt:string};
 export type Paged<T>={items:T[];page:number;pageSize:number;totalItems:number;totalPages:number};
 export type TicketDetail=TicketSummary&{id:number;description:string;organization:{id:number;name:string};businessOwner:{id:number;displayName:string};ticketLead:{id:number;displayName:string}|null;assignedTeam:string|null;currentResponsibility:string;createdAt:string;closedAt:string|null;sla?:{responseDueAt:string|null;firstInfoDueAt:string|null;nextUpdateDueAt:string|null;respondedAt:string|null;firstInfoAt:string|null;status:string};allowedTransitions:string[];latestProposal?:Proposal;proposalCommands:string[]};
-export type Proposal={id:number;description:string;effortEstimate:string|null;estimatedDeliveryDate:string|null;status:string;createdAt:string};
+export type Proposal={id:number;description:string;effortEstimate:string|null;estimatedDeliveryDate:string|null;status:string;createdAt:string;version?:number};

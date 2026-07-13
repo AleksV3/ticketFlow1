@@ -176,9 +176,9 @@ browser without duplicating authorization/workflow logic.
 - [x] T082 [P] Implement ticket list and URL-backed filters
 - [x] T083 [P] [US1][US2][US3] Implement ticket creation using the safe ticket-type reference endpoint
 - [x] T084 Implement ticket detail core and standard field editing/transition flows
-- [ ] T085 [P] [US4] Add comments, attachment references, and privacy-safe audit/history sections to ticket detail
-- [ ] T086 [P] [US1] Add proposal create/approve/reject UI driven by proposal commands from the API
-- [ ] T087 [US6] Implement user administration using assignable-role references
+- [x] T085 [P] [US4] Add comments, attachment references, and privacy-safe audit/history sections to ticket detail
+- [x] T086 [P] [US1] Add proposal create/approve/reject UI driven by proposal commands from the API
+- [x] T087 [US6] Implement user administration using assignable-role references
 - [ ] T088 [US7] Implement role editor and explain that edits affect the next token issuance
 - [ ] T089 [US8] Implement additive ticket-type/workflow editor with protected proposal kinds unavailable for custom workflows
 - [ ] T090 [P] Add focused frontend tests for API/CSRF handling, auth redirects, permission navigation, transition rendering, and form validation
