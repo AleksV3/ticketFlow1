@@ -37,10 +37,14 @@ public class Attachment extends Auditable {
         this.sizeBytes = sizeBytes;
     }
 
+    public void storeAt(String storagePath) { this.storagePath = storagePath; }
+
     public Long getId() { return id; }
     public AppUser getUploadedBy() { return uploadedBy; }
     public String getFileName() { return fileName; }
     public String getContentType() { return contentType; }
     public long getSizeBytes() { return sizeBytes; }
     public Instant getCreatedAt() { return createdAt; }
+    public String getStoragePath() { return storagePath; }
+    public Ticket getTicket() { return ticket; }
 }

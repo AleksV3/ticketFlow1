@@ -15,6 +15,18 @@ import java.util.List;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.multipart.MultipartFile;
+import org.springframework.core.io.FileSystemResource;
+import org.springframework.core.io.Resource;
+import org.springframework.http.ContentDisposition;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
+import java.io.IOException;
+import java.util.UUID;
 
 @Service
 public class AttachmentService {
@@ -23,15 +35,59 @@ public class AttachmentService {
     private final AppUserRepository appUserRepository;
     private final AuditService auditService;
     private final long maxSizeBytes;
+    private final Path storageRoot;
 
     public AttachmentService(AttachmentRepository attachmentRepository, TicketRepository ticketRepository,
             AppUserRepository appUserRepository, AuditService auditService,
-            @Value("${app.attachments.max-size-bytes:104857600}") long maxSizeBytes) {
+            @Value("${app.attachments.max-size-bytes:104857600}") long maxSizeBytes,
+            @Value("${app.attachments.storage-directory:./data/attachments}") String storageDirectory) {
         this.attachmentRepository = attachmentRepository;
         this.ticketRepository = ticketRepository;
         this.appUserRepository = appUserRepository;
         this.auditService = auditService;
         this.maxSizeBytes = maxSizeBytes;
+        this.storageRoot = Path.of(storageDirectory).toAbsolutePath().normalize();
+    }
+
+    @Transactional
+    public AttachmentResponse upload(String ticketKey, MultipartFile file, AuthPrincipal principal) {
+        if (file.isEmpty() || file.getOriginalFilename() == null || file.getOriginalFilename().isBlank()) {
+            throw ApiException.validation("Choose a non-empty file.");
+        }
+        if (file.getSize() > maxSizeBytes) throw ApiException.validation("File exceeds the configured limit of " + maxSizeBytes + " bytes.");
+        Ticket ticket = findVisibleTicket(ticketKey, principal);
+        AppUser uploader = appUserRepository.findById(principal.userId()).orElseThrow(() -> ApiException.notFound("Current user no longer exists."));
+        String fileName = Path.of(file.getOriginalFilename()).getFileName().toString();
+        String contentType = file.getContentType() == null || !file.getContentType().contains("/") ? "application/octet-stream" : file.getContentType();
+        String storedName = UUID.randomUUID() + "-" + fileName.replaceAll("[^A-Za-z0-9._-]", "_");
+        Path target = storageRoot.resolve(storedName).normalize();
+        if (!target.startsWith(storageRoot)) throw ApiException.validation("Invalid file name.");
+        try { Files.createDirectories(storageRoot); Files.copy(file.getInputStream(), target, StandardCopyOption.REPLACE_EXISTING); }
+        catch (IOException exception) { throw new IllegalStateException("Could not store attachment.", exception); }
+        try {
+            Attachment attachment = new Attachment(ticket, uploader, fileName, contentType, file.getSize());
+            attachment.storeAt(storedName);
+            Attachment saved = attachmentRepository.saveAndFlush(attachment);
+            auditService.record(ticket, uploader.getId(), AuditAction.ATTACHMENT_ADDED, "attachment", contentType, saved.getId().toString());
+            return AttachmentResponse.from(saved);
+        } catch (RuntimeException exception) {
+            try { Files.deleteIfExists(target); } catch (IOException ignored) { }
+            throw exception;
+        }
+    }
+
+    @Transactional(readOnly = true)
+    public ResponseEntity<Resource> download(String ticketKey, Long attachmentId, AuthPrincipal principal) {
+        Ticket ticket = findVisibleTicket(ticketKey, principal);
+        Attachment attachment = attachmentRepository.findById(attachmentId)
+                .filter(value -> value.getTicket().getId().equals(ticket.getId()))
+                .orElseThrow(() -> ApiException.notFound("Attachment not found: " + attachmentId));
+        if (attachment.getStoragePath() == null) throw ApiException.notFound("This legacy attachment is metadata-only.");
+        Path path = storageRoot.resolve(attachment.getStoragePath()).normalize();
+        if (!path.startsWith(storageRoot) || !Files.isRegularFile(path)) throw ApiException.notFound("Attachment content is unavailable.");
+        return ResponseEntity.ok().contentType(MediaType.parseMediaType(attachment.getContentType()))
+                .header(HttpHeaders.CONTENT_DISPOSITION, ContentDisposition.attachment().filename(attachment.getFileName()).build().toString())
+                .contentLength(attachment.getSizeBytes()).body(new FileSystemResource(path));
     }
 
     @Transactional(readOnly = true)

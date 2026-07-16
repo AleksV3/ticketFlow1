@@ -1,11 +1,11 @@
 "use client";
 
-import { FormEvent, useCallback, useEffect, useState } from "react";
-import { get, post } from "@/lib/api";
+import { ChangeEvent, FormEvent, useCallback, useEffect, useState } from "react";
+import { api, get, post } from "@/lib/api";
 
 type Person = { id: number; displayName: string };
 type Comment = { id: number; author: Person; body: string; visibility: "PUBLIC" | "INTERNAL"; createdAt: string };
-type Attachment = { id: number; uploadedBy: Person; fileName: string; contentType: string; sizeBytes: number; createdAt: string };
+type Attachment = { id: number; uploadedBy: Person; fileName: string; contentType: string; sizeBytes: number; createdAt: string; contentAvailable: boolean };
 type Audit = { id: number; actor: Person; action: string; fieldName?: string; createdAt: string };
 type History = { id: number; fromStatus?: string; toStatus: string; changedBy: Person; createdAt: string };
 type Proposal = { id: number; description: string; estimatedDeliveryDate: string | null; effortEstimate: string | null; status: string; version?: number };
@@ -38,6 +38,18 @@ function useTicketActivity(ticketKey: string) {
 
 export function TicketCommunication({ ticketKey }: { ticketKey: string }) {
   const { comments, attachments, body, setBody, visibility, setVisibility, error, addComment } = useTicketActivity(ticketKey);
+  const [uploading, setUploading] = useState(false), [attachmentError, setAttachmentError] = useState("");
+  async function uploadFile(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0]; if (!file) return;
+    setUploading(true); setAttachmentError("");
+    try { const data = new FormData(); data.append("file", file); await api(`/tickets/${ticketKey}/attachments/upload`, { method: "POST", body: data }); window.location.reload(); }
+    catch (error) { setAttachmentError(error instanceof Error ? error.message : "Could not upload file."); }
+    finally { setUploading(false); event.target.value = ""; }
+  }
+  async function downloadFile(attachment: Attachment) {
+    try { const response = await fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8081/api"}/tickets/${ticketKey}/attachments/${attachment.id}/content`, { credentials: "include" }); if (!response.ok) throw new Error("Could not download file."); const url = URL.createObjectURL(await response.blob()); const link = document.createElement("a"); link.href = url; link.download = attachment.fileName; link.click(); URL.revokeObjectURL(url); }
+    catch (error) { setAttachmentError(error instanceof Error ? error.message : "Could not download file."); }
+  }
   return <div className="grid gap-4 lg:grid-cols-3">
     <section className="card lg:col-span-2"><h2 className="text-lg font-bold">Comments</h2><form className="my-4 grid gap-3 sm:grid-cols-[1fr_150px_auto] sm:items-end" onSubmit={addComment}>
       <label className="block">Message<textarea className="field mt-1 min-h-20" value={body} maxLength={10000} required onChange={e => setBody(e.target.value)} /></label>
@@ -45,7 +57,7 @@ export function TicketCommunication({ ticketKey }: { ticketKey: string }) {
       <button className="btn-primary">Add comment</button></form>{error ? <p role="alert" className="text-red-700">{error}</p> : null}
       <div className="max-h-72 space-y-2 overflow-y-auto">{comments.length ? comments.map(c => <article className="rounded border p-3" key={c.id}><div className="flex justify-between gap-3 text-sm"><strong>{c.author.displayName}</strong><span className="text-xs text-slate-500">{c.visibility}</span></div><p className="mt-1 whitespace-pre-wrap text-sm">{c.body}</p><time className="text-xs text-slate-500">{new Date(c.createdAt).toLocaleString()}</time></article>) : <p className="text-sm text-slate-500">No comments yet.</p>}</div>
     </section>
-    <section className="card"><h2 className="mb-3 text-lg font-bold">Attachments</h2>{attachments.length ? <ul className="space-y-2">{attachments.map(a => <li className="rounded border p-3" key={a.id}><strong className="block text-sm">{a.fileName}</strong><span className="text-xs text-slate-500">{Math.ceil(a.sizeBytes / 1024)} KB · {a.contentType}</span></li>)}</ul> : <p className="text-sm text-slate-500">No attachments referenced.</p>}</section>
+    <section className="card"><div className="mb-3 flex items-center justify-between gap-2"><h2 className="text-lg font-bold">Attachments</h2><label className="btn-primary cursor-pointer"><input className="sr-only" type="file" disabled={uploading} onChange={event => void uploadFile(event)}/>{uploading ? "Uploading…" : "+ Add file"}</label></div>{attachmentError ? <p className="mb-2 text-sm text-red-400" role="alert">{attachmentError}</p> : null}{attachments.length ? <ul className="space-y-2">{attachments.map(a => <li className="rounded border p-3" key={a.id}><div className="flex items-start justify-between gap-2"><div><strong className="block text-sm">{a.fileName}</strong><span className="text-xs text-slate-500">{Math.ceil(a.sizeBytes / 1024)} KB · {a.contentType}</span></div>{a.contentAvailable ? <button className="btn-secondary px-2 py-1 text-xs" onClick={() => void downloadFile(a)}>Download</button> : <span className="text-[10px] text-slate-500">Reference only</span>}</div></li>)}</ul> : <p className="text-sm text-slate-500">No files attached.</p>}</section>
   </div>;
 }
 

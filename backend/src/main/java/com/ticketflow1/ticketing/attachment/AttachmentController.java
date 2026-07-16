@@ -15,6 +15,10 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.multipart.MultipartFile;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
+import org.springframework.core.io.Resource;
 
 @RestController
 @RequestMapping("/api/tickets/{ticketKey}/attachments")
@@ -37,5 +41,21 @@ public class AttachmentController {
             @Valid @RequestBody CreateAttachmentRequest request,
             @AuthenticationPrincipal AuthPrincipal principal) {
         return attachmentService.create(ticketKey, request, principal);
+    }
+
+    @PostMapping(value = "/upload", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @ResponseStatus(HttpStatus.CREATED)
+    @PreAuthorize("hasAuthority('TICKET_UPDATE')")
+    public AttachmentResponse upload(@PathVariable String ticketKey,
+            @RequestParam("file") MultipartFile file,
+            @AuthenticationPrincipal AuthPrincipal principal) {
+        return attachmentService.upload(ticketKey, file, principal);
+    }
+
+    @GetMapping("/{attachmentId}/content")
+    @PreAuthorize("hasAuthority('TICKET_READ')")
+    public ResponseEntity<Resource> download(@PathVariable String ticketKey,
+            @PathVariable Long attachmentId, @AuthenticationPrincipal AuthPrincipal principal) {
+        return attachmentService.download(ticketKey, attachmentId, principal);
     }
 }
