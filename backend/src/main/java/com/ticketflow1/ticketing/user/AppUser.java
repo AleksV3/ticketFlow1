@@ -14,8 +14,12 @@ import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
+import jakarta.persistence.ManyToMany;
+import jakarta.persistence.JoinTable;
 import jakarta.persistence.Table;
 import java.time.Instant;
+import java.util.LinkedHashSet;
+import java.util.Set;
 import org.hibernate.annotations.CreationTimestamp;
 
 @Entity
@@ -44,6 +48,12 @@ public class AppUser extends Auditable {
     @JoinColumn(name = "role_id")
     private Role role;
 
+    @ManyToMany(fetch = FetchType.LAZY)
+    @JoinTable(name = "app_user_role",
+            joinColumns = @JoinColumn(name = "user_id"),
+            inverseJoinColumns = @JoinColumn(name = "role_id"))
+    private Set<Role> roles = new LinkedHashSet<>();
+
     // Null for TicketFlow1-side users; required for CLIENT (enforced in UserService).
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "organization_id")
@@ -67,6 +77,7 @@ public class AppUser extends Auditable {
         this.displayName = displayName;
         this.party = party;
         this.role = role;
+        this.roles.add(role);
         this.organization = organization;
     }
 
@@ -97,6 +108,17 @@ public class AppUser extends Auditable {
     public void setRole(Role role) {
         this.role = role;
         this.party = role.getParty();
+    }
+
+    public Set<Role> getRoles() {
+        return roles;
+    }
+
+    public void replaceRoles(Set<Role> roles) {
+        this.roles.clear();
+        this.roles.addAll(roles);
+        this.role = roles.iterator().next();
+        this.party = this.role.getParty();
     }
 
     public Organization getOrganization() {

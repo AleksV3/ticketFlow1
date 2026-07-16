@@ -17,6 +17,8 @@ import org.springframework.data.jpa.domain.Specification;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import java.util.LinkedHashSet;
+import java.util.Set;
 
 @Service
 public class UserService {
@@ -106,13 +108,13 @@ public class UserService {
                     cb.equal(root.get("organization").get("id"), scopedOrganizationId));
         }
         if (roleId != null) {
-            spec = spec.and((root, query, cb) -> cb.equal(root.get("role").get("id"), roleId));
+            spec = spec.and((root, query, cb) -> cb.equal(root.join("roles").get("id"), roleId));
         }
         return PagedResponse.from(userRepository.findAll(spec, pageable), UserResponse::from);
     }
 
     @Transactional
-    public UserResponse updateRole(Long userId, Long roleId, AuthPrincipal principal) {
+    public UserResponse updateRoles(Long userId, Set<Long> roleIds, AuthPrincipal principal) {
         AppUser user = userRepository.findById(userId)
                 .orElseThrow(() -> ApiException.notFound("User not found: " + userId));
         if (principal.party() == Responsibility.CLIENT
@@ -121,11 +123,13 @@ public class UserService {
             throw ApiException.notFound("User not found: " + userId);
         }
 
-        Role role = roleRepository.findById(roleId)
-                .orElseThrow(() -> ApiException.validation("Role not found: " + roleId));
         Long organizationId = user.getOrganization() == null ? null : user.getOrganization().getId();
-        validateRoleAndOrganization(role, organizationId);
-        user.setRole(role);
+        Set<Role> roles = new LinkedHashSet<>(roleRepository.findAllById(roleIds));
+        if (roles.size() != roleIds.size()) {
+            throw ApiException.validation("One or more selected roles do not exist.");
+        }
+        roles.forEach(role -> validateRoleAndOrganization(role, organizationId));
+        user.replaceRoles(roles);
         return UserResponse.from(userRepository.saveAndFlush(user));
     }
 }

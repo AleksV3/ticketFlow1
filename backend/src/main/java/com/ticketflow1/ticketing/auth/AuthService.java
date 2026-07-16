@@ -64,7 +64,7 @@ public class AuthService {
         AppUser user = userRepository.findById(principal.userId())
                 .orElseThrow(() -> ApiException.notFound("Current user no longer exists."));
         Organization org = user.getOrganization();
-        Set<String> permissions = user.getRole().getPermissions().stream()
+        Set<String> permissions = user.getRoles().stream().flatMap(role -> role.getPermissions().stream())
                 .map(Permission::getKey)
                 .collect(Collectors.toSet());
         return new CurrentUserResponse(

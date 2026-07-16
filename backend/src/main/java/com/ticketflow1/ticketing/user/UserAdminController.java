@@ -55,6 +55,6 @@ public class UserAdminController {
     public UserResponse updateRole(@PathVariable Long userId,
             @Valid @RequestBody UpdateUserRoleRequest request,
             @AuthenticationPrincipal AuthPrincipal principal) {
-        return userService.updateRole(userId, request.roleId(), principal);
+        return userService.updateRoles(userId, request.roleIds(), principal);
     }
 }

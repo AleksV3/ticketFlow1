@@ -44,7 +44,7 @@ public class JwtService {
     public IssuedToken issue(AppUser user) {
         Instant now = Instant.now();
         Instant expiresAt = now.plus(expiration);
-        String permissions = user.getRole().getPermissions().stream()
+        String permissions = user.getRoles().stream().flatMap(role -> role.getPermissions().stream())
                 .map(Permission::getKey)
                 .sorted()
                 .collect(Collectors.joining(","));

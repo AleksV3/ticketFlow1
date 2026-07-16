@@ -1,6 +1,7 @@
 package com.ticketflow1.ticketing.user.dto;
 
-import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.NotEmpty;
+import java.util.Set;
 
-public record UpdateUserRoleRequest(@NotNull Long roleId) {
+public record UpdateUserRoleRequest(@NotEmpty Set<Long> roleIds) {
 }
