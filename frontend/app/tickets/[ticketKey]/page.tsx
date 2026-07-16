@@ -10,9 +10,9 @@ import type { TicketDetail } from "@/lib/types";
 
 type History = { id: number; fromStatus: string | null; toStatus: string; createdAt: string };
 
-export default function TicketPage() { return <AppShell require="TICKET_READ">{user => <Detail canEdit={user.permissions.includes("TICKET_UPDATE")} canAssign={user.permissions.includes("TICKET_ASSIGN")} />}</AppShell>; }
+export default function TicketPage() { return <AppShell require="TICKET_READ">{user => <Detail canEdit={user.permissions.includes("TICKET_UPDATE")} canAssign={user.permissions.includes("TICKET_ASSIGN")} internal={user.party === "TICKETFLOW1"} />}</AppShell>; }
 
-function Detail({ canEdit, canAssign }: { canEdit: boolean; canAssign: boolean }) {
+function Detail({ canEdit, canAssign, internal }: { canEdit: boolean; canAssign: boolean; internal: boolean }) {
   const { ticketKey } = useParams<{ ticketKey: string }>();
   const [ticket, setTicket] = useState<TicketDetail | null>(null), [history, setHistory] = useState<History[]>([]), [error, setError] = useState(""), [editing, setEditing] = useState(false);
   const load = useCallback(async () => { try { const [detail, events] = await Promise.all([get<TicketDetail>(`/tickets/${ticketKey}`), get<History[]>(`/tickets/${ticketKey}/status-history`)]); setTicket(detail); setHistory(events); } catch (error) { setError(error instanceof Error ? error.message : "Could not load ticket."); } }, [ticketKey]);
@@ -24,7 +24,7 @@ function Detail({ canEdit, canAssign }: { canEdit: boolean; canAssign: boolean }
     <section className="card py-4"><div className="grid gap-3 sm:grid-cols-3 lg:grid-cols-7"><Row k="Type" v={ticket.type}/><Row k="Priority" v={ticket.priority}/><Row k="Responsibility" v={ticket.currentResponsibility}/><Row k="Organization" v={ticket.organization.name}/><Row k="Lead" v={ticket.ticketLead?.displayName ?? "Unassigned"}/><Row k="Developers" v={ticket.developers?.map(item=>item.displayName).join(", ")||"Unassigned"}/><Row k="Owner" v={ticket.businessOwner.displayName}/></div><p className="mt-4 border-t pt-4 text-sm leading-6 text-slate-600 whitespace-pre-wrap">{ticket.description}</p></section>
     {editing ? <Edit ticket={ticket} canEdit={canEdit} canAssign={false} done={async () => { setEditing(false); await load(); }}/> : null}
     {canAssign ? <details className="card"><summary className="cursor-pointer font-bold">Quickly assign ticket lead and developers</summary><div className="mt-4"><Edit ticket={ticket} canEdit={false} canAssign done={load}/></div></details> : null}
-    <TicketCommunication ticketKey={ticketKey}/>
+    <TicketCommunication ticketKey={ticketKey} internal={internal}/>
     <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_300px]"><ProcessMap ticket={ticket} history={history}/><section className="card py-4"><div className="mb-3"><p className="eyebrow">Next step</p><h2 className="text-sm font-bold">Available actions</h2></div><TransitionButtons allowedTransitions={ticket.allowedTransitions} onTransition={async status => { await post(`/tickets/${ticketKey}/transition`, { toStatus: status }); await load(); }}/></section></div>
     <ProposalActions ticketKey={ticketKey} proposal={ticket.latestProposal} commands={ticket.proposalCommands ?? []} onDone={load}/>
     <details className="card"><summary className="cursor-pointer font-bold">Status history and audit log</summary><div className="mt-5"><TicketHistory ticketKey={ticketKey}/></div></details>

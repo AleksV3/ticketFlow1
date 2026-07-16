@@ -112,6 +112,22 @@ public class AttachmentService {
         return AttachmentResponse.from(saved);
     }
 
+    @Transactional
+    public void remove(String ticketKey, Long attachmentId, AuthPrincipal principal) {
+        Ticket ticket = findVisibleTicket(ticketKey, principal);
+        Attachment attachment = attachmentRepository.findById(attachmentId)
+                .filter(value -> value.getTicket().getId().equals(ticket.getId()))
+                .orElseThrow(() -> ApiException.notFound("Attachment not found: " + attachmentId));
+        if (attachment.getStoragePath() != null) {
+            Path path = storageRoot.resolve(attachment.getStoragePath()).normalize();
+            if (path.startsWith(storageRoot)) {
+                try { Files.deleteIfExists(path); }
+                catch (IOException exception) { throw new IllegalStateException("Could not remove attachment file.", exception); }
+            }
+        }
+        attachmentRepository.delete(attachment);
+    }
+
     private Ticket findVisibleTicket(String ticketKey, AuthPrincipal principal) {
         if (principal.party() == Responsibility.CLIENT) {
             return ticketRepository.findByTicketKeyAndOrganizationId(ticketKey, principal.organizationId())

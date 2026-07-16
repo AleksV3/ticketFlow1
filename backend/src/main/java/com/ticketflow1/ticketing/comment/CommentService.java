@@ -44,7 +44,7 @@ public class CommentService {
     @Transactional(readOnly = true)
     public List<CommentResponse> list(String ticketKey, AuthPrincipal principal) {
         Ticket ticket = findVisibleTicket(ticketKey, principal);
-        List<Comment> comments = principal.hasPermission(INTERNAL_READ)
+        List<Comment> comments = principal.party() == Responsibility.TICKETFLOW1 && principal.hasPermission(INTERNAL_READ)
                 ? commentRepository.findByTicketIdOrderByCreatedAtAsc(ticket.getId())
                 : commentRepository.findByTicketIdAndVisibilityOrderByCreatedAtAsc(
                         ticket.getId(), CommentVisibility.PUBLIC);
@@ -54,8 +54,8 @@ public class CommentService {
     @Transactional
     public CommentResponse create(String ticketKey, CreateCommentRequest request, AuthPrincipal principal) {
         Ticket ticket = findVisibleTicket(ticketKey, principal);
-        if (request.visibility() == CommentVisibility.INTERNAL && !principal.hasPermission(INTERNAL_WRITE)) {
-            throw ApiException.forbidden("COMMENT_INTERNAL_WRITE is required for INTERNAL comments.");
+        if (request.visibility() == CommentVisibility.INTERNAL && (principal.party() != Responsibility.TICKETFLOW1 || !principal.hasPermission(INTERNAL_WRITE))) {
+            throw ApiException.forbidden("Internal comments are available only to authorized TicketFlow1 users.");
         }
 
         return createForTicket(ticket, request.body(), request.visibility(), principal);

@@ -16,6 +16,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.multipart.MultipartFile;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -58,5 +59,13 @@ public class AttachmentController {
     public ResponseEntity<Resource> download(@PathVariable String ticketKey,
             @PathVariable Long attachmentId, @AuthenticationPrincipal AuthPrincipal principal) {
         return attachmentService.download(ticketKey, attachmentId, principal);
+    }
+
+    @DeleteMapping("/{attachmentId}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    @PreAuthorize("hasAuthority('TICKET_UPDATE')")
+    public void remove(@PathVariable String ticketKey, @PathVariable Long attachmentId,
+            @AuthenticationPrincipal AuthPrincipal principal) {
+        attachmentService.remove(ticketKey, attachmentId, principal);
     }
 }

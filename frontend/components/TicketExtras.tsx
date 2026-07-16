@@ -36,7 +36,7 @@ function useTicketActivity(ticketKey: string) {
   return { comments, attachments, audit, history, body, setBody, visibility, setVisibility, error, addComment, load };
 }
 
-export function TicketCommunication({ ticketKey }: { ticketKey: string }) {
+export function TicketCommunication({ ticketKey, internal = false }: { ticketKey: string; internal?: boolean }) {
   const { comments, attachments, body, setBody, visibility, setVisibility, error, addComment, load } = useTicketActivity(ticketKey);
   const [uploading, setUploading] = useState(false), [attachmentError, setAttachmentError] = useState("");
   const [preview, setPreview] = useState<{ attachment: Attachment; url?: string; text?: string } | null>(null);
@@ -72,16 +72,21 @@ export function TicketCommunication({ ticketKey }: { ticketKey: string }) {
     try { const response = await fetch(contentUrl(attachment), { credentials: "include" }); if (!response.ok) throw new Error("Could not download file."); const url = URL.createObjectURL(await response.blob()); const link = document.createElement("a"); link.href = url; link.download = attachment.fileName; link.click(); URL.revokeObjectURL(url); }
     catch (error) { setAttachmentError(error instanceof Error ? error.message : "Could not download file."); }
   }
-  return <div className="grid gap-4 lg:grid-cols-3">
+  async function removeFile(attachment: Attachment) {
+    if (!window.confirm(`Remove ${attachment.fileName}?`)) return;
+    try { await api(`/tickets/${ticketKey}/attachments/${attachment.id}`, { method: "DELETE" }); setPreview(null); await load(); }
+    catch (error) { setAttachmentError(error instanceof Error ? error.message : "Could not remove file."); }
+  }
+  return <><div className="grid gap-4 lg:grid-cols-3">
     <section className="card lg:col-span-2"><h2 className="text-lg font-bold">Comments</h2><form className="my-4 grid gap-3 sm:grid-cols-[1fr_150px_auto] sm:items-end" onSubmit={addComment}>
       <label className="block">Message<textarea className="field mt-1 min-h-20" value={body} maxLength={10000} required onChange={e => setBody(e.target.value)} /></label>
-      <label className="block">Visibility<select className="field mt-1" value={visibility} onChange={e => setVisibility(e.target.value as "PUBLIC" | "INTERNAL")}><option value="PUBLIC">Public</option><option value="INTERNAL">Internal</option></select></label>
+      {internal ? <label className="block">Visibility<select className="field mt-1" value={visibility} onChange={e => setVisibility(e.target.value as "PUBLIC" | "INTERNAL")}><option value="PUBLIC">Public</option><option value="INTERNAL">Internal</option></select></label> : null}
       <button className="btn-primary">Add comment</button></form>{error ? <p role="alert" className="text-red-700">{error}</p> : null}
       <div className="max-h-72 space-y-2 overflow-y-auto">{comments.length ? comments.map(c => <article className="rounded border p-3" key={c.id}><div className="flex justify-between gap-3 text-sm"><strong>{c.author.displayName}</strong><span className="text-xs text-slate-500">{c.visibility}</span></div><p className="mt-1 whitespace-pre-wrap text-sm">{c.body}</p><time className="text-xs text-slate-500">{new Date(c.createdAt).toLocaleString()}</time></article>) : <p className="text-sm text-slate-500">No comments yet.</p>}</div>
     </section>
     <section className="card"><div className="mb-3 flex items-center justify-between gap-2"><h2 className="text-lg font-bold">Attachments</h2><label className="btn-primary cursor-pointer"><input className="sr-only" type="file" disabled={uploading} onChange={event => void uploadFile(event)}/>{uploading ? "Uploading…" : "+ Add file"}</label></div>{attachmentError ? <p className="mb-2 text-sm text-red-400" role="alert">{attachmentError}</p> : null}{attachments.length ? <ul className="max-h-44 space-y-2 overflow-y-auto">{attachments.map(a => <li className={`rounded border p-3 ${preview?.attachment.id === a.id ? "border-blue-500 bg-blue-950/30" : ""}`} key={a.id}><div className="flex items-start justify-between gap-2"><button className="min-w-0 text-left hover:text-blue-400" disabled={!a.contentAvailable} onClick={() => void openPreview(a)}><strong className="block truncate text-sm">{a.fileName}</strong><span className="text-xs text-slate-500">{Math.ceil(a.sizeBytes / 1024)} KB · {a.contentType}</span></button>{a.contentAvailable ? <button className="btn-secondary px-2 py-1 text-xs" onClick={() => void downloadFile(a)}>Download</button> : <span className="text-[10px] text-slate-500">Reference only</span>}</div></li>)}</ul> : <p className="text-sm text-slate-500">No files attached.</p>}{preview ? <AttachmentPreview preview={preview} download={() => void downloadFile(preview.attachment)} fullView={() => setFullPreview(true)}/> : <div className="attachment-inline-empty">Upload or select a file to preview it here.</div>}</section>
     {preview && fullPreview ? <FullAttachmentPreview preview={preview} close={() => setFullPreview(false)} download={() => void downloadFile(preview.attachment)}/> : null}
-  </div>;
+  </div>{preview ? <button type="button" className="btn-secondary text-red-300" onClick={() => void removeFile(preview.attachment)}>Remove selected attachment</button> : null}</>;
 }
 
 function AttachmentPreview({ preview, download, fullView }: { preview: { attachment: Attachment; url?: string; text?: string }; download: () => void; fullView: () => void }) {

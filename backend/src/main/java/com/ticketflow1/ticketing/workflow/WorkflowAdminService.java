@@ -7,6 +7,7 @@ import com.ticketflow1.ticketing.organization.*;
 import com.ticketflow1.ticketing.rbac.*;
 import com.ticketflow1.ticketing.ticket.Responsibility;
 import com.ticketflow1.ticketing.ticket.TicketRepository;
+import com.ticketflow1.ticketing.statushistory.StatusHistoryRepository;
 import com.ticketflow1.ticketing.workflow.dto.*;
 import java.util.*;
 import java.util.function.Function;
@@ -21,11 +22,13 @@ public class WorkflowAdminService {
     private final OrganizationRepository organizations; private final PermissionRepository permissions;
     private final ConfigurationAuditService audit;
     private final TicketRepository tickets;
+    private final StatusHistoryRepository statusHistory;
     public WorkflowAdminService(WorkflowRepository workflows, WorkflowStateRepository states,
             WorkflowTransitionRepository transitions, TicketTypeRepository types, OrganizationRepository organizations,
-            PermissionRepository permissions, ConfigurationAuditService audit, TicketRepository tickets) {
+            PermissionRepository permissions, ConfigurationAuditService audit, TicketRepository tickets,
+            StatusHistoryRepository statusHistory) {
         this.workflows=workflows; this.states=states; this.transitions=transitions; this.types=types;
-        this.organizations=organizations; this.permissions=permissions; this.audit=audit; this.tickets=tickets;
+        this.organizations=organizations; this.permissions=permissions; this.audit=audit; this.tickets=tickets; this.statusHistory=statusHistory;
     }
     @Transactional(readOnly=true) public List<WorkflowResponse> listWorkflows(AuthPrincipal p, Long orgId) {
         Long scope=scope(p,orgId); List<Workflow> list=scope==null?workflows.findByOrganizationIsNull():workflows.findByOrganizationId(scope);
@@ -61,6 +64,16 @@ public class WorkflowAdminService {
             saveTransitions(w,map,r.transitions());
         }
         w.touchForAudit(); workflows.flush(); audit.record(w.getOrganization(),p.userId(),"WORKFLOW",id,"UPDATED",null,"{\"version\":"+w.getVersion()+"}"); return response(w);
+    }
+    @Transactional public void removeState(AuthPrincipal p,Long workflowId,Long stateId){
+        Workflow workflow=visible(p,workflowId);
+        WorkflowState state=states.findById(stateId).filter(item->item.getWorkflow().getId().equals(workflow.getId()))
+                .orElseThrow(()->ApiException.notFound("Workflow state not found: "+stateId));
+        if(state.isInitial())throw ApiException.validation("The starting state cannot be removed.");
+        if(tickets.existsByCurrentStateId(stateId)||statusHistory.existsByFromStateIdOrToStateId(stateId,stateId))
+            throw ApiException.conflict("This state is already used by tickets and cannot be removed.");
+        transitions.findByWorkflowId(workflowId).stream().filter(edge->edge.getFromState().getId().equals(stateId)||edge.getToState().getId().equals(stateId)).forEach(transitions::delete);
+        states.delete(state);
     }
     @Transactional(readOnly=true) public List<TicketTypeAdminResponse> listTypes(AuthPrincipal p,Long orgId){Long s=scope(p,orgId);return (s==null?types.findByOrganizationIsNull():types.findByOrganizationId(s)).stream().map(TicketTypeAdminResponse::from).toList();}
     @Transactional public TicketTypeAdminResponse createType(AuthPrincipal p,WorkflowRequests.CreateType r){if(r.requiresProposal())throw ApiException.validation("Custom ticket types cannot require proposals."); Organization org=organization(p,r.organizationId()); Workflow w=visible(p,r.workflowId()); if(w.getOrganization()!=null&&!w.getOrganization().getId().equals(org.getId()))throw ApiException.notFound("Workflow not found: "+r.workflowId()); if(types.findByOrganizationIdAndKey(org.getId(),r.key()).isPresent())throw ApiException.validation("Duplicate ticket type key."); TicketType t=types.saveAndFlush(new TicketType(r.key(),r.name(),w,org,false,false));audit.record(org,p.userId(),"TICKET_TYPE",t.getId(),"CREATED",null,"{\"key\":\""+r.key()+"\"}");return TicketTypeAdminResponse.from(t);}

@@ -18,6 +18,8 @@ public class WorkflowAdminController {
     WorkflowResponse createWorkflow(@AuthenticationPrincipal AuthPrincipal p,@RequestBody WorkflowRequests.Create r){return service.createWorkflow(p,r);}
     @PatchMapping("/workflows/{id}") @PreAuthorize("hasAuthority('WORKFLOW_MANAGE')")
     WorkflowResponse updateWorkflow(@AuthenticationPrincipal AuthPrincipal p,@PathVariable Long id,@RequestBody WorkflowRequests.Update r){return service.updateWorkflow(p,id,r);}
+    @DeleteMapping("/workflows/{id}/states/{stateId}") @ResponseStatus(HttpStatus.NO_CONTENT) @PreAuthorize("hasAuthority('WORKFLOW_MANAGE')")
+    void removeState(@AuthenticationPrincipal AuthPrincipal p,@PathVariable Long id,@PathVariable Long stateId){service.removeState(p,id,stateId);}
     @GetMapping("/ticket-types") @PreAuthorize("hasAuthority('TYPE_MANAGE')")
     List<TicketTypeAdminResponse> types(@AuthenticationPrincipal AuthPrincipal p,@RequestParam(required=false)Long organizationId){return service.listTypes(p,organizationId);}
     @PostMapping("/ticket-types") @ResponseStatus(HttpStatus.CREATED) @PreAuthorize("hasAuthority('TYPE_MANAGE')")
