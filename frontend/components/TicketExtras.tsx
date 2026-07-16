@@ -33,21 +33,35 @@ function useTicketActivity(ticketKey: string) {
     try { await post(`/tickets/${ticketKey}/comments`, { body, visibility }); setBody(""); await load(); }
     catch (e) { setError(e instanceof Error ? e.message : "Could not add comment"); }
   }
-  return { comments, attachments, audit, history, body, setBody, visibility, setVisibility, error, addComment };
+  return { comments, attachments, audit, history, body, setBody, visibility, setVisibility, error, addComment, load };
 }
 
 export function TicketCommunication({ ticketKey }: { ticketKey: string }) {
-  const { comments, attachments, body, setBody, visibility, setVisibility, error, addComment } = useTicketActivity(ticketKey);
+  const { comments, attachments, body, setBody, visibility, setVisibility, error, addComment, load } = useTicketActivity(ticketKey);
   const [uploading, setUploading] = useState(false), [attachmentError, setAttachmentError] = useState("");
+  const [preview, setPreview] = useState<{ attachment: Attachment; url?: string; text?: string } | null>(null);
+  useEffect(() => () => { if (preview?.url) URL.revokeObjectURL(preview.url); }, [preview]);
+  const contentUrl = (attachment: Attachment) => `${process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8081/api"}/tickets/${ticketKey}/attachments/${attachment.id}/content`;
+  async function openPreview(attachment: Attachment) {
+    if (!attachment.contentAvailable) return;
+    setAttachmentError("");
+    try {
+      const response = await fetch(contentUrl(attachment), { credentials: "include" });
+      if (!response.ok) throw new Error("Could not open file.");
+      const blob = await response.blob();
+      if (attachment.contentType.startsWith("text/") && attachment.contentType !== "text/html") setPreview({ attachment, text: await blob.text() });
+      else setPreview({ attachment, url: URL.createObjectURL(blob) });
+    } catch (error) { setAttachmentError(error instanceof Error ? error.message : "Could not open file."); }
+  }
   async function uploadFile(event: ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0]; if (!file) return;
     setUploading(true); setAttachmentError("");
-    try { const data = new FormData(); data.append("file", file); await api(`/tickets/${ticketKey}/attachments/upload`, { method: "POST", body: data }); window.location.reload(); }
+    try { const data = new FormData(); data.append("file", file); const saved = await api<Attachment>(`/tickets/${ticketKey}/attachments/upload`, { method: "POST", body: data }); await load(); await openPreview(saved); }
     catch (error) { setAttachmentError(error instanceof Error ? error.message : "Could not upload file."); }
     finally { setUploading(false); event.target.value = ""; }
   }
   async function downloadFile(attachment: Attachment) {
-    try { const response = await fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8081/api"}/tickets/${ticketKey}/attachments/${attachment.id}/content`, { credentials: "include" }); if (!response.ok) throw new Error("Could not download file."); const url = URL.createObjectURL(await response.blob()); const link = document.createElement("a"); link.href = url; link.download = attachment.fileName; link.click(); URL.revokeObjectURL(url); }
+    try { const response = await fetch(contentUrl(attachment), { credentials: "include" }); if (!response.ok) throw new Error("Could not download file."); const url = URL.createObjectURL(await response.blob()); const link = document.createElement("a"); link.href = url; link.download = attachment.fileName; link.click(); URL.revokeObjectURL(url); }
     catch (error) { setAttachmentError(error instanceof Error ? error.message : "Could not download file."); }
   }
   return <div className="grid gap-4 lg:grid-cols-3">
@@ -57,8 +71,17 @@ export function TicketCommunication({ ticketKey }: { ticketKey: string }) {
       <button className="btn-primary">Add comment</button></form>{error ? <p role="alert" className="text-red-700">{error}</p> : null}
       <div className="max-h-72 space-y-2 overflow-y-auto">{comments.length ? comments.map(c => <article className="rounded border p-3" key={c.id}><div className="flex justify-between gap-3 text-sm"><strong>{c.author.displayName}</strong><span className="text-xs text-slate-500">{c.visibility}</span></div><p className="mt-1 whitespace-pre-wrap text-sm">{c.body}</p><time className="text-xs text-slate-500">{new Date(c.createdAt).toLocaleString()}</time></article>) : <p className="text-sm text-slate-500">No comments yet.</p>}</div>
     </section>
-    <section className="card"><div className="mb-3 flex items-center justify-between gap-2"><h2 className="text-lg font-bold">Attachments</h2><label className="btn-primary cursor-pointer"><input className="sr-only" type="file" disabled={uploading} onChange={event => void uploadFile(event)}/>{uploading ? "Uploading…" : "+ Add file"}</label></div>{attachmentError ? <p className="mb-2 text-sm text-red-400" role="alert">{attachmentError}</p> : null}{attachments.length ? <ul className="space-y-2">{attachments.map(a => <li className="rounded border p-3" key={a.id}><div className="flex items-start justify-between gap-2"><div><strong className="block text-sm">{a.fileName}</strong><span className="text-xs text-slate-500">{Math.ceil(a.sizeBytes / 1024)} KB · {a.contentType}</span></div>{a.contentAvailable ? <button className="btn-secondary px-2 py-1 text-xs" onClick={() => void downloadFile(a)}>Download</button> : <span className="text-[10px] text-slate-500">Reference only</span>}</div></li>)}</ul> : <p className="text-sm text-slate-500">No files attached.</p>}</section>
+    <section className="card"><div className="mb-3 flex items-center justify-between gap-2"><h2 className="text-lg font-bold">Attachments</h2><label className="btn-primary cursor-pointer"><input className="sr-only" type="file" disabled={uploading} onChange={event => void uploadFile(event)}/>{uploading ? "Uploading…" : "+ Add file"}</label></div>{attachmentError ? <p className="mb-2 text-sm text-red-400" role="alert">{attachmentError}</p> : null}{attachments.length ? <ul className="space-y-2">{attachments.map(a => <li className="rounded border p-3" key={a.id}><div className="flex items-start justify-between gap-2"><button className="min-w-0 text-left hover:text-blue-400" disabled={!a.contentAvailable} onClick={() => void openPreview(a)}><strong className="block truncate text-sm">{a.fileName}</strong><span className="text-xs text-slate-500">{Math.ceil(a.sizeBytes / 1024)} KB · {a.contentType}</span></button><div className="flex gap-1">{a.contentAvailable ? <><button className="btn-secondary px-2 py-1 text-xs" onClick={() => void openPreview(a)}>View</button><button className="btn-secondary px-2 py-1 text-xs" onClick={() => void downloadFile(a)}>Download</button></> : <span className="text-[10px] text-slate-500">Reference only</span>}</div></div></li>)}</ul> : <p className="text-sm text-slate-500">No files attached.</p>}</section>
+    {preview ? <AttachmentPreview preview={preview} close={() => setPreview(null)} download={() => void downloadFile(preview.attachment)}/> : null}
   </div>;
+}
+
+function AttachmentPreview({ preview, close, download }: { preview: { attachment: Attachment; url?: string; text?: string }; close: () => void; download: () => void }) {
+  const { attachment, url, text } = preview;
+  const image = attachment.contentType.startsWith("image/") && attachment.contentType !== "image/svg+xml";
+  const pdf = attachment.contentType === "application/pdf";
+  const audio = attachment.contentType.startsWith("audio/"), video = attachment.contentType.startsWith("video/");
+  return <div className="attachment-preview-backdrop" role="dialog" aria-modal="true" aria-label={`Preview ${attachment.fileName}`} onMouseDown={event => { if (event.currentTarget === event.target) close(); }}><section className="attachment-preview"><header><div className="min-w-0"><strong className="block truncate">{attachment.fileName}</strong><span className="text-xs text-slate-500">{attachment.contentType} · {Math.ceil(attachment.sizeBytes / 1024)} KB</span></div><div className="flex gap-2"><button className="btn-secondary" onClick={download}>Download</button><button className="btn-secondary" onClick={close}>Close</button></div></header><div className="attachment-preview-body">{text !== undefined ? <pre>{text}</pre> : image && url ? <img src={url} alt={attachment.fileName}/> : pdf && url ? <iframe src={url} title={attachment.fileName}/> : audio && url ? <audio controls autoPlay src={url}/> : video && url ? <video controls autoPlay src={url}/> : <div className="text-center"><p>This file type cannot be previewed safely in the browser.</p><button className="btn-primary mt-4" onClick={download}>Download and open</button></div>}</div></section></div>;
 }
 
 export function TicketHistory({ ticketKey }: { ticketKey: string }) {
