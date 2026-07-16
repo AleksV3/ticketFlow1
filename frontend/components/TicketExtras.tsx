@@ -1,6 +1,6 @@
 "use client";
 
-import { ChangeEvent, FormEvent, useCallback, useEffect, useState } from "react";
+import { ChangeEvent, FormEvent, useCallback, useEffect, useRef, useState } from "react";
 import { api, get, post } from "@/lib/api";
 
 type Person = { id: number; displayName: string };
@@ -40,6 +40,7 @@ export function TicketCommunication({ ticketKey }: { ticketKey: string }) {
   const { comments, attachments, body, setBody, visibility, setVisibility, error, addComment, load } = useTicketActivity(ticketKey);
   const [uploading, setUploading] = useState(false), [attachmentError, setAttachmentError] = useState("");
   const [preview, setPreview] = useState<{ attachment: Attachment; url?: string; text?: string } | null>(null);
+  const autoPreviewed = useRef(false);
   useEffect(() => () => { if (preview?.url) URL.revokeObjectURL(preview.url); }, [preview]);
   const contentUrl = (attachment: Attachment) => `${process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8081/api"}/tickets/${ticketKey}/attachments/${attachment.id}/content`;
   async function openPreview(attachment: Attachment) {
@@ -53,6 +54,12 @@ export function TicketCommunication({ ticketKey }: { ticketKey: string }) {
       else setPreview({ attachment, url: URL.createObjectURL(blob) });
     } catch (error) { setAttachmentError(error instanceof Error ? error.message : "Could not open file."); }
   }
+  useEffect(() => {
+    if (autoPreviewed.current || !attachments.length) return;
+    autoPreviewed.current = true;
+    const newest = [...attachments].reverse().find(attachment => attachment.contentAvailable);
+    if (newest) void openPreview(newest);
+  }, [attachments]);
   async function uploadFile(event: ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0]; if (!file) return;
     setUploading(true); setAttachmentError("");
