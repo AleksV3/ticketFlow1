@@ -43,7 +43,11 @@ public class OrganizationService {
         Organization org = organizationRepository.findById(id)
                 .orElseThrow(() -> ApiException.notFound("Organization not found: " + id));
         if (request.name() != null && !request.name().isBlank()) {
-            org.setName(request.name());
+            String name = request.name().trim();
+            if (!name.equalsIgnoreCase(org.getName()) && organizationRepository.existsByNameIgnoreCase(name)) {
+                throw ApiException.validation("An organization named '" + name + "' already exists.");
+            }
+            org.setName(name);
         }
         if (request.active() != null) {
             org.setActive(request.active());
