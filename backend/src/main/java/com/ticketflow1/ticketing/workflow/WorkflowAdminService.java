@@ -48,7 +48,16 @@ public class WorkflowAdminService {
         if(r.states()!=null) states.flush();
         List<WorkflowRequests.State> resulting=map.values().stream().map(s->new WorkflowRequests.State(s.getKey(),s.isInitial(),s.isTerminal(),s.getSortOrder())).toList();
         List<WorkflowRequests.Transition> defs=r.transitions()==null?List.of():r.transitions(); validateGraph(resulting,defs);
-        if(r.transitions()!=null){transitions.deleteByWorkflowId(id);saveTransitions(w,map,r.transitions());}
+        if(r.transitions()!=null){
+            // Admins replace the editable STANDARD graph edges. Proposal
+            // approve/reject/create edges are protected business commands and
+            // remain intact while ordinary branches are redesigned.
+            transitions.findByWorkflowId(id).stream()
+                    .filter(edge -> edge.getOperationKind() == TransitionOperationKind.STANDARD)
+                    .forEach(transitions::delete);
+            transitions.flush();
+            saveTransitions(w,map,r.transitions());
+        }
         w.touchForAudit(); workflows.flush(); audit.record(w.getOrganization(),p.userId(),"WORKFLOW",id,"UPDATED",null,"{\"version\":"+w.getVersion()+"}"); return response(w);
     }
     @Transactional(readOnly=true) public List<TicketTypeAdminResponse> listTypes(AuthPrincipal p,Long orgId){Long s=scope(p,orgId);return (s==null?types.findByOrganizationIsNull():types.findByOrganizationId(s)).stream().map(TicketTypeAdminResponse::from).toList();}
