@@ -8,4 +8,6 @@ public interface RoleRepository extends JpaRepository<Role, Long> {
     List<Role> findByOrganizationId(Long organizationId);
 
     List<Role> findByTemplateTrue();
+
+    List<Role> findByOrganizationIsNull();
 }

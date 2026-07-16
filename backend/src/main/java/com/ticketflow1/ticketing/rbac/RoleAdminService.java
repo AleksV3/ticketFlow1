@@ -36,7 +36,7 @@ public class RoleAdminService {
     public List<RoleResponse> list(AuthPrincipal principal, Long organizationId) {
         if (principal.party() == Responsibility.CLIENT) organizationId = principal.organizationId();
         List<Role> roles = organizationId == null
-                ? roleRepository.findByTemplateTrue()
+                ? roleRepository.findByOrganizationIsNull()
                 : roleRepository.findByOrganizationId(organizationId);
         return roles.stream().map(RoleResponse::from).toList();
     }

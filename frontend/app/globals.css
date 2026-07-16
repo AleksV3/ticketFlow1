@@ -108,4 +108,10 @@ tbody tr:hover { background: rgb(0 84 166 / 10%); }
 .attachment-preview-body iframe { width: 100%; height: 100%; border: 0; background: white; }
 .attachment-preview-body audio { width: min(700px, 100%); }
 .attachment-preview-body pre { width: 100%; height: 100%; overflow: auto; white-space: pre-wrap; color: var(--off-white); font: .8rem/1.5 ui-monospace, monospace; }
+.permission-option { display: flex; min-height: 74px; cursor: pointer; align-items: flex-start; gap: .7rem; border: 1px solid var(--line); border-radius: .65rem; padding: .8rem; background: rgb(11 19 37 / 45%); transition: .18s ease; }
+.permission-option:hover { border-color: rgb(0 130 255 / 70%); background: rgb(0 84 166 / 12%); }
+.permission-option-selected { border-color: var(--accent-blue); background: rgb(0 84 166 / 20%); }
+.permission-option input { margin-top: .2rem; width: 1rem; height: 1rem; flex: none; accent-color: var(--accent-blue); }
+.permission-option strong { display: block; font-size: .82rem; }
+.permission-option small { display: block; margin-top: .2rem; color: var(--muted); font-size: .68rem; line-height: 1.35; }
 .react-flow-shell .flow-edge-draft path { stroke: rgb(250 204 21); stroke-width: 3; stroke-dasharray: 6 4; }
