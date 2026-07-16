@@ -94,6 +94,11 @@ public class AppUser extends Auditable {
         return role;
     }
 
+    public void setRole(Role role) {
+        this.role = role;
+        this.party = role.getParty();
+    }
+
     public Organization getOrganization() {
         return organization;
     }

@@ -25,7 +25,7 @@ public class ReferenceController {
     @GetMapping("/ticket-leads") @PreAuthorize("hasAuthority('TICKET_UPDATE')")
     public List<IdName> leads(@AuthenticationPrincipal AuthPrincipal p){requireInternal(p);return users.findByActiveTrueAndPartyOrderByDisplayNameAsc(Responsibility.TICKETFLOW1).stream().map(u->new IdName(u.getId(),u.getDisplayName())).toList();}
     @GetMapping("/assignable-roles") @PreAuthorize("hasAuthority('USER_MANAGE')")
-    public List<RoleRef> roles(@AuthenticationPrincipal AuthPrincipal p,@RequestParam(required=false)Long organizationId){Long id=p.party()==Responsibility.CLIENT?p.organizationId():organizationId;return (id==null?roles.findByTemplateTrue():roles.findByOrganizationId(id)).stream().map(r->new RoleRef(r.getId(),r.getName(),r.getParty().name())).toList();}
+    public List<RoleRef> roles(@AuthenticationPrincipal AuthPrincipal p,@RequestParam(required=false)Long organizationId){Long id=p.party()==Responsibility.CLIENT?p.organizationId():organizationId;return (id==null?roles.findByOrganizationIsNull():roles.findByOrganizationId(id)).stream().map(r->new RoleRef(r.getId(),r.getName(),r.getParty().name())).toList();}
     private void requireInternal(AuthPrincipal p){if(p.party()!=Responsibility.TICKETFLOW1)throw ApiException.forbidden("TICKETFLOW1 party is required.");}
     public record IdName(Long id,String name){} public record TypeRef(Long id,String key,String name){} public record RoleRef(Long id,String name,String party){}
 }

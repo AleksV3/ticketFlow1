@@ -3,11 +3,14 @@ package com.ticketflow1.ticketing.user;
 import com.ticketflow1.ticketing.common.PagedResponse;
 import com.ticketflow1.ticketing.user.dto.CreateUserRequest;
 import com.ticketflow1.ticketing.user.dto.UserResponse;
+import com.ticketflow1.ticketing.user.dto.UpdateUserRoleRequest;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -46,5 +49,12 @@ public class UserAdminController {
     public UserResponse create(@Valid @RequestBody CreateUserRequest request,
             @AuthenticationPrincipal AuthPrincipal principal) {
         return userService.create(request, principal);
+    }
+
+    @PatchMapping("/{userId}/role")
+    public UserResponse updateRole(@PathVariable Long userId,
+            @Valid @RequestBody UpdateUserRoleRequest request,
+            @AuthenticationPrincipal AuthPrincipal principal) {
+        return userService.updateRole(userId, request.roleId(), principal);
     }
 }

@@ -110,4 +110,22 @@ public class UserService {
         }
         return PagedResponse.from(userRepository.findAll(spec, pageable), UserResponse::from);
     }
+
+    @Transactional
+    public UserResponse updateRole(Long userId, Long roleId, AuthPrincipal principal) {
+        AppUser user = userRepository.findById(userId)
+                .orElseThrow(() -> ApiException.notFound("User not found: " + userId));
+        if (principal.party() == Responsibility.CLIENT
+                && (user.getOrganization() == null
+                || !principal.organizationId().equals(user.getOrganization().getId()))) {
+            throw ApiException.notFound("User not found: " + userId);
+        }
+
+        Role role = roleRepository.findById(roleId)
+                .orElseThrow(() -> ApiException.validation("Role not found: " + roleId));
+        Long organizationId = user.getOrganization() == null ? null : user.getOrganization().getId();
+        validateRoleAndOrganization(role, organizationId);
+        user.setRole(role);
+        return UserResponse.from(userRepository.saveAndFlush(user));
+    }
 }
