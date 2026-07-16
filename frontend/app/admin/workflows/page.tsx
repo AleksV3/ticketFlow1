@@ -5,7 +5,6 @@ import { AppShell } from "@/components/AppShell";
 import { get, patch, post } from "@/lib/api";
 import type { CurrentUser } from "@/lib/auth";
 import { Background, ConnectionLineType, Controls, MarkerType, MiniMap, Position, ReactFlow, useEdgesState, useNodesState, type Connection, type Edge, type Node } from "@xyflow/react";
-import "@xyflow/react/dist/style.css";
 
 type State = { id: number; key: string; isInitial: boolean; isTerminal: boolean; sortOrder: number };
 type Transition = { id: number; fromStateId: number; toStateId: number; requiredPermission: string; requiredParty: string | null; responsibilityAfter: string | null; operationKind: string };
