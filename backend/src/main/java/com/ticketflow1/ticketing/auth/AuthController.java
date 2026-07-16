@@ -7,6 +7,7 @@ import jakarta.validation.Valid;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.security.web.csrf.CsrfToken;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -39,7 +40,10 @@ public class AuthController {
     }
 
     @GetMapping("/users/me")
-    public CurrentUserResponse me(@AuthenticationPrincipal AuthPrincipal principal) {
+    public CurrentUserResponse me(@AuthenticationPrincipal AuthPrincipal principal, CsrfToken csrfToken) {
+        // Resolve Spring Security's deferred token so CookieCsrfTokenRepository
+        // emits the readable XSRF-TOKEN cookie used by the browser client.
+        csrfToken.getToken();
         return authService.currentUser(principal);
     }
 }

@@ -3,3 +3,6 @@ spring:
     locations:
       - classpath:db/migration
       - classpath:db/demo-migration
+app:
+  security:
+    secure-cookies: false

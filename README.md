@@ -82,6 +82,8 @@ npm run dev
 
 The defaults use PostgreSQL port `5433`, API port `8081`, and frontend port
 `3000`. Override them through `.env` and `frontend/.env.local`.
+For plain-HTTP local development, also set `COOKIE_SECURE=false`; production
+must retain the secure default.
 
 ## Database migrations
 

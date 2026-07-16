@@ -1,18 +1,20 @@
 package com.ticketflow1.ticketing.auth;
 
+import java.util.Arrays;
 import java.util.List;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
-import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
+import org.springframework.security.web.csrf.CookieCsrfTokenRepository;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
@@ -33,20 +35,27 @@ class SecurityConfig {
     private final JwtAuthFilter jwtAuthFilter;
     private final RestAuthenticationEntryPoint authenticationEntryPoint;
     private final RestAccessDeniedHandler accessDeniedHandler;
+    private final List<String> allowedOrigins;
 
     SecurityConfig(JwtAuthFilter jwtAuthFilter,
             RestAuthenticationEntryPoint authenticationEntryPoint,
-            RestAccessDeniedHandler accessDeniedHandler) {
+            RestAccessDeniedHandler accessDeniedHandler,
+            @Value("${app.cors.allowed-origins}") String allowedOrigins) {
         this.jwtAuthFilter = jwtAuthFilter;
         this.authenticationEntryPoint = authenticationEntryPoint;
         this.accessDeniedHandler = accessDeniedHandler;
+        this.allowedOrigins = Arrays.stream(allowedOrigins.split(","))
+                .map(String::trim).filter(value -> !value.isBlank()).toList();
     }
 
     @Bean
     SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         http
-            // Stateless JWT API stored in an HttpOnly cookie.
-            .csrf(AbstractHttpConfigurer::disable)
+            .csrf(csrf -> csrf
+                .csrfTokenRepository(CookieCsrfTokenRepository.withHttpOnlyFalse())
+                // Login/logout do not rely on an authenticated browser state.
+                // Every authenticated mutation remains CSRF protected.
+                .ignoringRequestMatchers("/api/auth/login", "/api/auth/logout"))
             // CORS must be handled INSIDE the security chain (and before auth):
             // the browser's OPTIONS preflight carries no Authorization header,
             // so without this it would be rejected as unauthenticated before
@@ -89,11 +98,9 @@ class SecurityConfig {
     @Bean
     CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration config = new CorsConfiguration();
-        config.setAllowedOriginPatterns(List.of(
-                "http://localhost:3000",
-                "http://192.168.*.*:3000"));
+        config.setAllowedOrigins(allowedOrigins);
         config.setAllowedMethods(List.of("GET", "POST", "PATCH", "DELETE", "OPTIONS"));
-        config.setAllowedHeaders(List.of("Authorization", "Content-Type"));
+        config.setAllowedHeaders(List.of("Content-Type", "X-XSRF-TOKEN"));
         config.setAllowCredentials(true);
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
         source.registerCorsConfiguration("/api/**", config);

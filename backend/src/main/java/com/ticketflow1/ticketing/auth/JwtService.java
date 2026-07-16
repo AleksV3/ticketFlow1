@@ -29,13 +29,16 @@ public class JwtService {
 
     private final SecretKey key;
     private final Duration expiration;
+    private final boolean secureCookies;
 
     public JwtService(
             @Value("${app.jwt.secret}") String secret,
-            @Value("${app.jwt.expiration-hours}") long expirationHours) {
+            @Value("${app.jwt.expiration-hours}") long expirationHours,
+            @Value("${app.security.secure-cookies}") boolean secureCookies) {
         // HS256 requires a key of at least 256 bits (32 bytes).
         this.key = Keys.hmacShaKeyFor(secret.getBytes(StandardCharsets.UTF_8));
         this.expiration = Duration.ofHours(expirationHours);
+        this.secureCookies = secureCookies;
     }
 
     public IssuedToken issue(AppUser user) {
@@ -61,7 +64,7 @@ public class JwtService {
     public ResponseCookie buildAuthCookie(String token) {
         return ResponseCookie.from(AUTH_COOKIE_NAME, token)
                 .httpOnly(true)
-                .secure(false)
+                .secure(secureCookies)
                 .sameSite("Lax")
                 .path("/")
                 .maxAge(expiration)
@@ -71,7 +74,7 @@ public class JwtService {
     public ResponseCookie clearAuthCookie() {
         return ResponseCookie.from(AUTH_COOKIE_NAME, "")
                 .httpOnly(true)
-                .secure(false)
+                .secure(secureCookies)
                 .sameSite("Lax")
                 .path("/")
                 .maxAge(Duration.ZERO)
