@@ -113,6 +113,22 @@ public class TicketService {
                 actor,
                 Responsibility.TICKETFLOW1);
 
+        if (request.ticketLeadId() != null || request.developerIds() != null) {
+            requireAssignmentPermission(principal);
+            if (request.ticketLeadId() != null) {
+                AppUser lead = internalUser(request.ticketLeadId(), "ticketLeadId");
+                ticket.setTicketLead(lead);
+            }
+            if (request.developerIds() != null) {
+                Set<AppUser> developers = new LinkedHashSet<>(appUserRepository.findAllById(request.developerIds()));
+                if (developers.size() != request.developerIds().size()
+                        || developers.stream().anyMatch(user -> user.getParty() != Responsibility.TICKETFLOW1)) {
+                    throw ApiException.validation("Developers must be valid TicketFlow1 users.");
+                }
+                ticket.replaceDevelopers(developers);
+            }
+        }
+
         Ticket saved = ticketRepository.saveAndFlush(ticket);
         if (DEFECT_TYPE_KEY.equals(ticketType.getKey())) {
             applyDeadlines(saved, saved.getSeverity(), saved.getCreatedAt());
@@ -258,6 +274,15 @@ public class TicketService {
         if (!principal.hasPermission("TICKET_ASSIGN")) {
             throw ApiException.forbidden("TICKET_ASSIGN permission is required.");
         }
+    }
+
+    private AppUser internalUser(Long userId, String fieldName) {
+        AppUser user = appUserRepository.findById(userId)
+                .orElseThrow(() -> ApiException.validation(fieldName + " not found: " + userId));
+        if (user.getParty() != Responsibility.TICKETFLOW1) {
+            throw ApiException.validation(fieldName + " must belong to a TicketFlow1 user.");
+        }
+        return user;
     }
 
     @Transactional(readOnly = true)

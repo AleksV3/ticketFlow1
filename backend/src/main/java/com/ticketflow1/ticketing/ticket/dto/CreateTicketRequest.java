@@ -5,6 +5,7 @@ import com.ticketflow1.ticketing.ticket.Severity;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
+import java.util.Set;
 
 public record CreateTicketRequest(
         @NotBlank String type,
@@ -12,5 +13,7 @@ public record CreateTicketRequest(
         @NotBlank String description,
         @NotNull Priority priority,
         Severity severity,
-        Long organizationId) {
+        Long organizationId,
+        Long ticketLeadId,
+        Set<Long> developerIds) {
 }
