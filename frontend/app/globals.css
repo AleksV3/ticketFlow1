@@ -86,7 +86,8 @@ tbody tr:hover { background: rgb(0 84 166 / 10%); }
 .graph-connection-editor label { min-width: 220px; }
 .confirm-action { display: flex; margin-top: .75rem; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: .75rem; border: 1px solid rgb(250 204 21 / 45%); border-radius: .65rem; padding: .75rem; background: rgb(250 204 21 / 8%); }
 .confirm-action p { margin-top: .15rem; color: var(--muted); font-size: .75rem; }
-.ticket-view-map { height: 560px; min-height: 560px; }
+.ticket-view-map { height: 300px; min-height: 300px; }
+.ticket-view-map .react-flow__node { width: 150px; padding: .55rem; font-size: .65rem; }
 .react-flow-shell .process-current { border: 3px solid rgb(250 204 21); background: rgb(91 73 10); box-shadow: 0 0 20px rgb(250 204 21 / 28%); }
 .react-flow-shell .process-visited { border-color: rgb(52 211 153); background: rgb(13 62 49); }
 .react-flow-shell .process-next { border: 2px solid var(--accent-blue); box-shadow: 0 0 18px rgb(0 130 255 / 28%); }
