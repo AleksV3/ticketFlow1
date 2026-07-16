@@ -8,14 +8,17 @@ import java.util.List;
 import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import jakarta.persistence.EntityManager;
 
 @Service
 public class OrganizationService {
 
     private final OrganizationRepository organizationRepository;
+    private final EntityManager entityManager;
 
-    public OrganizationService(OrganizationRepository organizationRepository) {
+    public OrganizationService(OrganizationRepository organizationRepository, EntityManager entityManager) {
         this.organizationRepository = organizationRepository;
+        this.entityManager = entityManager;
     }
 
     @Transactional(readOnly = true)
@@ -33,8 +36,9 @@ public class OrganizationService {
         // saveAndFlush forces the INSERT now so @CreationTimestamp is populated
         // before we map the response (UUID keys otherwise defer INSERT to commit).
         Organization saved = organizationRepository.saveAndFlush(new Organization(request.name()));
-        // FR-022 template cloning (roles, ticket types, workflows) is wired in
-        // here once the template model and clone_org_templates() exist (V2).
+        entityManager.createNativeQuery("SELECT clone_org_templates(:organizationId)")
+                .setParameter("organizationId", saved.getId())
+                .getSingleResult();
         return OrganizationResponse.from(saved);
     }
 
