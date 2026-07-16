@@ -67,13 +67,13 @@ public record TicketDetailResponse(
             var workflow = ticket.getTicketType().getWorkflow();
             return new ProcessMap(workflow.getName(),
                     workflow.getStates().stream().sorted(java.util.Comparator.comparingInt(WorkflowState::getSortOrder))
-                            .map(state -> new ProcessState(state.getId(), state.getKey(), state.isInitial(), state.isTerminal())).toList(),
+                            .map(state -> new ProcessState(state.getId(), state.getKey(), state.isInitial(), state.isTerminal(), state.getSortOrder())).toList(),
                     workflow.getTransitions().stream().sorted(java.util.Comparator.comparing(WorkflowTransition::getId))
                             .map(edge -> new ProcessTransition(edge.getFromState().getId(), edge.getToState().getId())).toList());
         }
     }
 
-    public record ProcessState(Long id, String key, boolean isInitial, boolean isTerminal) {}
+    public record ProcessState(Long id, String key, boolean isInitial, boolean isTerminal, int sortOrder) {}
     public record ProcessTransition(Long fromStateId, Long toStateId) {}
 
     public record OrganizationRef(Long id, String name) {

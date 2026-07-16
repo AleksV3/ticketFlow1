@@ -86,10 +86,9 @@ tbody tr:hover { background: rgb(0 84 166 / 10%); }
 .graph-connection-editor label { min-width: 220px; }
 .confirm-action { display: flex; margin-top: .75rem; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: .75rem; border: 1px solid rgb(250 204 21 / 45%); border-radius: .65rem; padding: .75rem; background: rgb(250 204 21 / 8%); }
 .confirm-action p { margin-top: .15rem; color: var(--muted); font-size: .75rem; }
-.ticket-process-map { height: 360px; overflow: hidden; border: 1px solid var(--line); border-radius: .65rem; background: rgb(7 13 27 / 78%); }
-.ticket-process-map .react-flow__node { width: 150px; border: 1px solid rgb(72 105 148); border-radius: .55rem; padding: .55rem; color: var(--off-white); background: rgb(26 35 50); font-size: .68rem; font-weight: 700; }
-.ticket-process-map .process-current { border: 2px solid rgb(250 204 21); background: rgb(91 73 10); box-shadow: 0 0 20px rgb(250 204 21 / 25%); }
-.ticket-process-map .process-visited { border-color: rgb(52 211 153); }
-.ticket-process-map .process-next { border-color: var(--accent-blue); box-shadow: 0 0 14px rgb(0 130 255 / 20%); }
-.ticket-process-map .react-flow__handle { opacity: 0; }
+.ticket-view-map { height: 560px; min-height: 560px; }
+.react-flow-shell .process-current { border: 3px solid rgb(250 204 21); background: rgb(91 73 10); box-shadow: 0 0 20px rgb(250 204 21 / 28%); }
+.react-flow-shell .process-visited { border-color: rgb(52 211 153); background: rgb(13 62 49); }
+.react-flow-shell .process-next { border: 2px solid var(--accent-blue); box-shadow: 0 0 18px rgb(0 130 255 / 28%); }
+.ticket-view-map .react-flow__handle { opacity: 0; pointer-events: none; }
 .react-flow-shell .flow-edge-draft path { stroke: rgb(250 204 21); stroke-width: 3; stroke-dasharray: 6 4; }

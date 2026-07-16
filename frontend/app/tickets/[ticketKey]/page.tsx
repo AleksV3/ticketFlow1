@@ -1,9 +1,9 @@
 "use client";
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import { useParams } from "next/navigation";
-import { Background, Controls, MarkerType, Position, ReactFlow, type Edge, type Node } from "@xyflow/react";
+import { Background, Controls, MarkerType, MiniMap, Position, ReactFlow, type Edge, type Node } from "@xyflow/react";
 import { AppShell } from "@/components/AppShell";
-import { ProposalActions, TicketActivity } from "@/components/TicketExtras";
+import { ProposalActions, TicketCommunication, TicketHistory } from "@/components/TicketExtras";
 import { SlaBadge, StatusBadge, TransitionButtons } from "@/components/TicketUi";
 import { get, patch, post } from "@/lib/api";
 import type { TicketDetail } from "@/lib/types";
@@ -26,20 +26,31 @@ function Detail({ canEdit }: { canEdit: boolean }) {
     <ProcessMap ticket={ticket} history={history}/>
     <section className="card py-4"><div className="mb-3"><p className="eyebrow">Next step</p><h2 className="font-bold">Available actions</h2></div><TransitionButtons allowedTransitions={ticket.allowedTransitions} onTransition={async status => { await post(`/tickets/${ticketKey}/transition`, { toStatus: status }); await load(); }}/></section>
     <ProposalActions ticketKey={ticketKey} proposal={ticket.latestProposal} commands={ticket.proposalCommands ?? []} onDone={load}/>
-    <details className="card"><summary className="cursor-pointer font-bold">Comments, attachments and full history</summary><div className="mt-5"><TicketActivity ticketKey={ticketKey}/></div></details>
+    <TicketCommunication ticketKey={ticketKey}/>
+    <details className="card"><summary className="cursor-pointer font-bold">Status history and audit log</summary><div className="mt-5"><TicketHistory ticketKey={ticketKey}/></div></details>
   </div>;
 }
 
 function ProcessMap({ ticket, history }: { ticket: TicketDetail; history: History[] }) {
   const elements = useMemo(() => {
     const visited = new Set(history.map(item => item.toStatus));
-    const states = ticket.processMap.states, positions = new Map<number, { x: number; y: number }>();
-    states.forEach((state, index) => positions.set(state.id, { x: 30 + index * 205, y: state.isTerminal ? 170 : 65 }));
-    const nodes: Node[] = states.map(state => ({ id: String(state.id), position: positions.get(state.id)!, sourcePosition: Position.Right, targetPosition: Position.Left, data: { label: state.key.replaceAll("_", " ") }, className: state.key === ticket.status ? "process-current" : ticket.allowedTransitions.includes(state.key) ? "process-next" : visited.has(state.key) ? "process-visited" : "" }));
+    const states = ticket.processMap.states, positions = processLayout(ticket);
+    const nodes: Node[] = states.map(state => ({ id: String(state.id), position: positions.get(state.id)!, sourcePosition: Position.Right, targetPosition: Position.Left, data: { label: `${state.isInitial ? "▶ " : state.isTerminal ? "■ " : ""}${state.key.replaceAll("_", " ")}` }, className: `flow-state ${state.isInitial ? "flow-state-start" : ""} ${state.isTerminal ? "flow-state-end" : ""} ${state.key === ticket.status ? "process-current" : ticket.allowedTransitions.includes(state.key) ? "process-next" : visited.has(state.key) ? "process-visited" : ""}` }));
     const edges: Edge[] = ticket.processMap.transitions.map((edge, index) => ({ id: `process-${index}`, source: String(edge.fromStateId), target: String(edge.toStateId), type: "smoothstep", markerEnd: { type: MarkerType.ArrowClosed }, animated: edge.toStateId === states.find(state => state.key === ticket.status)?.id }));
     return { nodes, edges };
   }, [history, ticket]);
-  return <section className="card py-4"><div className="mb-3 flex flex-wrap items-center justify-between gap-2"><div><p className="eyebrow">Process</p><h2 className="font-bold">{ticket.processMap.name}</h2></div><div className="flex gap-3 text-xs text-slate-500"><span>● Completed</span><span className="text-yellow-300">● Current</span><span className="text-blue-400">● Available next</span></div></div><div className="ticket-process-map"><ReactFlow nodes={elements.nodes} edges={elements.edges} nodesDraggable={false} nodesConnectable={false} elementsSelectable={false} fitView fitViewOptions={{ padding: .15 }} minZoom={.25} maxZoom={1.5} colorMode="dark"><Controls showInteractive={false}/><Background gap={20} size={1}/></ReactFlow></div></section>;
+  return <section className="card py-4"><div className="mb-3 flex flex-wrap items-center justify-between gap-2"><div><p className="eyebrow">Workflow map · View only</p><h2 className="font-bold">{ticket.processMap.name}</h2></div><div className="flex gap-3 text-xs text-slate-500"><span className="text-emerald-400">● Completed</span><span className="text-yellow-300">● Current</span><span className="text-blue-400">● Available next</span></div></div><div className="react-flow-shell ticket-view-map"><ReactFlow nodes={elements.nodes} edges={elements.edges} nodesDraggable={false} nodesConnectable={false} edgesFocusable={false} elementsSelectable={false} fitView fitViewOptions={{ padding: .12 }} minZoom={.2} maxZoom={2} colorMode="dark"><MiniMap pannable zoomable/><Controls showInteractive={false}/><Background gap={20} size={1}/></ReactFlow></div></section>;
+}
+
+function processLayout(ticket: TicketDetail) {
+  const states = ticket.processMap.states, transitions = ticket.processMap.transitions, levels = new Map<number, number>(), queue: number[] = [];
+  const initial = states.find(state => state.isInitial) ?? states[0]; if (initial) { levels.set(initial.id, 0); queue.push(initial.id); }
+  while (queue.length) { const from = queue.shift()!, next = levels.get(from)! + 1; transitions.filter(edge => edge.fromStateId === from).forEach(edge => { if (!levels.has(edge.toStateId)) { levels.set(edge.toStateId, next); queue.push(edge.toStateId); } }); }
+  states.forEach((state, index) => { if (!levels.has(state.id)) levels.set(state.id, Math.max(1, index)); });
+  const maxLevel = Math.max(0, ...levels.values()); states.filter(state => state.isTerminal).forEach(state => levels.set(state.id, maxLevel));
+  const columns = new Map<number, typeof states>(); states.forEach(state => { const level = levels.get(state.id)!; columns.set(level, [...(columns.get(level) ?? []), state]); });
+  const positions = new Map<number, { x: number; y: number }>(); columns.forEach((column, level) => column.sort((a, b) => a.sortOrder - b.sortOrder).forEach((state, row) => positions.set(state.id, { x: 40 + level * 270, y: 40 + row * 130 })));
+  return positions;
 }
 
 function Row({ k, v }: { k: string; v: string }) { return <div><dt className="text-[10px] uppercase tracking-wider text-slate-500">{k}</dt><dd className="truncate text-sm font-medium" title={v}>{v}</dd></div>; }

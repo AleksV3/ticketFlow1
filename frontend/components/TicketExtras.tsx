@@ -10,7 +10,7 @@ type Audit = { id: number; actor: Person; action: string; fieldName?: string; cr
 type History = { id: number; fromStatus?: string; toStatus: string; changedBy: Person; createdAt: string };
 type Proposal = { id: number; description: string; estimatedDeliveryDate: string | null; effortEstimate: string | null; status: string; version?: number };
 
-export function TicketActivity({ ticketKey }: { ticketKey: string }) {
+function useTicketActivity(ticketKey: string) {
   const [comments, setComments] = useState<Comment[]>([]);
   const [attachments, setAttachments] = useState<Attachment[]>([]);
   const [audit, setAudit] = useState<Audit[]>([]);
@@ -33,19 +33,32 @@ export function TicketActivity({ ticketKey }: { ticketKey: string }) {
     try { await post(`/tickets/${ticketKey}/comments`, { body, visibility }); setBody(""); await load(); }
     catch (e) { setError(e instanceof Error ? e.message : "Could not add comment"); }
   }
-  return <div className="grid gap-6 xl:grid-cols-2">
-    <section className="card"><h2 className="text-lg font-bold">Comments</h2><form className="my-4 space-y-3" onSubmit={addComment}>
-      <label className="block">Message<textarea className="field mt-1" value={body} maxLength={10000} required onChange={e => setBody(e.target.value)} /></label>
+  return { comments, attachments, audit, history, body, setBody, visibility, setVisibility, error, addComment };
+}
+
+export function TicketCommunication({ ticketKey }: { ticketKey: string }) {
+  const { comments, attachments, body, setBody, visibility, setVisibility, error, addComment } = useTicketActivity(ticketKey);
+  return <div className="grid gap-4 lg:grid-cols-3">
+    <section className="card lg:col-span-2"><h2 className="text-lg font-bold">Comments</h2><form className="my-4 grid gap-3 sm:grid-cols-[1fr_150px_auto] sm:items-end" onSubmit={addComment}>
+      <label className="block">Message<textarea className="field mt-1 min-h-20" value={body} maxLength={10000} required onChange={e => setBody(e.target.value)} /></label>
       <label className="block">Visibility<select className="field mt-1" value={visibility} onChange={e => setVisibility(e.target.value as "PUBLIC" | "INTERNAL")}><option value="PUBLIC">Public</option><option value="INTERNAL">Internal</option></select></label>
       <button className="btn-primary">Add comment</button></form>{error ? <p role="alert" className="text-red-700">{error}</p> : null}
-      <div className="space-y-3">{comments.map(c => <article className="rounded border p-3" key={c.id}><div className="flex justify-between gap-3 text-sm"><strong>{c.author.displayName}</strong><span>{c.visibility}</span></div><p className="mt-2 whitespace-pre-wrap">{c.body}</p><time className="text-xs text-slate-500">{new Date(c.createdAt).toLocaleString()}</time></article>)}</div>
+      <div className="max-h-72 space-y-2 overflow-y-auto">{comments.length ? comments.map(c => <article className="rounded border p-3" key={c.id}><div className="flex justify-between gap-3 text-sm"><strong>{c.author.displayName}</strong><span className="text-xs text-slate-500">{c.visibility}</span></div><p className="mt-1 whitespace-pre-wrap text-sm">{c.body}</p><time className="text-xs text-slate-500">{new Date(c.createdAt).toLocaleString()}</time></article>) : <p className="text-sm text-slate-500">No comments yet.</p>}</div>
     </section>
-    <div className="space-y-6">
-      <section className="card"><h2 className="mb-3 text-lg font-bold">Attachment references</h2>{attachments.length ? <ul className="space-y-2">{attachments.map(a => <li key={a.id}><strong>{a.fileName}</strong> <span className="text-sm text-slate-500">({Math.ceil(a.sizeBytes / 1024)} KB, {a.contentType})</span></li>)}</ul> : <p className="text-slate-500">No attachments referenced.</p>}</section>
-      <section className="card"><h2 className="mb-3 text-lg font-bold">Status history</h2><ol className="space-y-2">{history.map(h => <li key={h.id}><strong>{h.fromStatus ?? "Created"} → {h.toStatus}</strong><div className="text-sm text-slate-500">{h.changedBy.displayName} · {new Date(h.createdAt).toLocaleString()}</div></li>)}</ol></section>
-      <section className="card"><h2 className="mb-3 text-lg font-bold">Audit log</h2><ol className="space-y-2">{audit.map(a => <li key={a.id}><strong>{a.action.replaceAll("_", " ")}</strong>{a.fieldName ? ` · ${a.fieldName}` : ""}<div className="text-sm text-slate-500">{a.actor.displayName} · {new Date(a.createdAt).toLocaleString()}</div></li>)}</ol></section>
-    </div>
+    <section className="card"><h2 className="mb-3 text-lg font-bold">Attachments</h2>{attachments.length ? <ul className="space-y-2">{attachments.map(a => <li className="rounded border p-3" key={a.id}><strong className="block text-sm">{a.fileName}</strong><span className="text-xs text-slate-500">{Math.ceil(a.sizeBytes / 1024)} KB · {a.contentType}</span></li>)}</ul> : <p className="text-sm text-slate-500">No attachments referenced.</p>}</section>
   </div>;
+}
+
+export function TicketHistory({ ticketKey }: { ticketKey: string }) {
+  const { audit, history, error } = useTicketActivity(ticketKey);
+  return <div className="grid gap-4 lg:grid-cols-2">{error ? <p role="alert" className="text-red-700 lg:col-span-2">{error}</p> : null}
+    <section><h2 className="mb-3 font-bold">Status history</h2><ol className="space-y-2">{history.map(h => <li className="rounded border p-3" key={h.id}><strong>{h.fromStatus ?? "Created"} → {h.toStatus}</strong><div className="text-sm text-slate-500">{h.changedBy.displayName} · {new Date(h.createdAt).toLocaleString()}</div></li>)}</ol></section>
+    <section><h2 className="mb-3 font-bold">Audit log</h2><ol className="space-y-2">{audit.map(a => <li className="rounded border p-3" key={a.id}><strong>{a.action.replaceAll("_", " ")}</strong>{a.fieldName ? ` · ${a.fieldName}` : ""}<div className="text-sm text-slate-500">{a.actor.displayName} · {new Date(a.createdAt).toLocaleString()}</div></li>)}</ol></section>
+  </div>;
+}
+
+export function TicketActivity({ ticketKey }: { ticketKey: string }) {
+  return <div className="space-y-4"><TicketCommunication ticketKey={ticketKey}/><TicketHistory ticketKey={ticketKey}/></div>;
 }
 
 export function ProposalActions({ ticketKey, proposal, commands, onDone }: { ticketKey: string; proposal?: Proposal | null; commands: string[]; onDone: () => void }) {
