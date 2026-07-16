@@ -74,6 +74,7 @@ class TicketControllerIntegrationTest {
 
     @BeforeEach
     void ensureClientUsersExist() {
+        ensureInternalAdminExists();
         Organization orgA = ensureOrganizationExists("Client A");
         Organization orgB = ensureOrganizationExists("Client B");
 
@@ -106,6 +107,17 @@ class TicketControllerIntegrationTest {
                     .filter(r -> "Client Approver".equals(r.getName())).findFirst().orElseThrow();
             appUserRepository.save(new AppUser("approver-b@demo.test", passwordEncoder.encode("client123"),
                     "Client B Approver", Responsibility.CLIENT, role, role.getOrganization()));
+        }
+    }
+
+    private void ensureInternalAdminExists() {
+        if (!appUserRepository.existsByEmailIgnoreCase("admin@ticketflow1.demo")) {
+            Role role = roleRepository.findAll().stream()
+                    .filter(r -> "Admin".equals(r.getName()) && r.getOrganization() == null)
+                    .findFirst()
+                    .orElseThrow();
+            appUserRepository.save(new AppUser("admin@ticketflow1.demo", passwordEncoder.encode("admin123"),
+                    "Test Admin", Responsibility.TICKETFLOW1, role, null));
         }
     }
 

@@ -70,13 +70,13 @@ export default function LoginPage() {
   }
 
   return (
-    <main className="flex min-h-screen items-center justify-center bg-slate-100 px-6 py-12">
-      <section className="w-full max-w-md rounded-2xl border border-slate-200 bg-white p-8 shadow-sm">
+    <main className="flex min-h-screen items-center justify-center px-6 py-12">
+      <section className="auth-panel">
         <div>
-          <p className="text-sm font-semibold uppercase tracking-[0.2em] text-slate-500">
+          <p className="eyebrow">
             TicketFlow1
           </p>
-          <h1 className="mt-3 text-3xl font-bold text-slate-900">Sign in</h1>
+          <h1 className="mt-3 text-3xl font-bold">Sign in</h1>
           <p className="mt-2 text-sm text-slate-600">
             Authenticate against the Spring Boot backend using an HttpOnly cookie.
           </p>
@@ -87,7 +87,7 @@ export default function LoginPage() {
             <span className="mb-2 block text-sm font-medium text-slate-700">Email</span>
             <input
               autoComplete="email"
-              className="w-full rounded-xl border border-slate-300 px-4 py-3 text-slate-900 outline-none transition focus:border-slate-500"
+              className="field px-4 py-3"
               onChange={(event) => setEmail(event.target.value)}
               placeholder="approver@clientco.com"
               required
@@ -100,7 +100,7 @@ export default function LoginPage() {
             <span className="mb-2 block text-sm font-medium text-slate-700">Password</span>
             <input
               autoComplete="current-password"
-              className="w-full rounded-xl border border-slate-300 px-4 py-3 text-slate-900 outline-none transition focus:border-slate-500"
+              className="field px-4 py-3"
               onChange={(event) => setPassword(event.target.value)}
               placeholder="Enter your password"
               required
@@ -116,7 +116,7 @@ export default function LoginPage() {
           ) : null}
 
           <button
-            className="w-full rounded-xl bg-slate-900 px-4 py-3 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-400"
+            className="btn-primary w-full py-3"
             disabled={isSubmitting}
             type="submit"
           >

@@ -131,10 +131,7 @@ WHERE r.name = 'Client Approver' AND p.key IN
     ('TICKET_READ', 'TICKET_CREATE', 'TICKET_UPDATE', 'TICKET_TRANSITION',
      'PROPOSAL_APPROVE', 'COMMENT_PUBLIC_WRITE');
 
--- Bootstrap admin so login is verifiable this phase (global role, no org).
--- Credentials: admin@ticketflow1.demo / admin123 (BCrypt hash below).
-INSERT INTO app_user (email, password_hash, display_name, party, role_id, organization_id)
-SELECT 'admin@ticketflow1.demo',
-       '$2a$10$ssUxK.6FCVlYURe4987adu/r5Ccy4B0rSfDOCsaiQO/rswNRW/Qje',
-       'TicketFlow1 Admin', 'TICKETFLOW1', r.id, NULL
-FROM role r WHERE r.name = 'Admin';
+-- Intentionally no users or credentials here. Fixed demo accounts live only
+-- in db/demo-migration/V8__seed_demo_data.sql and are enabled by the demo
+-- Spring profile. Production deployments bootstrap their first user through
+-- an environment-specific operational process.
