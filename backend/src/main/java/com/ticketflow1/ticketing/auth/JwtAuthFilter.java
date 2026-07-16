@@ -11,6 +11,8 @@ import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import java.util.List;
 import java.util.Set;
+import java.util.Arrays;
+import java.util.stream.Collectors;
 import org.springframework.lang.NonNull;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
@@ -88,7 +90,10 @@ public class JwtAuthFilter extends OncePerRequestFilter {
         Long organizationId = orgIdClaim == null ? null : Long.valueOf(orgIdClaim);
         String permissionsClaim = claims.get("permissions", String.class);
         Set<String> permissions = permissionsClaim == null || permissionsClaim.isBlank()
-                ? Set.of() : Set.of(permissionsClaim.split(","));
+                ? Set.of()
+                : Arrays.stream(permissionsClaim.split(","))
+                        .filter(permission -> !permission.isBlank())
+                        .collect(Collectors.toSet());
         return new AuthPrincipal(userId, party, organizationId, permissions);
     }
 }
