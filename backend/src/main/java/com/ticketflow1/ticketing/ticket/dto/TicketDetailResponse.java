@@ -25,6 +25,7 @@ public record TicketDetailResponse(
         OrganizationRef organization,
         UserRef businessOwner,
         UserRef ticketLead,
+        List<UserRef> developers,
         String assignedTeam,
         String currentResponsibility,
         Instant createdAt,
@@ -50,6 +51,8 @@ public record TicketDetailResponse(
                 OrganizationRef.from(ticket.getOrganization()),
                 UserRef.from(ticket.getBusinessOwner()),
                 UserRef.from(ticket.getTicketLead()),
+                ticket.getDevelopers().stream().map(UserRef::from)
+                        .sorted(java.util.Comparator.comparing(UserRef::displayName)).toList(),
                 ticket.getAssignedTeam(),
                 ticket.getCurrentResponsibility().name(),
                 ticket.getCreatedAt(),

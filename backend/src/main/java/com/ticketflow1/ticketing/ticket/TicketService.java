@@ -25,6 +25,8 @@ import com.ticketflow1.ticketing.workflow.TicketTransitionService;
 import com.ticketflow1.ticketing.workflow.WorkflowState;
 import com.ticketflow1.ticketing.workflow.WorkflowStateRepository;
 import java.util.List;
+import java.util.LinkedHashSet;
+import java.util.Set;
 import java.time.Clock;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -136,6 +138,11 @@ public class TicketService {
         if (request.status() != null) {
             throw ApiException.validation("status must be changed via /transition.");
         }
+        boolean changesContent = request.title() != null || request.description() != null
+                || request.priority() != null || request.severity() != null || request.assignedTeam() != null;
+        if (changesContent && !principal.hasPermission("TICKET_UPDATE")) {
+            throw ApiException.forbidden("TICKET_UPDATE permission is required.");
+        }
 
         boolean changed = false;
 
@@ -193,6 +200,7 @@ public class TicketService {
         }
 
         if (request.ticketLeadId() != null) {
+            requireAssignmentPermission(principal);
             requireTicketflow1Party(principal, "ticketLeadId");
             AppUser ticketLead = appUserRepository.findById(request.ticketLeadId())
                     .orElseThrow(() -> ApiException.validation("ticketLeadId not found: " + request.ticketLeadId()));
@@ -208,6 +216,21 @@ public class TicketService {
                 ticket.setTicketLead(ticketLead);
                 changed = true;
             }
+        }
+
+        if (request.developerIds() != null) {
+            requireAssignmentPermission(principal);
+            Set<AppUser> developers = new LinkedHashSet<>(appUserRepository.findAllById(request.developerIds()));
+            if (developers.size() != request.developerIds().size()) {
+                throw ApiException.validation("One or more developerIds do not exist.");
+            }
+            if (developers.stream().anyMatch(user -> user.getParty() != Responsibility.TICKETFLOW1)) {
+                throw ApiException.validation("Developers must be TicketFlow1 users.");
+            }
+            ticket.replaceDevelopers(developers);
+            auditService.record(ticket, actor.getId(), AuditAction.ASSIGNEE_CHANGED,
+                    "developers", null, developers.stream().map(AppUser::getDisplayName).sorted().toList().toString());
+            changed = true;
         }
 
         if (request.assignedTeam() != null) {
@@ -228,6 +251,13 @@ public class TicketService {
 
         Ticket saved = changed ? ticketRepository.save(ticket) : ticket;
         return detail(saved, principal);
+    }
+
+    private void requireAssignmentPermission(AuthPrincipal principal) {
+        requireTicketflow1Party(principal, "ticket team");
+        if (!principal.hasPermission("TICKET_ASSIGN")) {
+            throw ApiException.forbidden("TICKET_ASSIGN permission is required.");
+        }
     }
 
     @Transactional(readOnly = true)

@@ -32,7 +32,7 @@ public class WorkflowAdminService {
         return list.stream().map(this::response).toList();
     }
     @Transactional public WorkflowResponse createWorkflow(AuthPrincipal p, WorkflowRequests.Create r) {
-        Organization org=organization(p,r.organizationId()); validateGraph(r.states(),r.transitions());
+        Organization org=optionalOrganization(p,r.organizationId()); validateGraph(r.states(),r.transitions());
         Workflow w=workflows.saveAndFlush(new Workflow(r.name(),org));
         Map<String,WorkflowState> map=r.states().stream().map(s->states.save(new WorkflowState(w,s.key(),s.isInitial(),s.isTerminal(),s.sortOrder())))
                 .collect(Collectors.toMap(WorkflowState::getKey,Function.identity()));
@@ -77,5 +77,9 @@ public class WorkflowAdminService {
     private Workflow visible(AuthPrincipal p,Long id){Workflow w=workflows.findById(id).orElseThrow(()->ApiException.notFound("Workflow not found: "+id));if(p.party()==Responsibility.CLIENT&&(w.getOrganization()==null||!w.getOrganization().getId().equals(p.organizationId())))throw ApiException.notFound("Workflow not found: "+id);return w;}
     private Long scope(AuthPrincipal p,Long requested){return p.party()==Responsibility.CLIENT?p.organizationId():requested;}
     private Organization organization(AuthPrincipal p,Long requested){if(p.party()==Responsibility.CLIENT&&requested!=null&&!p.organizationId().equals(requested))throw ApiException.notFound("Organization not found: "+requested);Long id=scope(p,requested);if(id==null)throw ApiException.validation("organizationId is required.");return organizations.findById(id).orElseThrow(()->ApiException.notFound("Organization not found: "+id));}
+    private Organization optionalOrganization(AuthPrincipal p,Long requested){
+        if(p.party()==Responsibility.CLIENT) return organization(p,requested);
+        return requested==null?null:organizations.findById(requested).orElseThrow(()->ApiException.notFound("Organization not found: "+requested));
+    }
     private WorkflowResponse response(Workflow w){return WorkflowResponse.from(w,states.findByWorkflowIdOrderBySortOrderAsc(w.getId()),transitions.findByWorkflowId(w.getId()));}
 }

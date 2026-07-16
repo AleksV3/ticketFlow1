@@ -69,7 +69,7 @@ public class TicketController {
     }
 
     @PatchMapping("/{ticketKey}")
-    @PreAuthorize("hasAuthority('TICKET_UPDATE')")
+    @PreAuthorize("hasAnyAuthority('TICKET_UPDATE', 'TICKET_ASSIGN')")
     public TicketDetailResponse update(@PathVariable String ticketKey,
             @RequestBody UpdateTicketRequest request,
             @AuthenticationPrincipal AuthPrincipal principal) {

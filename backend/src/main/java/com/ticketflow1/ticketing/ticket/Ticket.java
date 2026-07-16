@@ -15,8 +15,12 @@ import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
+import jakarta.persistence.ManyToMany;
+import jakarta.persistence.JoinTable;
 import jakarta.persistence.Table;
 import java.time.Instant;
+import java.util.LinkedHashSet;
+import java.util.Set;
 import org.hibernate.annotations.CreationTimestamp;
 
 @Entity
@@ -63,6 +67,12 @@ public class Ticket extends Auditable {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "ticket_lead_id")
     private AppUser ticketLead;
+
+    @ManyToMany(fetch = FetchType.LAZY)
+    @JoinTable(name = "ticket_developer",
+            joinColumns = @JoinColumn(name = "ticket_id"),
+            inverseJoinColumns = @JoinColumn(name = "user_id"))
+    private Set<AppUser> developers = new LinkedHashSet<>();
 
     @Column(name = "assigned_team", length = 100)
     private String assignedTeam;
@@ -182,6 +192,12 @@ public class Ticket extends Auditable {
 
     public void setTicketLead(AppUser ticketLead) {
         this.ticketLead = ticketLead;
+    }
+
+    public Set<AppUser> getDevelopers() { return developers; }
+    public void replaceDevelopers(Set<AppUser> developers) {
+        this.developers.clear();
+        this.developers.addAll(developers);
     }
 
     public String getAssignedTeam() {
