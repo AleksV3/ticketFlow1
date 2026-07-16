@@ -9,6 +9,8 @@ import java.util.List;
 import com.ticketflow1.ticketing.proposal.ProposalDetailService.ProposalDetail;
 import com.ticketflow1.ticketing.proposal.dto.ChangeProposalResponse;
 import com.ticketflow1.ticketing.sla.SlaStatus;
+import com.ticketflow1.ticketing.workflow.WorkflowState;
+import com.ticketflow1.ticketing.workflow.WorkflowTransition;
 
 @JsonInclude(JsonInclude.Include.NON_NULL)
 public record TicketDetailResponse(
@@ -29,6 +31,7 @@ public record TicketDetailResponse(
         Instant updatedAt,
         Instant closedAt,
         SlaRef sla,
+        ProcessMap processMap,
         List<String> allowedTransitions,
         ChangeProposalResponse latestProposal,
         List<String> proposalCommands) {
@@ -53,10 +56,25 @@ public record TicketDetailResponse(
                 ticket.getUpdatedAt(),
                 ticket.getClosedAt(),
                 "DEFECT".equals(ticket.getTicketType().getKey()) ? SlaRef.from(ticket, slaStatus) : null,
+                ProcessMap.from(ticket),
                 allowedTransitions,
                 proposal == null ? null : proposal.latestProposal(),
                 proposal == null ? List.of() : proposal.permittedCommands());
     }
+
+    public record ProcessMap(String name, List<ProcessState> states, List<ProcessTransition> transitions) {
+        static ProcessMap from(Ticket ticket) {
+            var workflow = ticket.getTicketType().getWorkflow();
+            return new ProcessMap(workflow.getName(),
+                    workflow.getStates().stream().sorted(java.util.Comparator.comparingInt(WorkflowState::getSortOrder))
+                            .map(state -> new ProcessState(state.getId(), state.getKey(), state.isInitial(), state.isTerminal())).toList(),
+                    workflow.getTransitions().stream().sorted(java.util.Comparator.comparing(WorkflowTransition::getId))
+                            .map(edge -> new ProcessTransition(edge.getFromState().getId(), edge.getToState().getId())).toList());
+        }
+    }
+
+    public record ProcessState(Long id, String key, boolean isInitial, boolean isTerminal) {}
+    public record ProcessTransition(Long fromStateId, Long toStateId) {}
 
     public record OrganizationRef(Long id, String name) {
         public static OrganizationRef from(Organization organization) {

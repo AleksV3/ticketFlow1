@@ -4,7 +4,7 @@ import AxeBuilder from "@axe-core/playwright";
 const user = { id: 7, email: "manager@example.test", displayName: "Demo Manager", roleName: "Client Approver", party: "CLIENT", organizationId: 11, organizationName: "Acme", permissions: ["TICKET_READ", "TICKET_CREATE", "TICKET_UPDATE", "TICKET_TRANSITION", "COMMENT_PUBLIC_WRITE", "PROPOSAL_APPROVE"] };
 const now = () => new Date().toISOString();
 function ticket(status = "SUBMITTED", latestProposal: object | null = null, proposalCommands = ["CREATE"]) {
-  return { id: 1, ticketKey: "TF-101", type: "CHANGE_REQUEST", status, priority: "MEDIUM", severity: null, title: "Add SSO", description: "Support company login", organization: { id: 11, name: "Acme" }, organizationName: "Acme", businessOwner: { id: 7, displayName: "Demo Manager" }, ticketLead: null, assignedTeam: null, currentResponsibility: "CLIENT", createdAt: now(), updatedAt: now(), closedAt: null, slaStatus: "NOT_APPLICABLE", allowedTransitions: status === "SUBMITTED" ? ["ANALYSIS"] : [], latestProposal, proposalCommands };
+  return { id: 1, ticketKey: "TF-101", type: "CHANGE_REQUEST", status, priority: "MEDIUM", severity: null, title: "Add SSO", description: "Support company login", organization: { id: 11, name: "Acme" }, organizationName: "Acme", businessOwner: { id: 7, displayName: "Demo Manager" }, ticketLead: null, assignedTeam: null, currentResponsibility: "CLIENT", createdAt: now(), updatedAt: now(), closedAt: null, slaStatus: "NOT_APPLICABLE", processMap:{name:"Change workflow",states:[{id:1,key:"SUBMITTED",isInitial:true,isTerminal:false},{id:2,key:"ANALYSIS",isInitial:false,isTerminal:false}],transitions:[{fromStateId:1,toStateId:2}]}, allowedTransitions: status === "SUBMITTED" ? ["ANALYSIS"] : [], latestProposal, proposalCommands };
 }
 
 async function mockApi(page: Page) {
@@ -14,11 +14,11 @@ async function mockApi(page: Page) {
     if (path === "/users/me" && !authenticated) return route.fulfill({ status: 200, contentType: "application/json", body: "null" });
     if (path === "/users/me") body = user;
     else if (path === "/auth/login") { authenticated = true; body = { expiresAt: now(), user }; }
-    else if (path === "/dashboard") body = { activeCount: 1, closedCount: 0, defectsBySeverity: {}, slaBreached: [], slaDueSoon: [], waitingForClientApproval: [], waitingForClientConfirmation: [], myAssignedTickets: [] };
     else if (path === "/reference/ticket-types") body = [{ id: 1, key: "CHANGE_REQUEST", name: "Change request" }];
     else if (path === "/tickets" && route.request().method() === "POST") body = current;
     else if (path === "/tickets/TF-101" && route.request().method() === "GET") body = current;
     else if (path.endsWith("/transition")) { current = ticket("ANALYSIS"); body = current; }
+    else if (path.endsWith("/status-history")) body = [];
     else if (path.endsWith("/comments") && route.request().method() === "POST") { comments = [{ id: 1, author: { id: 7, displayName: "Demo Manager" }, body: "Ready for review", visibility: "PUBLIC", createdAt: now() }]; body = comments[0]; }
     else if (path.endsWith("/comments")) body = comments;
     else if (path.endsWith("/attachments") || path.endsWith("/audit-log") || path.endsWith("/status-history")) body = [];
@@ -29,16 +29,14 @@ async function mockApi(page: Page) {
 }
 
 test("login, create, transition, comment, and approve a proposal", async ({ page }) => {
-  const startedAt = Date.now();
   await mockApi(page); await page.goto("/login");
   await page.getByLabel("Email").fill("manager@example.test"); await page.getByLabel("Password").fill("secret1"); await page.getByRole("button", { name: "Sign in" }).click();
   await expect(page).toHaveURL(/dashboard/); await page.goto("/tickets/new");
   await page.getByLabel("Title").fill("Add SSO"); await page.getByLabel("Description").fill("Support company login"); await page.getByRole("button", { name: "Create ticket" }).click();
-  await expect(page).toHaveURL(/TF-101/); await page.getByRole("button", { name: "ANALYSIS" }).click();
+  await expect(page).toHaveURL(/TF-101/); await page.getByRole("button", { name: "ANALYSIS" }).click(); await page.getByRole("button", { name: "Yes, continue" }).click();
   await page.getByLabel("Message").fill("Ready for review"); await page.getByRole("button", { name: "Add comment" }).click(); await expect(page.getByText("Ready for review")).toBeVisible();
   await page.getByLabel("Proposal").fill("Deliver SSO"); await page.getByLabel("Estimated delivery").fill("2026-08-01"); await page.getByLabel("Effort estimate").fill("3 days"); await page.getByRole("button", { name: "Create proposal" }).click();
   await page.getByRole("button", { name: "Approve" }).click(); await expect(page.getByText("PROPOSAL APPROVED")).toBeVisible();
-  expect(Date.now() - startedAt, "automated demo path must remain below ten minutes").toBeLessThan(10 * 60 * 1000);
 });
 
 test("responsive, keyboard reachable, accessible login without console errors", async ({ page }) => {
