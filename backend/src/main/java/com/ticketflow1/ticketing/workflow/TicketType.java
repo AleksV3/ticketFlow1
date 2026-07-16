@@ -81,4 +81,8 @@ public class TicketType extends Auditable {
     public boolean isRequiresProposal() {
         return requiresProposal;
     }
+
+    public void applyWorkflow(Workflow workflow) {
+        this.workflow = workflow;
+    }
 }

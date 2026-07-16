@@ -6,6 +6,7 @@ import com.ticketflow1.ticketing.configaudit.ConfigurationAuditService;
 import com.ticketflow1.ticketing.organization.*;
 import com.ticketflow1.ticketing.rbac.*;
 import com.ticketflow1.ticketing.ticket.Responsibility;
+import com.ticketflow1.ticketing.ticket.TicketRepository;
 import com.ticketflow1.ticketing.workflow.dto.*;
 import java.util.*;
 import java.util.function.Function;
@@ -19,11 +20,12 @@ public class WorkflowAdminService {
     private final WorkflowTransitionRepository transitions; private final TicketTypeRepository types;
     private final OrganizationRepository organizations; private final PermissionRepository permissions;
     private final ConfigurationAuditService audit;
+    private final TicketRepository tickets;
     public WorkflowAdminService(WorkflowRepository workflows, WorkflowStateRepository states,
             WorkflowTransitionRepository transitions, TicketTypeRepository types, OrganizationRepository organizations,
-            PermissionRepository permissions, ConfigurationAuditService audit) {
+            PermissionRepository permissions, ConfigurationAuditService audit, TicketRepository tickets) {
         this.workflows=workflows; this.states=states; this.transitions=transitions; this.types=types;
-        this.organizations=organizations; this.permissions=permissions; this.audit=audit;
+        this.organizations=organizations; this.permissions=permissions; this.audit=audit; this.tickets=tickets;
     }
     @Transactional(readOnly=true) public List<WorkflowResponse> listWorkflows(AuthPrincipal p, Long orgId) {
         Long scope=scope(p,orgId); List<Workflow> list=scope==null?workflows.findByOrganizationIsNull():workflows.findByOrganizationId(scope);
@@ -62,6 +64,14 @@ public class WorkflowAdminService {
     }
     @Transactional(readOnly=true) public List<TicketTypeAdminResponse> listTypes(AuthPrincipal p,Long orgId){Long s=scope(p,orgId);return (s==null?types.findByOrganizationIsNull():types.findByOrganizationId(s)).stream().map(TicketTypeAdminResponse::from).toList();}
     @Transactional public TicketTypeAdminResponse createType(AuthPrincipal p,WorkflowRequests.CreateType r){if(r.requiresProposal())throw ApiException.validation("Custom ticket types cannot require proposals."); Organization org=organization(p,r.organizationId()); Workflow w=visible(p,r.workflowId()); if(w.getOrganization()!=null&&!w.getOrganization().getId().equals(org.getId()))throw ApiException.notFound("Workflow not found: "+r.workflowId()); if(types.findByOrganizationIdAndKey(org.getId(),r.key()).isPresent())throw ApiException.validation("Duplicate ticket type key."); TicketType t=types.saveAndFlush(new TicketType(r.key(),r.name(),w,org,false,false));audit.record(org,p.userId(),"TICKET_TYPE",t.getId(),"CREATED",null,"{\"key\":\""+r.key()+"\"}");return TicketTypeAdminResponse.from(t);}
+    @Transactional public TicketTypeAdminResponse updateType(AuthPrincipal p,Long id,WorkflowRequests.UpdateType r){
+        TicketType type=types.findById(id).orElseThrow(()->ApiException.notFound("Ticket type not found: "+id));
+        if(type.getOrganization()==null||(p.party()==Responsibility.CLIENT&&!type.getOrganization().getId().equals(p.organizationId())))throw ApiException.notFound("Ticket type not found: "+id);
+        Workflow workflow=visible(p,r.workflowId());
+        if(workflow.getOrganization()==null||!workflow.getOrganization().getId().equals(type.getOrganization().getId()))throw ApiException.notFound("Workflow not found: "+r.workflowId());
+        if(tickets.existsByTicketTypeId(id))throw ApiException.conflict("This ticket type already has tickets. Its workflow cannot be changed because their current states belong to the existing workflow.");
+        type.applyWorkflow(workflow); types.flush(); audit.record(type.getOrganization(),p.userId(),"TICKET_TYPE",id,"UPDATED",null,"{\"workflowId\":"+workflow.getId()+"}");return TicketTypeAdminResponse.from(type);
+    }
     private void saveTransitions(Workflow w,Map<String,WorkflowState> map,List<WorkflowRequests.Transition> defs){for(var d:defs){if(d.operationKind()!=null&&d.operationKind()!=TransitionOperationKind.STANDARD)throw ApiException.validation("Custom workflows may use only STANDARD operations."); Permission perm=permissions.findByKey(d.requiredPermission()).orElseThrow(()->ApiException.validation("Unknown permission: "+d.requiredPermission()));transitions.save(new WorkflowTransition(w,map.get(d.fromState()),map.get(d.toState()),perm,d.requiredParty(),d.responsibilityAfter(),TransitionOperationKind.STANDARD));}}
     private void validateGraph(List<WorkflowRequests.State> s,List<WorkflowRequests.Transition> t){if(s==null||s.stream().filter(WorkflowRequests.State::isInitial).count()!=1)throw ApiException.validation("Exactly one initial state is required.");if(s.stream().noneMatch(WorkflowRequests.State::isTerminal))throw ApiException.validation("At least one terminal state is required.");Set<String> keys=s.stream().map(WorkflowRequests.State::key).collect(Collectors.toSet());if(keys.size()!=s.size())throw ApiException.validation("State keys must be unique.");if(t!=null&&t.stream().anyMatch(x->!keys.contains(x.fromState())||!keys.contains(x.toState())))throw ApiException.validation("Transitions must reference defined states.");}
     private Workflow visible(AuthPrincipal p,Long id){Workflow w=workflows.findById(id).orElseThrow(()->ApiException.notFound("Workflow not found: "+id));if(p.party()==Responsibility.CLIENT&&(w.getOrganization()==null||!w.getOrganization().getId().equals(p.organizationId())))throw ApiException.notFound("Workflow not found: "+id);return w;}

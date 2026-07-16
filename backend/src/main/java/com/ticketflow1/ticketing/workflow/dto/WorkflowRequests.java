@@ -13,4 +13,5 @@ public final class WorkflowRequests {
     public record Update(Long version, List<State> states, List<Transition> transitions) {}
     public record CreateType(String key, String name, Long workflowId, Long organizationId,
             boolean requiresProposal) {}
+    public record UpdateType(Long workflowId) {}
 }

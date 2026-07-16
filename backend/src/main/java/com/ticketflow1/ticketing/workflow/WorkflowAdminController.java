@@ -22,4 +22,6 @@ public class WorkflowAdminController {
     List<TicketTypeAdminResponse> types(@AuthenticationPrincipal AuthPrincipal p,@RequestParam(required=false)Long organizationId){return service.listTypes(p,organizationId);}
     @PostMapping("/ticket-types") @ResponseStatus(HttpStatus.CREATED) @PreAuthorize("hasAuthority('TYPE_MANAGE')")
     TicketTypeAdminResponse createType(@AuthenticationPrincipal AuthPrincipal p,@RequestBody WorkflowRequests.CreateType r){return service.createType(p,r);}
+    @PatchMapping("/ticket-types/{id}") @PreAuthorize("hasAuthority('TYPE_MANAGE')")
+    TicketTypeAdminResponse updateType(@AuthenticationPrincipal AuthPrincipal p,@PathVariable Long id,@RequestBody WorkflowRequests.UpdateType r){return service.updateType(p,id,r);}
 }

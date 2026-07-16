@@ -1,9 +1,11 @@
 "use client";
 
-import { FormEvent, useCallback, useEffect, useState } from "react";
+import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import { AppShell } from "@/components/AppShell";
 import { get, patch, post } from "@/lib/api";
 import type { CurrentUser } from "@/lib/auth";
+import { Background, ConnectionLineType, Controls, MarkerType, MiniMap, Position, ReactFlow, useEdgesState, useNodesState, type Connection, type Edge, type Node } from "@xyflow/react";
+import "@xyflow/react/dist/style.css";
 
 type State = { id: number; key: string; isInitial: boolean; isTerminal: boolean; sortOrder: number };
 type Transition = { id: number; fromStateId: number; toStateId: number; requiredPermission: string; requiredParty: string | null; responsibilityAfter: string | null; operationKind: string };
@@ -24,14 +26,8 @@ function Editor({ user }: { user: CurrentUser }) {
   const [workflowName, setWorkflowName] = useState("");
   const [initialKey, setInitialKey] = useState("OPEN");
   const [terminalKey, setTerminalKey] = useState("DONE");
-  const [stateKey, setStateKey] = useState("");
   const [typeKey, setTypeKey] = useState("");
   const [typeName, setTypeName] = useState("");
-  const [fromState, setFromState] = useState("");
-  const [toState, setToState] = useState("");
-  const [requiredParty, setRequiredParty] = useState("");
-  const [responsibilityAfter, setResponsibilityAfter] = useState("");
-  const [draggedStateId, setDraggedStateId] = useState<number | null>(null);
   const [message, setMessage] = useState("");
 
   useEffect(() => {
@@ -75,13 +71,16 @@ function Editor({ user }: { user: CurrentUser }) {
     } catch (error) { setMessage(error instanceof Error ? error.message : "Could not create workflow."); }
   }
 
-  async function addState(event: FormEvent) {
-    event.preventDefault(); if (!selected) return;
+  async function addGraphState(name: string, isTerminal: boolean) {
+    if (!selected) return;
+    const key = normalize(name);
+    if (!key) { setMessage("Enter a state name."); return; }
+    if (selected.states.some(state => state.key === key)) { setMessage("A state with that name already exists."); return; }
     const states = [...selected.states.map(({ key, isInitial, isTerminal, sortOrder }) => ({ key, isInitial, isTerminal, sortOrder })),
-      { key: normalize(stateKey), isInitial: false, isTerminal: false, sortOrder: selected.states.length }];
+      { key, isInitial: false, isTerminal, sortOrder: selected.states.length }];
     try {
       await patch(`/admin/workflows/${selected.id}`, { version: selected.version, states });
-      setStateKey(""); setMessage("State added; existing states and transitions were preserved."); await load();
+      setMessage(`${key.replaceAll("_", " ")} added to the canvas. Drag it where you want, then connect it.`); await load();
     } catch (error) { setMessage(error instanceof Error ? error.message : "Could not update workflow."); }
   }
 
@@ -94,6 +93,12 @@ function Editor({ user }: { user: CurrentUser }) {
     } catch (error) { setMessage(error instanceof Error ? error.message : "Could not create ticket type."); }
   }
 
+  async function applyWorkflowToType(type: TicketType, workflowId: number) {
+    if (type.workflowId === workflowId) return;
+    try { await patch(`/admin/ticket-types/${type.id}`, { workflowId }); setMessage("Ticket type workflow updated."); await load(); }
+    catch (error) { setMessage(error instanceof Error ? error.message : "Could not update ticket type workflow."); }
+  }
+
   const editableTransitions = (workflow: Workflow) => workflow.transitions.filter(edge => edge.operationKind === "STANDARD");
   const transitionRequest = (workflow: Workflow, edges: Transition[]) => edges.map(edge => ({
     fromState: workflow.states.find(state => state.id === edge.fromStateId)?.key,
@@ -104,16 +109,16 @@ function Editor({ user }: { user: CurrentUser }) {
     operationKind: "STANDARD",
   }));
 
-  async function addTransition(event: FormEvent) {
-    event.preventDefault(); if (!selected || !fromState || !toState || fromState === toState) return;
+  async function addGraphTransition(from: string, to: string, party: string | null = null, responsibility: string | null = null) {
+    if (!selected || from === to) return;
     const existing = transitionRequest(selected, editableTransitions(selected));
-    if (selected.transitions.some(edge => selected.states.find(state => state.id === edge.fromStateId)?.key === fromState && selected.states.find(state => state.id === edge.toStateId)?.key === toState)) { setMessage("That connection already exists."); return; }
+    if (selected.transitions.some(edge => selected.states.find(state => state.id === edge.fromStateId)?.key === from && selected.states.find(state => state.id === edge.toStateId)?.key === to)) { setMessage("That connection already exists."); return; }
     try {
       await patch(`/admin/workflows/${selected.id}`, { version: selected.version, transitions: [...existing, {
-        fromState, toState, requiredPermission: "TICKET_TRANSITION",
-        requiredParty: requiredParty || null, responsibilityAfter: responsibilityAfter || null, operationKind: "STANDARD",
+        fromState: from, toState: to, requiredPermission: "TICKET_TRANSITION",
+        requiredParty: party, responsibilityAfter: responsibility, operationKind: "STANDARD",
       }] });
-      setMessage(`Branch added: ${fromState} → ${toState}.`); setFromState(""); setToState(""); await load();
+      setMessage(`Branch added: ${from} → ${to}.`); await load();
     } catch (error) { setMessage(error instanceof Error ? error.message : "Could not add workflow branch."); }
   }
 
@@ -126,52 +131,80 @@ function Editor({ user }: { user: CurrentUser }) {
     } catch (error) { setMessage(error instanceof Error ? error.message : "Could not remove workflow branch."); }
   }
 
-  async function reorderStates(targetId: number) {
-    if (!selected || draggedStateId === null || draggedStateId === targetId) return;
-    const from = selected.states.findIndex(state => state.id === draggedStateId);
-    const to = selected.states.findIndex(state => state.id === targetId);
-    if (from < 0 || to < 0) return;
-    const ordered = [...selected.states];
-    const [moved] = ordered.splice(from, 1); ordered.splice(to, 0, moved);
-    setSelected({ ...selected, states: ordered.map((state, index) => ({ ...state, sortOrder: index })) });
-    setDraggedStateId(null);
-    try {
-      await patch(`/admin/workflows/${selected.id}`, {
-        version: selected.version,
-        states: ordered.map((state, sortOrder) => ({ key: state.key, isInitial: state.isInitial, isTerminal: state.isTerminal, sortOrder })),
-      });
-      setMessage("State order saved."); await load();
-    } catch (error) { setMessage(error instanceof Error ? error.message : "Could not reorder states."); await load(); }
-  }
-
   return <div className="space-y-6">
     <div><p className="eyebrow">Ticket configuration</p><h1 className="mt-1 text-3xl font-bold">Ticket types apply workflows</h1><p className="mt-2 max-w-3xl text-slate-600">A <strong>ticket type</strong> defines what kind of ticket is created. Each ticket type applies exactly one <strong>workflow</strong>: a branching map of states and allowed choices. Admins can add states and connect one state to multiple next states.</p></div>
     {user.party === "TICKETFLOW1" ? <label className="card block">Organization<select className="field mt-1" value={organizationId} onChange={event => setOrganizationId(event.target.value)}><option value="">Select an organization…</option>{organizations.map(org => <option key={org.id} value={org.id}>{org.name}</option>)}</select></label> : null}
-    {!organizationId ? <p className="card">Select an organization before creating or editing configuration.</p> : <div className="grid gap-6 lg:grid-cols-3">
-      <section className="card"><h2 className="font-bold">1. Choose a workflow map</h2>{workflows.map(workflow => <button className="mt-2 block w-full rounded border p-3 text-left hover:bg-slate-50" key={workflow.id} onClick={() => setSelected(workflow)}><strong>{workflow.name}</strong><span className="mt-1 block text-xs text-slate-500">Applied by: {types.filter(type => type.workflowId === workflow.id).map(type => type.name).join(", ") || "No ticket type"}</span><span className="mt-1 block text-xs text-blue-400">{workflow.states.length} states · {workflow.transitions.length} choices</span></button>)}<h2 className="mt-6 font-bold">2. Ticket type → workflow</h2>{types.map(type => <button type="button" className="mt-2 block w-full rounded border p-3 text-left hover:bg-slate-50" key={type.id} onClick={() => setSelected(workflows.find(workflow => workflow.id === type.workflowId) ?? null)}><strong>{type.name}</strong> <span className="text-xs text-slate-500">({type.key})</span><span className="mt-1 block text-sm"><span className="text-blue-400">applies →</span> {workflows.find(workflow => workflow.id === type.workflowId)?.name ?? "Unavailable"}</span></button>)}</section>
-      <section className="space-y-6 lg:col-span-2">
-        <form className="card grid gap-3 sm:grid-cols-2" onSubmit={createWorkflow}><h2 className="font-bold sm:col-span-2">Create custom workflow</h2><label className="sm:col-span-2">Name<input className="field mt-1" required value={workflowName} onChange={event => setWorkflowName(event.target.value)} /></label><label>Initial state<input className="field mt-1" required value={initialKey} onChange={event => setInitialKey(event.target.value)} /></label><label>Terminal state<input className="field mt-1" required value={terminalKey} onChange={event => setTerminalKey(event.target.value)} /></label><button className="btn-primary sm:col-span-2">Create workflow</button></form>
-        {selected ? <WorkflowMap workflow={selected} types={types.filter(type => type.workflowId === selected.id)} removeTransition={removeTransition} /> : <div className="card">Select a workflow to view its branching map.</div>}
-        <form className="card grid gap-3 sm:grid-cols-2" onSubmit={addTransition}><div className="sm:col-span-2"><h2 className="font-bold">Add another choice / branch</h2><p className="text-sm text-slate-500">Multiple connections may leave the same state, such as Approve, Decline, or Request changes.</p></div><SelectState label="From state" value={fromState} set={setFromState} states={selected?.states ?? []}/><SelectState label="To state" value={toState} set={setToState} states={selected?.states ?? []}/><label>Who can choose it?<select className="field mt-1" value={requiredParty} onChange={event => setRequiredParty(event.target.value)}><option value="">Any permitted party</option><option value="CLIENT">Client</option><option value="TICKETFLOW1">TicketFlow1</option></select></label><label>Responsibility after<select className="field mt-1" value={responsibilityAfter} onChange={event => setResponsibilityAfter(event.target.value)}><option value="">No change</option><option value="CLIENT">Client</option><option value="TICKETFLOW1">TicketFlow1</option></select></label><button disabled={!selected || !fromState || !toState} className="btn-primary sm:col-span-2">Add branch</button></form>
-        <form className="card space-y-3" onSubmit={addState}><h2 className="font-bold">Add a state</h2><label className="block">State key<input required disabled={!selected} className="field mt-1" value={stateKey} onChange={event => setStateKey(event.target.value)} /></label><button disabled={!selected} className="btn-primary">Add state safely</button></form>
+    {!organizationId ? <p className="card">Select an organization before creating or editing configuration.</p> : <div className="space-y-6">
+      <section className="card grid gap-5 lg:grid-cols-2"><div><h2 className="font-bold">1. Choose a workflow map</h2><div className="mt-2 grid gap-2 sm:grid-cols-3">{workflows.map(workflow => <button className="block w-full rounded border p-3 text-left hover:bg-slate-50" key={workflow.id} onClick={() => setSelected(workflow)}><strong>{workflow.name}</strong><span className="mt-1 block text-xs text-slate-500">Applied by: {types.filter(type => type.workflowId === workflow.id).map(type => type.name).join(", ") || "No ticket type"}</span><span className="mt-1 block text-xs text-blue-400">{workflow.states.length} states · {workflow.transitions.length} choices</span></button>)}</div></div><div><h2 className="font-bold">2. Select workflow for each ticket type</h2><div className="mt-2 grid gap-2 sm:grid-cols-3">{types.map(type => <label className="block rounded border p-3" key={type.id}><strong>{type.name}</strong><span className="block text-xs text-slate-500">{type.key}</span><select aria-label={`Workflow for ${type.name}`} className="field mt-2" value={type.workflowId} onChange={event => void applyWorkflowToType(type, Number(event.target.value))}>{workflows.map(workflow => <option value={workflow.id} key={workflow.id}>{workflow.name}</option>)}</select></label>)}</div><p className="mt-2 text-xs text-slate-500">For safety, a ticket type can only switch workflows before its first ticket is created.</p></div></section>
+      <section className="space-y-6">
+        {selected ? <WorkflowMap workflow={selected} types={types.filter(type => type.workflowId === selected.id)} addState={addGraphState} addTransition={addGraphTransition} removeTransition={removeTransition} /> : <div className="card">Select a workflow to view its branching map.</div>}
         <form className="card space-y-3" onSubmit={addType}><h2 className="font-bold">Create ticket type for selected workflow</h2><label className="block">Key<input required disabled={!selected} className="field mt-1" value={typeKey} onChange={event => setTypeKey(event.target.value)} /></label><label className="block">Display name<input required disabled={!selected} className="field mt-1" value={typeName} onChange={event => setTypeName(event.target.value)} /></label><button disabled={!selected} className="btn-primary">Create ticket type</button></form>
+        <form className="card grid gap-3 sm:grid-cols-2" onSubmit={createWorkflow}><div className="sm:col-span-2"><p className="eyebrow">New map</p><h2 className="font-bold">Create custom workflow</h2><p className="text-sm text-slate-500">Start with two states, then arrange and connect everything directly in the canvas.</p></div><label className="sm:col-span-2">Workflow name<input className="field mt-1" required value={workflowName} onChange={event => setWorkflowName(event.target.value)} /></label><label>Starting state<input className="field mt-1" required value={initialKey} onChange={event => setInitialKey(event.target.value)} /></label><label>Ending state<input className="field mt-1" required value={terminalKey} onChange={event => setTerminalKey(event.target.value)} /></label><button className="btn-primary sm:col-span-2">Create workflow</button></form>
       </section>
     </div>}
     {message ? <p className="card" role="status">{message}</p> : null}
   </div>;
 }
 
-function WorkflowMap({ workflow, types, removeTransition }: { workflow: Workflow; types: TicketType[]; removeTransition: (edge: Transition) => Promise<void> }) {
-  const layout = graphLayout(workflow);
+function WorkflowMap({ workflow, types, addState, addTransition, removeTransition }: { workflow: Workflow; types: TicketType[]; addState: (name: string, isTerminal: boolean) => Promise<void>; addTransition: (from: string, to: string, party?: string | null, responsibility?: string | null) => Promise<void>; removeTransition: (edge: Transition) => Promise<void> }) {
+  const [addingState, setAddingState] = useState(false);
+  const [newStateName, setNewStateName] = useState("");
+  const [newStateTerminal, setNewStateTerminal] = useState(false);
+  const [savingState, setSavingState] = useState(false);
+  const [pendingConnection, setPendingConnection] = useState<{ from: string; to: string } | null>(null);
+  const [connectionParty, setConnectionParty] = useState("");
+  const [connectionResponsibility, setConnectionResponsibility] = useState("");
+  const initial = useMemo(() => flowElements(workflow), [workflow]);
+  const [nodes, setNodes, onNodesChange] = useNodesState(initial.nodes);
+  const [edges, setEdges, onEdgesChange] = useEdgesState(initial.edges);
+  useEffect(() => { setNodes(initial.nodes); setEdges(initial.edges); }, [initial, setEdges, setNodes]);
+  const connect = useCallback((connection: Connection) => {
+    const from = workflow.states.find(state => String(state.id) === connection.source)?.key;
+    const to = workflow.states.find(state => String(state.id) === connection.target)?.key;
+    if (!from || !to || from === to) return;
+    setPendingConnection({ from, to });
+    setEdges(current => [...current.filter(edge => edge.id !== "draft-connection"), {
+      id: "draft-connection", source: connection.source!, target: connection.target!,
+      label: "Configure…", animated: true, deletable: false,
+      markerEnd: { type: MarkerType.ArrowClosed }, className: "flow-edge-draft",
+    }]);
+  }, [setEdges, workflow.states]);
+  const deleteEdges = useCallback(async (removed: Edge[]) => {
+    for (const edge of removed) {
+      const transition = workflow.transitions.find(item => String(item.id) === edge.id);
+      if (transition?.operationKind === "STANDARD") await removeTransition(transition);
+    }
+  }, [removeTransition, workflow.transitions]);
+  const rememberPosition = useCallback((_: unknown, node: Node) => {
+    const saved = JSON.parse(localStorage.getItem(`workflow-layout-${workflow.id}`) ?? "{}") as Record<string, { x: number; y: number }>;
+    saved[node.id] = node.position; localStorage.setItem(`workflow-layout-${workflow.id}`, JSON.stringify(saved));
+  }, [workflow.id]);
+  async function submitState(event: FormEvent) {
+    event.preventDefault(); if (!newStateName.trim()) return;
+    setSavingState(true);
+    try { await addState(newStateName, newStateTerminal); setNewStateName(""); setNewStateTerminal(false); setAddingState(false); }
+    finally { setSavingState(false); }
+  }
+  async function saveConnection(event: FormEvent) {
+    event.preventDefault(); if (!pendingConnection) return;
+    await addTransition(pendingConnection.from, pendingConnection.to, connectionParty || null, connectionResponsibility || null);
+    setPendingConnection(null); setConnectionParty(""); setConnectionResponsibility("");
+  }
+  function cancelConnection() { setPendingConnection(null); setEdges(current => current.filter(edge => edge.id !== "draft-connection")); }
   return <section className="card overflow-hidden">
-    <div className="flex flex-wrap items-start justify-between gap-3"><div><p className="eyebrow">Branching workflow map</p><h2 className="mt-1 text-xl font-bold">{workflow.name}</h2><p className="mt-1 text-sm text-slate-500">Applied to ticket type{types.length === 1 ? "" : "s"}: <strong className="text-slate-700">{types.map(type => type.name).join(", ") || "None yet"}</strong></p></div><span className="badge bg-blue-900 text-blue-100">{workflow.transitions.length} allowed choices</span></div>
-    <div className="workflow-canvas-scroll mt-6"><div className="workflow-canvas" style={{ width: layout.width, height: layout.height }}>
-      <svg className="workflow-connectors" width={layout.width} height={layout.height} aria-hidden="true"><defs><marker id={`arrow-${workflow.id}`} viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 z" /></marker></defs>{workflow.transitions.map(edge => { const from = layout.positions.get(edge.fromStateId), to = layout.positions.get(edge.toStateId); if (!from || !to) return null; const x1 = from.x + 190, y1 = from.y + 38, x2 = to.x, y2 = to.y + 38, bend = Math.max(45, Math.abs(x2 - x1) / 2); return <path key={edge.id} className={edge.operationKind === "STANDARD" ? "workflow-edge" : "workflow-edge workflow-edge-protected"} markerEnd={`url(#arrow-${workflow.id})`} d={`M ${x1} ${y1} C ${x1 + bend} ${y1}, ${x2 - bend} ${y2}, ${x2} ${y2}`} />; })}</svg>
-      {workflow.states.map(state => { const position = layout.positions.get(state.id)!; return <article className={`workflow-node ${state.isInitial ? "workflow-node-start" : ""} ${state.isTerminal ? "workflow-node-end" : ""}`} style={{ left: position.x, top: position.y }} key={state.id}><span className="workflow-node-kind">{state.isInitial ? "START" : state.isTerminal ? "END" : "STATE"}</span><strong>{state.key.replaceAll("_", " ")}</strong><span className="workflow-node-count">{workflow.transitions.filter(edge => edge.fromStateId === state.id).length} outgoing choice(s)</span></article>; })}
-      {workflow.transitions.map(edge => { const from = layout.positions.get(edge.fromStateId), to = layout.positions.get(edge.toStateId); if (!from || !to) return null; return <div className="workflow-edge-label" style={{ left: (from.x + to.x) / 2 + 82, top: (from.y + to.y) / 2 + 44 }} key={`label-${edge.id}`}><span>{edge.operationKind === "STANDARD" ? edge.requiredParty ? edge.requiredParty : "Choice" : edge.operationKind.replace("PROPOSAL_", "")}</span>{edge.operationKind === "STANDARD" ? <button type="button" title="Remove connection" aria-label="Remove connection" onClick={() => void removeTransition(edge)}>×</button> : <span title="Protected business decision">◆</span>}</div>; })}
-    </div></div>
-    <p className="mt-4 text-xs text-slate-500">Each arrow is an allowed user choice. More than one arrow from a state creates a branch. Protected proposal decisions remain available even when admins edit ordinary branches.</p>
+    <div className="flex flex-wrap items-start justify-between gap-3"><div><p className="eyebrow">Interactive workflow canvas</p><h2 className="mt-1 text-xl font-bold">{workflow.name}</h2><p className="mt-1 text-sm text-slate-500">Applied to: <strong className="text-slate-700">{types.map(type => type.name).join(", ") || "No ticket type"}</strong></p></div><div className="flex items-center gap-2"><span className="badge bg-blue-900 text-blue-100">Drag nodes · connect handles</span><button type="button" className="btn-primary" onClick={() => setAddingState(value => !value)}>+ Add state</button></div></div>
+    {addingState ? <form className="graph-add-state mt-4" onSubmit={event => void submitState(event)}><label className="flex-1"><span className="sr-only">State name</span><input autoFocus required className="field" placeholder="State name, e.g. REQUEST CHANGES" value={newStateName} onChange={event => setNewStateName(event.target.value)} /></label><label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={newStateTerminal} onChange={event => setNewStateTerminal(event.target.checked)} /> End state</label><button className="btn-primary" disabled={savingState}>{savingState ? "Adding…" : "Add to canvas"}</button><button type="button" className="btn-secondary" onClick={() => setAddingState(false)}>Cancel</button></form> : null}
+    {pendingConnection ? <form className="graph-connection-editor mt-4" onSubmit={event => void saveConnection(event)}><div className="min-w-48"><span className="eyebrow">New connection</span><strong className="block">{pendingConnection.from.replaceAll("_", " ")} → {pendingConnection.to.replaceAll("_", " ")}</strong></div><label className="flex-1">Who can choose?<select className="field mt-1" value={connectionParty} onChange={event => setConnectionParty(event.target.value)}><option value="">Any permitted party</option><option value="CLIENT">Client</option><option value="TICKETFLOW1">TicketFlow1</option></select></label><label className="flex-1">Responsibility after<select className="field mt-1" value={connectionResponsibility} onChange={event => setConnectionResponsibility(event.target.value)}><option value="">No change</option><option value="CLIENT">Client</option><option value="TICKETFLOW1">TicketFlow1</option></select></label><button className="btn-primary">Save connection</button><button type="button" className="btn-secondary" onClick={cancelConnection}>Cancel</button></form> : null}
+    <div className="react-flow-shell mt-5"><ReactFlow nodes={nodes} edges={edges} onNodesChange={onNodesChange} onEdgesChange={onEdgesChange} onConnect={connect} connectionLineType={ConnectionLineType.SmoothStep} connectionLineStyle={{ stroke: "rgb(250 204 21)", strokeWidth: 4 }} connectOnClick onEdgesDelete={removed => void deleteEdges(removed)} onNodeDragStop={rememberPosition} fitView fitViewOptions={{ padding: 0.12 }} defaultEdgeOptions={{ type: "smoothstep" }} deleteKeyCode={["Backspace", "Delete"]} minZoom={0.2} maxZoom={2} colorMode="dark"><MiniMap pannable zoomable /><Controls /><Background gap={20} size={1} /></ReactFlow></div>
+    <p className="mt-4 text-xs text-slate-500">Add a state here, drag it into place, then connect its handles. Select a solid connection and press Delete to remove it. Dashed proposal decisions are protected.</p>
   </section>;
+}
+
+function flowElements(workflow: Workflow): { nodes: Node[]; edges: Edge[] } {
+  const layout = graphLayout(workflow), saved = typeof window === "undefined" ? {} : JSON.parse(localStorage.getItem(`workflow-layout-${workflow.id}`) ?? "{}") as Record<string, { x: number; y: number }>;
+  const nodes: Node[] = workflow.states.map(state => ({ id: String(state.id), position: saved[String(state.id)] ?? layout.positions.get(state.id)!, sourcePosition: Position.Right, targetPosition: Position.Left, data: { label: `${state.isInitial ? "▶ " : state.isTerminal ? "■ " : ""}${state.key.replaceAll("_", " ")}` }, className: `flow-state ${state.isInitial ? "flow-state-start" : ""} ${state.isTerminal ? "flow-state-end" : ""}` }));
+  const edges: Edge[] = workflow.transitions.map(edge => ({ id: String(edge.id), source: String(edge.fromStateId), target: String(edge.toStateId), type: "smoothstep", label: edge.operationKind === "STANDARD" ? edge.requiredParty ?? "Choice" : edge.operationKind.replace("PROPOSAL_", ""), deletable: edge.operationKind === "STANDARD", animated: edge.operationKind !== "STANDARD", markerEnd: { type: MarkerType.ArrowClosed }, className: edge.operationKind === "STANDARD" ? "flow-edge" : "flow-edge-protected" }));
+  return { nodes, edges };
 }
 
 function graphLayout(workflow: Workflow) {
@@ -195,11 +228,7 @@ function graphLayout(workflow: Workflow) {
   const positions = new Map<number, { x: number; y: number }>();
   let tallest = 1;
   columns.forEach((states, level) => { tallest = Math.max(tallest, states.length); states.sort((a, b) => a.sortOrder - b.sortOrder).forEach((state, row) => positions.set(state.id, { x: 40 + level * 270, y: 40 + row * 130 })); });
-  return { positions, width: Math.max(760, 80 + (maxLevel + 1) * 270), height: Math.max(260, 90 + tallest * 130) };
-}
-
-function SelectState({ label, value, set, states }: { label: string; value: string; set: (value: string) => void; states: State[] }) {
-  return <label>{label}<select required className="field mt-1" value={value} onChange={event => set(event.target.value)}><option value="">Select a state…</option>{states.map(state => <option value={state.key} key={state.id}>{state.key.replaceAll("_", " ")}</option>)}</select></label>;
+  return { positions };
 }
 
 function normalize(value: string) { return value.trim().toUpperCase().replaceAll(/\s+/g, "_"); }
