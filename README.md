@@ -138,4 +138,5 @@ described in `docs/release-verification.md`.
 - [`specs/001-ticketing-mvp/tasks.md`](specs/001-ticketing-mvp/tasks.md) — task source of truth
 - [`specs/001-ticketing-mvp/quickstart.md`](specs/001-ticketing-mvp/quickstart.md) — validation flows
 - [`docs/database-er.md`](docs/database-er.md) — database model
+- [`docs/operations-and-limitations.md`](docs/operations-and-limitations.md) — backup, restore, and MVP limits
 - [`docs/02-product-requirements-and-build-brief.md`](docs/02-product-requirements-and-build-brief.md) — product brief

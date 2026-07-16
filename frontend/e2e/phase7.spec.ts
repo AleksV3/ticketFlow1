@@ -14,6 +14,7 @@ async function mockApi(page: Page) {
     if (path === "/users/me" && !authenticated) return route.fulfill({ status: 200, contentType: "application/json", body: "null" });
     if (path === "/users/me") body = user;
     else if (path === "/auth/login") { authenticated = true; body = { expiresAt: now(), user }; }
+    else if (path === "/dashboard") body = { activeCount: 1, closedCount: 0, defectsBySeverity: {}, slaBreached: [], slaDueSoon: [], waitingForClientApproval: [], waitingForClientConfirmation: [], myAssignedTickets: [] };
     else if (path === "/reference/ticket-types") body = [{ id: 1, key: "CHANGE_REQUEST", name: "Change request" }];
     else if (path === "/tickets" && route.request().method() === "POST") body = current;
     else if (path === "/tickets/TF-101" && route.request().method() === "GET") body = current;
@@ -28,6 +29,7 @@ async function mockApi(page: Page) {
 }
 
 test("login, create, transition, comment, and approve a proposal", async ({ page }) => {
+  const startedAt = Date.now();
   await mockApi(page); await page.goto("/login");
   await page.getByLabel("Email").fill("manager@example.test"); await page.getByLabel("Password").fill("secret1"); await page.getByRole("button", { name: "Sign in" }).click();
   await expect(page).toHaveURL(/dashboard/); await page.goto("/tickets/new");
@@ -36,6 +38,7 @@ test("login, create, transition, comment, and approve a proposal", async ({ page
   await page.getByLabel("Message").fill("Ready for review"); await page.getByRole("button", { name: "Add comment" }).click(); await expect(page.getByText("Ready for review")).toBeVisible();
   await page.getByLabel("Proposal").fill("Deliver SSO"); await page.getByLabel("Estimated delivery").fill("2026-08-01"); await page.getByLabel("Effort estimate").fill("3 days"); await page.getByRole("button", { name: "Create proposal" }).click();
   await page.getByRole("button", { name: "Approve" }).click(); await expect(page.getByText("PROPOSAL APPROVED")).toBeVisible();
+  expect(Date.now() - startedAt, "automated demo path must remain below ten minutes").toBeLessThan(10 * 60 * 1000);
 });
 
 test("responsive, keyboard reachable, accessible login without console errors", async ({ page }) => {

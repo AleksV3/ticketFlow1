@@ -37,3 +37,31 @@ zero users and no V8 row; clean demo migration reached V8 with 2 organizations,
 backend tests (including 12 Testcontainers integration cases), the zero-finding
 frontend production audit, 11 frontend tests, type checking, and the Next.js
 production build passed.
+
+## T100 two-organization isolation matrix
+
+The Docker-backed `TicketControllerIntegrationTest` uses Client A and Client B
+principals and passed all 12 cases on 2026-07-16.
+
+| Surface | Verification |
+|---|---|
+| Ticket list/detail | Org A cannot list or directly read Org B tickets; direct access returns 404 |
+| Comments and attachments | Cross-org create/read returns 404; internal comments are privacy filtered |
+| Proposals | Org B approver cannot decide Org A proposal and receives 404 |
+| Dashboard and SLA | Counts, cards, queues, and filters exclude the other organization |
+| Admin configuration | Cross-organization client workflow creation returns 404 |
+| Configuration audit | Queries are organization filtered and writes cannot cross scope |
+| Ticket audit/history | The parent ticket tenant check protects both feeds |
+
+TicketFlow1-party accounts are intentionally cross-organization per FR-020.
+
+## T101 timed demo rehearsal
+
+The browser smoke rehearsal is timed in `frontend/e2e/phase7.spec.ts` and fails
+if login → create → transition → comment → proposal approval exceeds ten
+minutes. The complete presenter checklist is in `docs/demo-script.md`.
+
+Recorded 2026-07-16: the timed functional path took 3.8 seconds and the complete
+two-test browser project took 9.7 seconds. The 13 presenter steps were checked
+against the same seeded states and leave more than nine minutes for dashboard,
+SLA, history, and narration. No console or accessibility errors occurred.
