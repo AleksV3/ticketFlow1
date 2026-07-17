@@ -51,10 +51,7 @@ services:
       - key: NEXT_PUBLIC_API_BASE_URL
         value: /api
       - key: BACKEND_HOST
-        fromService:
-          type: web
-          name: ticketflow1-api
-          property: host
+        value: ticketflow1-api.onrender.com
 
 databases:
   - name: ticketflow1-db
