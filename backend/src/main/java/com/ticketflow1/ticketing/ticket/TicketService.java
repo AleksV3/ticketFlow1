@@ -35,6 +35,14 @@ import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+/**
+ * Owns ticket creation, update, listing, and visibility rules.
+ *
+ * This service is the main ticket domain coordinator. It resolves the current
+ * actor, enforces tenancy and permission checks, applies SLA deadlines,
+ * validates workflow-specific constraints, and returns enriched ticket detail
+ * views that include allowed transitions and proposal/SLA state.
+ */
 @Service
 public class TicketService {
 
@@ -84,6 +92,10 @@ public class TicketService {
         this.clock = clock;
     }
 
+    /**
+     * Creates a ticket, assigns its initial workflow state, and persists the
+     * first audit and status-history entries.
+     */
     @Transactional
     public TicketDetailResponse createTicket(CreateTicketRequest request, AuthPrincipal principal) {
         AppUser actor = appUserRepository.findById(principal.userId())
@@ -139,12 +151,18 @@ public class TicketService {
         return detail(saved, principal);
     }
 
+    /**
+     * Loads a ticket in the current user's scope and returns the full detail view.
+     */
     @Transactional(readOnly = true)
     public TicketDetailResponse getTicket(String ticketKey, AuthPrincipal principal) {
         Ticket ticket = findVisibleTicket(ticketKey, principal);
         return detail(ticket, principal);
     }
 
+    /**
+     * Applies editable ticket changes while enforcing field-specific rules.
+     */
     @Transactional
     public TicketDetailResponse updateTicket(String ticketKey, UpdateTicketRequest request, AuthPrincipal principal) {
         Ticket ticket = findVisibleTicket(ticketKey, principal);
@@ -285,8 +303,11 @@ public class TicketService {
         return user;
     }
 
+    /**
+     * Lists tickets using the active tenant scope and optional search filters.
+     */
     @Transactional(readOnly = true)
-    public PagedResponse<TicketSummaryResponse> listTickets(String type, String status, Severity severity,
+    public PagedResponse<TicketSummaryResponse> listTickets(String type, String status, String lifecycle, Severity severity,
             Priority priority, String assignedTo, Responsibility responsibility, String slaStatus,
             Long organizationId, String q, int page, int pageSize, AuthPrincipal principal) {
         SlaStatus requestedSlaStatus = parseSlaStatus(slaStatus);
@@ -308,6 +329,13 @@ public class TicketService {
         }
         if (status != null && !status.isBlank()) {
             spec = spec.and((root, query, cb) -> cb.equal(root.get("currentState").get("key"), status));
+        }
+        if (lifecycle != null && !lifecycle.isBlank()) {
+            if (!"active".equalsIgnoreCase(lifecycle) && !"closed".equalsIgnoreCase(lifecycle)) {
+                throw ApiException.validation("lifecycle must be 'active' or 'closed'.");
+            }
+            boolean terminal = "closed".equalsIgnoreCase(lifecycle);
+            spec = spec.and((root, query, cb) -> cb.equal(root.get("currentState").get("terminal"), terminal));
         }
         if (severity != null) {
             spec = spec.and((root, query, cb) -> cb.equal(root.get("severity"), severity));
@@ -342,6 +370,9 @@ public class TicketService {
                 ticket -> TicketSummaryResponse.from(ticket, slaStatusService.status(ticket)));
     }
 
+    /**
+     * Resolves a ticket by key while honoring organization visibility.
+     */
     @Transactional(readOnly = true)
     public Ticket findVisibleTicket(String ticketKey, AuthPrincipal principal) {
         if (principal.party() == Responsibility.CLIENT) {

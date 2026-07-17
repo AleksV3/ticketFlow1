@@ -24,6 +24,12 @@ import org.springframework.web.bind.annotation.RestController;
 
 @RestController
 @RequestMapping("/api/tickets")
+/**
+ * Main ticket API.
+ *
+ * The controller keeps HTTP concerns thin and delegates listing, ticket
+ * lifecycle changes, and workflow transitions to the domain services.
+ */
 public class TicketController {
 
     private final TicketService ticketService;
@@ -34,11 +40,15 @@ public class TicketController {
         this.ticketTransitionService = ticketTransitionService;
     }
 
+    /**
+     * Lists tickets with optional filters and tenant scoping.
+     */
     @GetMapping
     @PreAuthorize("hasAuthority('TICKET_READ')")
     public PagedResponse<TicketSummaryResponse> list(
             @RequestParam(required = false) String type,
             @RequestParam(required = false) String status,
+            @RequestParam(required = false) String lifecycle,
             @RequestParam(required = false) Severity severity,
             @RequestParam(required = false) Priority priority,
             @RequestParam(required = false) String assignedTo,
@@ -49,10 +59,13 @@ public class TicketController {
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int pageSize,
             @AuthenticationPrincipal AuthPrincipal principal) {
-        return ticketService.listTickets(type, status, severity, priority, assignedTo, responsibility,
+        return ticketService.listTickets(type, status, lifecycle, severity, priority, assignedTo, responsibility,
                 slaStatus, organizationId, q, page, pageSize, principal);
     }
 
+    /**
+     * Creates a new ticket in the caller's allowed scope.
+     */
     @PostMapping
     @PreAuthorize("hasAuthority('TICKET_CREATE')")
     @ResponseStatus(HttpStatus.CREATED)
@@ -61,6 +74,9 @@ public class TicketController {
         return ticketService.createTicket(request, principal);
     }
 
+    /**
+     * Returns the detailed view for one ticket.
+     */
     @GetMapping("/{ticketKey}")
     @PreAuthorize("hasAuthority('TICKET_READ')")
     public TicketDetailResponse getByTicketKey(@PathVariable String ticketKey,
@@ -68,6 +84,9 @@ public class TicketController {
         return ticketService.getTicket(ticketKey, principal);
     }
 
+    /**
+     * Updates editable ticket fields or assignment data.
+     */
     @PatchMapping("/{ticketKey}")
     @PreAuthorize("hasAnyAuthority('TICKET_UPDATE', 'TICKET_ASSIGN')")
     public TicketDetailResponse update(@PathVariable String ticketKey,
@@ -76,6 +95,9 @@ public class TicketController {
         return ticketService.updateTicket(ticketKey, request, principal);
     }
 
+    /**
+     * Moves the ticket along its configured workflow.
+     */
     @PostMapping("/{ticketKey}/transition")
     @PreAuthorize("hasAuthority('TICKET_TRANSITION')")
     public TicketDetailResponse transition(@PathVariable String ticketKey,
