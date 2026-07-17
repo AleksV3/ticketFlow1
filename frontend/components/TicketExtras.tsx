@@ -3,6 +3,13 @@
 import { ChangeEvent, FormEvent, useCallback, useEffect, useRef, useState } from "react";
 import { api, get, post } from "@/lib/api";
 
+/**
+ * Shared ticket detail widgets for activity, attachments, history, and change
+ * proposals.
+ *
+ * The page composes these pieces so comments, files, history, and proposal
+ * decisions all use the same loading and refresh logic.
+ */
 type Person = { id: number; displayName: string };
 type Comment = { id: number; author: Person; body: string; visibility: "PUBLIC" | "INTERNAL"; createdAt: string };
 type Attachment = { id: number; uploadedBy: Person; fileName: string; contentType: string; sizeBytes: number; createdAt: string; contentAvailable: boolean };

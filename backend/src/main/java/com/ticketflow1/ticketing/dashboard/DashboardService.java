@@ -22,6 +22,13 @@ import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+/**
+ * Builds the dashboard aggregates used by the landing page.
+ *
+ * It scopes tickets to the current tenant, computes summary counts, and
+ * prepares the spotlight cards for SLA breaches, due-soon items, proposals,
+ * confirmations, and ticket assignments.
+ */
 @Service
 public class DashboardService {
 
@@ -39,6 +46,9 @@ public class DashboardService {
         this.clock = clock;
     }
 
+    /**
+     * Returns the dashboard snapshot for the current user.
+     */
     @Transactional(readOnly = true)
     public DashboardResponse get(AuthPrincipal principal) {
         Specification<Ticket> scope = tenantScope(principal);
@@ -64,6 +74,9 @@ public class DashboardService {
                                 && ticket.getTicketLead().getId().equals(principal.userId()), newestFirst));
     }
 
+    /**
+     * Builds a dashboard card for tickets matching a specific SLA status.
+     */
     private List<TicketSummaryResponse> slaCard(Specification<Ticket> scope, SlaStatus status) {
         var page = ticketRepository.findAll(scope.and(
                 SlaSpecifications.hasStatus(status, clock.instant(), slaCalculator)),
@@ -71,6 +84,9 @@ public class DashboardService {
         return page.stream().map(this::summary).toList();
     }
 
+    /**
+     * Builds a sorted, limited dashboard card from an in-memory ticket list.
+     */
     private List<TicketSummaryResponse> card(List<Ticket> tickets,
             java.util.function.Predicate<Ticket> predicate, Comparator<Ticket> order) {
         return tickets.stream().filter(predicate).sorted(order).limit(CARD_LIMIT).map(this::summary).toList();
@@ -80,6 +96,9 @@ public class DashboardService {
         return TicketSummaryResponse.from(ticket, slaStatusService.status(ticket));
     }
 
+    /**
+     * Restricts dashboard data to the current organization for client users.
+     */
     private Specification<Ticket> tenantScope(AuthPrincipal principal) {
         if (principal.party() == Responsibility.CLIENT) {
             return (root, query, cb) -> cb.equal(root.get("organization").get("id"), principal.organizationId());

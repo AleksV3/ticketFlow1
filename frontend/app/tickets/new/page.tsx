@@ -1,5 +1,11 @@
 "use client";
 
+/**
+ * New ticket page.
+ *
+ * It loads the available ticket types, organizations, and assignment targets
+ * before sending a create request to the backend.
+ */
 import { FormEvent, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { AppShell } from "@/components/AppShell";

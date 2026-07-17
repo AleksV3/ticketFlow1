@@ -17,6 +17,13 @@ import java.time.Clock;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+/**
+ * Handles ticket comments and their SLA side effects.
+ *
+ * Public comments are visible to both parties, internal comments are guarded
+ * by role-specific permissions, and public TicketFlow1 comments can update the
+ * defect SLA timestamps when they provide the first info response.
+ */
 @Service
 public class CommentService {
 
@@ -41,6 +48,9 @@ public class CommentService {
         this.clock = clock;
     }
 
+    /**
+     * Returns comments visible to the current actor.
+     */
     @Transactional(readOnly = true)
     public List<CommentResponse> list(String ticketKey, AuthPrincipal principal) {
         Ticket ticket = findVisibleTicket(ticketKey, principal);
@@ -51,6 +61,9 @@ public class CommentService {
         return comments.stream().map(CommentResponse::from).toList();
     }
 
+    /**
+     * Creates a comment on a visible ticket.
+     */
     @Transactional
     public CommentResponse create(String ticketKey, CreateCommentRequest request, AuthPrincipal principal) {
         Ticket ticket = findVisibleTicket(ticketKey, principal);
@@ -61,7 +74,9 @@ public class CommentService {
         return createForTicket(ticket, request.body(), request.visibility(), principal);
     }
 
-    /** Used by owning domain operations that already resolved and locked the ticket. */
+    /**
+     * Creates a comment for an already resolved ticket instance.
+     */
     @Transactional
     public CommentResponse createForTicket(Ticket ticket, String body, CommentVisibility visibility,
             AuthPrincipal principal) {

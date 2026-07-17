@@ -22,6 +22,12 @@ import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.core.io.Resource;
 
+/**
+ * Attachment API for a single ticket.
+ *
+ * The controller only handles HTTP wiring; storage, validation, and cleanup
+ * are implemented in {@link AttachmentService}.
+ */
 @RestController
 @RequestMapping("/api/tickets/{ticketKey}/attachments")
 public class AttachmentController {
@@ -29,6 +35,9 @@ public class AttachmentController {
 
     public AttachmentController(AttachmentService attachmentService) { this.attachmentService = attachmentService; }
 
+    /**
+     * Lists attachment metadata for the ticket.
+     */
     @GetMapping
     @PreAuthorize("hasAuthority('TICKET_READ')")
     public List<AttachmentResponse> list(@PathVariable String ticketKey,
@@ -36,6 +45,9 @@ public class AttachmentController {
         return attachmentService.list(ticketKey, principal);
     }
 
+    /**
+     * Creates a metadata-only attachment entry.
+     */
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
     @PreAuthorize("hasAuthority('TICKET_UPDATE')")
@@ -45,6 +57,9 @@ public class AttachmentController {
         return attachmentService.create(ticketKey, request, principal);
     }
 
+    /**
+     * Uploads a file and stores the bytes on disk.
+     */
     @PostMapping(value = "/upload", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     @ResponseStatus(HttpStatus.CREATED)
     @PreAuthorize("hasAuthority('TICKET_UPDATE')")
@@ -54,6 +69,9 @@ public class AttachmentController {
         return attachmentService.upload(ticketKey, file, principal);
     }
 
+    /**
+     * Downloads the stored attachment content.
+     */
     @GetMapping("/{attachmentId}/content")
     @PreAuthorize("hasAuthority('TICKET_READ')")
     public ResponseEntity<Resource> download(@PathVariable String ticketKey,
@@ -61,6 +79,9 @@ public class AttachmentController {
         return attachmentService.download(ticketKey, attachmentId, principal);
     }
 
+    /**
+     * Removes the attachment and its stored file when present.
+     */
     @DeleteMapping("/{attachmentId}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     @PreAuthorize("hasAuthority('TICKET_UPDATE')")

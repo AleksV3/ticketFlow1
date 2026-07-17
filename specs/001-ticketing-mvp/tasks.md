@@ -195,12 +195,12 @@ Goal: a clean install is secure, reproducible, and demoable in under ten minutes
 - [x] T094 Create demo-only Flyway location/profile `db/demo-migration/V8__seed_demo_data.sql`; never include fixed demo credentials in production migrations
 - [x] T095 [P] Complete Docker Compose for Postgres + backend and document frontend startup/environment variables in `.env.example`
 - [x] T096 [P] Replace the placeholder README with prerequisites, profiles, secrets, migration, run, test, and troubleshooting instructions
-- [x] T097 [P] Write the exact seeded-account demo script and expected results for every step
-- [x] T098 Run dependency/security review, verify CSRF/CORS/cookie settings, and confirm bootstrap/demo credentials are disabled outside demo profile
-- [x] T099 Verify a clean database migrates production V1–V7, demo profile applies V8 separately, and backend tests + frontend lint/test/build all pass
-- [x] T100 Verify two-Organization isolation across tickets, comments, proposals, dashboard, admin configuration, and audit endpoints
-- [x] T101 Time the complete 13-step demo under ten minutes and record the result
-- [x] T102 Document basic backup/restore and known MVP limitations
+- [ ] T097 [P] Write the exact seeded-account demo script and expected results for every step
+- [ ] T098 Run dependency/security review, verify CSRF/CORS/cookie settings, and confirm bootstrap/demo credentials are disabled outside demo profile
+- [ ] T099 Verify a clean database migrates production V1–V7, demo profile applies V8 separately, and backend tests + frontend lint/test/build all pass
+- [ ] T100 Verify two-Organization isolation across tickets, comments, proposals, dashboard, admin configuration, and audit endpoints
+- [ ] T101 Time the complete 13-step demo under ten minutes and record the result
+- [ ] T102 Document basic backup/restore and known MVP limitations
 
 ---
 

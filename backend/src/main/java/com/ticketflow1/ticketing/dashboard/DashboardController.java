@@ -9,6 +9,11 @@ import org.springframework.web.bind.annotation.RestController;
 
 @RestController
 @RequestMapping("/api/dashboard")
+/**
+ * Dashboard API.
+ *
+ * It exposes the single aggregated snapshot used by the landing page.
+ */
 public class DashboardController {
 
     private final DashboardService dashboardService;
@@ -17,6 +22,9 @@ public class DashboardController {
         this.dashboardService = dashboardService;
     }
 
+    /**
+     * Returns the current dashboard aggregates.
+     */
     @GetMapping
     @PreAuthorize("hasAuthority('TICKET_READ')")
     public DashboardResponse get(@AuthenticationPrincipal AuthPrincipal principal) {

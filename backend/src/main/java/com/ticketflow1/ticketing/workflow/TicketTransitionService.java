@@ -21,6 +21,13 @@ import java.time.Clock;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+/**
+ * Enforces workflow state transitions for tickets.
+ *
+ * The service is responsible for deciding which transitions are legal for the
+ * current actor, applying the state change, recording status history, and
+ * exposing the set of next STANDARD transitions for the UI.
+ */
 @Service
 public class TicketTransitionService {
 
@@ -57,6 +64,9 @@ public class TicketTransitionService {
         this.clock = clock;
     }
 
+    /**
+     * Moves a ticket to a named state and appends an optional public comment.
+     */
     @Transactional
     public TicketDetailResponse transition(String ticketKey, String toStateKey, String comment,
             AuthPrincipal principal) {
@@ -69,6 +79,9 @@ public class TicketTransitionService {
                 proposalDetailService.detail(saved, principal), slaStatusService.status(saved));
     }
 
+    /**
+     * Applies the single owned transition that matches the requested operation.
+     */
     @Transactional
     public Ticket transitionOwned(Ticket ticket, TransitionOperationKind operationKind, AuthPrincipal principal) {
         List<WorkflowTransition> matches = workflowTransitionRepository
@@ -83,6 +96,9 @@ public class TicketTransitionService {
         return apply(ticket, matches.getFirst(), principal);
     }
 
+    /**
+     * Validates the requested destination state against the configured workflow graph.
+     */
     private Ticket transitionToState(Ticket ticket, String toStateKey, TransitionOperationKind operationKind,
             AuthPrincipal principal) {
         Long workflowId = ticket.getTicketType().getWorkflow().getId();
@@ -126,6 +142,9 @@ public class TicketTransitionService {
         return saved;
     }
 
+    /**
+     * Returns the STANDARD transition targets the current actor may choose from.
+     */
     @Transactional(readOnly = true)
     public List<String> allowedTransitions(Ticket ticket, AuthPrincipal principal) {
         Long workflowId = ticket.getTicketType().getWorkflow().getId();

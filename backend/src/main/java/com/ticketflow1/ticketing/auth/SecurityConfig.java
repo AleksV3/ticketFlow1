@@ -53,8 +53,6 @@ class SecurityConfig {
         http
             .csrf(csrf -> csrf
                 .csrfTokenRepository(CookieCsrfTokenRepository.withHttpOnlyFalse())
-                // Login/logout do not rely on an authenticated browser state.
-                // Every authenticated mutation remains CSRF protected.
                 .ignoringRequestMatchers("/api/auth/login", "/api/auth/logout"))
             // CORS must be handled INSIDE the security chain (and before auth):
             // the browser's OPTIONS preflight carries no Authorization header,

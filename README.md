@@ -5,6 +5,33 @@ Tasks, and Defects. It includes configurable workflows and roles, comments,
 audit history, change-proposal approval, defect SLAs, dashboards, and a Next.js
 frontend.
 
+## Public demo on Render
+
+The repository includes [`render.yaml`](render.yaml), which provisions a
+Next.js web service, a Dockerized Spring Boot API, and PostgreSQL as one Render
+Blueprint.
+
+1. Push the branch you want to deploy to GitHub.
+2. In Render, choose **New > Blueprint** and connect this repository.
+3. Keep the Blueprint name and service settings, then choose **Deploy
+   Blueprint**.
+4. Open `https://ticketflow1-web.onrender.com` after both services finish.
+
+The Blueprint deliberately uses the `demo` Spring profile. Every demo account
+uses password `admin123`; useful starting accounts are:
+
+| Persona | Email |
+|---|---|
+| Client contributor | `contributor@alpine.demo` |
+| Ticket agent | `agent@ticketflow1.demo` |
+| Administrator | `admin@ticketflow1.demo` |
+
+The free API sleeps when idle, so the first request can take about a minute.
+Render's free PostgreSQL database expires after 30 days and must not be used for
+important data. Before using this as a real production service, switch the API
+to the `default` profile, use paid persistent infrastructure, provision real
+accounts, and configure a durable attachment store.
+
 ## Prerequisites
 
 - Docker Engine with Docker Compose v2
@@ -82,8 +109,6 @@ npm run dev
 
 The defaults use PostgreSQL port `5433`, API port `8081`, and frontend port
 `3000`. Override them through `.env` and `frontend/.env.local`.
-For plain-HTTP local development, also set `COOKIE_SECURE=false`; production
-must retain the secure default.
 
 ## Database migrations
 
@@ -138,5 +163,4 @@ described in `docs/release-verification.md`.
 - [`specs/001-ticketing-mvp/tasks.md`](specs/001-ticketing-mvp/tasks.md) — task source of truth
 - [`specs/001-ticketing-mvp/quickstart.md`](specs/001-ticketing-mvp/quickstart.md) — validation flows
 - [`docs/database-er.md`](docs/database-er.md) — database model
-- [`docs/operations-and-limitations.md`](docs/operations-and-limitations.md) — backup, restore, and MVP limits
 - [`docs/02-product-requirements-and-build-brief.md`](docs/02-product-requirements-and-build-brief.md) — product brief

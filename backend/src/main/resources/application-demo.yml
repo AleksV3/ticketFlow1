@@ -1,8 +1,6 @@
+## Demo profile: loads the normal schema migrations plus demo-only seed data.
 spring:
   flyway:
     locations:
       - classpath:db/migration
       - classpath:db/demo-migration
-app:
-  security:
-    secure-cookies: false

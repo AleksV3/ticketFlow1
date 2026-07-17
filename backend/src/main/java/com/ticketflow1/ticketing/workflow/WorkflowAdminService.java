@@ -15,6 +15,14 @@ import java.util.stream.Collectors;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+/**
+ * Implements the business rules behind the admin workflow API.
+ *
+ * The service owns the real behavior: organization scoping, graph validation,
+ * optimistic locking, transition persistence, and safety checks for deleting
+ * states or reassigning ticket types. The controller only passes authenticated
+ * requests through to this layer.
+ */
 @Service
 public class WorkflowAdminService {
     private final WorkflowRepository workflows; private final WorkflowStateRepository states;
@@ -30,10 +38,16 @@ public class WorkflowAdminService {
         this.workflows=workflows; this.states=states; this.transitions=transitions; this.types=types;
         this.organizations=organizations; this.permissions=permissions; this.audit=audit; this.tickets=tickets; this.statusHistory=statusHistory;
     }
+    /**
+     * Returns workflows that the current user can access.
+     */
     @Transactional(readOnly=true) public List<WorkflowResponse> listWorkflows(AuthPrincipal p, Long orgId) {
         Long scope=scope(p,orgId); List<Workflow> list=scope==null?workflows.findByOrganizationIsNull():workflows.findByOrganizationId(scope);
         return list.stream().map(this::response).toList();
     }
+    /**
+     * Creates a workflow, its states, and its standard transitions in one transaction.
+     */
     @Transactional public WorkflowResponse createWorkflow(AuthPrincipal p, WorkflowRequests.Create r) {
         Organization org=optionalOrganization(p,r.organizationId()); validateGraph(r.states(),r.transitions());
         Workflow w=workflows.saveAndFlush(new Workflow(r.name(),org));
@@ -42,6 +56,9 @@ public class WorkflowAdminService {
         saveTransitions(w,map,r.transitions()); audit.record(org,p.userId(),"WORKFLOW",w.getId(),"CREATED",null,"{\"name\":\""+r.name()+"\"}");
         return response(w);
     }
+    /**
+     * Applies an admin update while preserving protected business transitions.
+     */
     @Transactional public WorkflowResponse updateWorkflow(AuthPrincipal p,Long id,WorkflowRequests.Update r) {
         Workflow w=visible(p,id); if(r.version()==null||r.version()!=w.getVersion()) throw ApiException.conflict("Workflow was modified by another user.");
         Map<String,WorkflowState> map=states.findByWorkflowIdOrderBySortOrderAsc(id).stream().collect(Collectors.toMap(WorkflowState::getKey,Function.identity()));
@@ -65,6 +82,10 @@ public class WorkflowAdminService {
         }
         w.touchForAudit(); workflows.flush(); audit.record(w.getOrganization(),p.userId(),"WORKFLOW",id,"UPDATED",null,"{\"version\":"+w.getVersion()+"}"); return response(w);
     }
+    /**
+     * Deletes a workflow state only when it is not the initial state and is not
+     * already referenced by tickets or status history.
+     */
     @Transactional public void removeState(AuthPrincipal p,Long workflowId,Long stateId){
         Workflow workflow=visible(p,workflowId);
         WorkflowState state=states.findById(stateId).filter(item->item.getWorkflow().getId().equals(workflow.getId()))
@@ -75,8 +96,18 @@ public class WorkflowAdminService {
         transitions.findByWorkflowId(workflowId).stream().filter(edge->edge.getFromState().getId().equals(stateId)||edge.getToState().getId().equals(stateId)).forEach(transitions::delete);
         states.delete(state);
     }
+    /**
+     * Lists ticket types that belong to the current scope.
+     */
     @Transactional(readOnly=true) public List<TicketTypeAdminResponse> listTypes(AuthPrincipal p,Long orgId){Long s=scope(p,orgId);return (s==null?types.findByOrganizationIsNull():types.findByOrganizationId(s)).stream().map(TicketTypeAdminResponse::from).toList();}
+    /**
+     * Creates a ticket type and ensures it is compatible with the selected workflow.
+     */
     @Transactional public TicketTypeAdminResponse createType(AuthPrincipal p,WorkflowRequests.CreateType r){if(r.requiresProposal())throw ApiException.validation("Custom ticket types cannot require proposals."); Organization org=organization(p,r.organizationId()); Workflow w=visible(p,r.workflowId()); if(w.getOrganization()!=null&&!w.getOrganization().getId().equals(org.getId()))throw ApiException.notFound("Workflow not found: "+r.workflowId()); if(types.findByOrganizationIdAndKey(org.getId(),r.key()).isPresent())throw ApiException.validation("Duplicate ticket type key."); TicketType t=types.saveAndFlush(new TicketType(r.key(),r.name(),w,org,false,false));audit.record(org,p.userId(),"TICKET_TYPE",t.getId(),"CREATED",null,"{\"key\":\""+r.key()+"\"}");return TicketTypeAdminResponse.from(t);}
+    /**
+     * Repoints an existing ticket type to another workflow after validating scope
+     * and ticket history constraints.
+     */
     @Transactional public TicketTypeAdminResponse updateType(AuthPrincipal p,Long id,WorkflowRequests.UpdateType r){
         TicketType type=types.findById(id).orElseThrow(()->ApiException.notFound("Ticket type not found: "+id));
         if(type.getOrganization()==null||(p.party()==Responsibility.CLIENT&&!type.getOrganization().getId().equals(p.organizationId())))throw ApiException.notFound("Ticket type not found: "+id);

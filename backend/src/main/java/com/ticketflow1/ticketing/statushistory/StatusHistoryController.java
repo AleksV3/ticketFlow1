@@ -10,6 +10,12 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+/**
+ * Status history API for a ticket.
+ *
+ * The endpoint is read-only because status changes are produced by workflow
+ * transitions elsewhere in the domain.
+ */
 @RestController
 @RequestMapping("/api/tickets/{ticketKey}/status-history")
 public class StatusHistoryController {
@@ -20,6 +26,9 @@ public class StatusHistoryController {
         this.statusHistoryService = statusHistoryService;
     }
 
+    /**
+     * Lists the recorded state transitions for the ticket.
+     */
     @GetMapping
     @PreAuthorize("hasAuthority('TICKET_READ')")
     public List<StatusHistoryResponse> list(@PathVariable String ticketKey,

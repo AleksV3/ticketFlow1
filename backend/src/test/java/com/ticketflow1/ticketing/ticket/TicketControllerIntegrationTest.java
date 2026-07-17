@@ -2,7 +2,7 @@ package com.ticketflow1.ticketing.ticket;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
-import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -33,8 +33,6 @@ import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
-import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
-import org.springframework.test.web.servlet.request.MockMvcRequestBuilders;
 import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
@@ -43,14 +41,6 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 @AutoConfigureMockMvc
 @Testcontainers
 class TicketControllerIntegrationTest {
-
-    private static MockHttpServletRequestBuilder post(String uri, Object... uriVariables) {
-        return MockMvcRequestBuilders.post(uri, uriVariables).with(csrf());
-    }
-
-    private static MockHttpServletRequestBuilder patch(String uri, Object... uriVariables) {
-        return MockMvcRequestBuilders.patch(uri, uriVariables).with(csrf());
-    }
 
     @Container
     static PostgreSQLContainer<?> postgres = new PostgreSQLContainer<>("postgres:16");
@@ -773,17 +763,20 @@ class TicketControllerIntegrationTest {
         mockMvc.perform(post("/api/admin/ticket-types").cookie(internal).contentType("application/json").content("""
                 {"key":"ACCESS_REQUEST","name":"Access Request","workflowId":%d,"organizationId":%d,"requiresProposal":false}
                 """.formatted(workflowId, orgA))).andExpect(status().isCreated());
-        mockMvc.perform(patch("/api/admin/workflows/{id}", workflowId).cookie(internal).contentType("application/json")
+        mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch(
+                        "/api/admin/workflows/{id}", workflowId).cookie(internal).contentType("application/json")
                         .content("{\"version\":999,\"transitions\":[]}"))
                 .andExpect(status().isConflict());
-        MvcResult updated = mockMvc.perform(patch("/api/admin/workflows/{id}", workflowId).cookie(internal).contentType("application/json")
+        MvcResult updated = mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch(
+                        "/api/admin/workflows/{id}", workflowId).cookie(internal).contentType("application/json")
                         .content("""
                 {"version":%d,"states":[{"key":"REVIEW","isInitial":false,"isTerminal":false,"sortOrder":2}],
                  "transitions":[{"fromState":"OPEN","toState":"REVIEW","requiredPermission":"TICKET_TRANSITION","operationKind":"STANDARD"},{"fromState":"REVIEW","toState":"CLOSED","requiredPermission":"TICKET_TRANSITION","operationKind":"STANDARD"}]}
                 """.formatted(version))).andExpect(status().isOk())
                 .andExpect(jsonPath("$.states.length()").value(3)).andReturn();
         long reorderedVersion = objectMapper.readTree(updated.getResponse().getContentAsString()).path("version").asLong();
-        mockMvc.perform(patch("/api/admin/workflows/{id}", workflowId).cookie(internal).contentType("application/json")
+        mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch(
+                        "/api/admin/workflows/{id}", workflowId).cookie(internal).contentType("application/json")
                         .content("""
                 {"version":%d,"states":[
                   {"key":"CLOSED","isInitial":false,"isTerminal":true,"sortOrder":0},

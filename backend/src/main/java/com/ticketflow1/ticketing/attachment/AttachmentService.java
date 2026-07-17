@@ -28,6 +28,13 @@ import java.nio.file.StandardCopyOption;
 import java.io.IOException;
 import java.util.UUID;
 
+/**
+ * Manages attachment metadata and file storage for tickets.
+ *
+ * The service validates file uploads, stores bytes on disk, keeps metadata in
+ * the database, returns safe download responses, and deletes both the row and
+ * the file when an attachment is removed.
+ */
 @Service
 public class AttachmentService {
     private final AttachmentRepository attachmentRepository;
@@ -49,6 +56,9 @@ public class AttachmentService {
         this.storageRoot = Path.of(storageDirectory).toAbsolutePath().normalize();
     }
 
+    /**
+     * Uploads a file, stores it on disk, and records attachment metadata.
+     */
     @Transactional
     public AttachmentResponse upload(String ticketKey, MultipartFile file, AuthPrincipal principal) {
         if (file.isEmpty() || file.getOriginalFilename() == null || file.getOriginalFilename().isBlank()) {
@@ -76,6 +86,9 @@ public class AttachmentService {
         }
     }
 
+    /**
+     * Streams attachment content back to the client when the file is present.
+     */
     @Transactional(readOnly = true)
     public ResponseEntity<Resource> download(String ticketKey, Long attachmentId, AuthPrincipal principal) {
         Ticket ticket = findVisibleTicket(ticketKey, principal);
@@ -90,6 +103,9 @@ public class AttachmentService {
                 .contentLength(attachment.getSizeBytes()).body(new FileSystemResource(path));
     }
 
+    /**
+     * Lists attachments in creation order for the visible ticket.
+     */
     @Transactional(readOnly = true)
     public List<AttachmentResponse> list(String ticketKey, AuthPrincipal principal) {
         Ticket ticket = findVisibleTicket(ticketKey, principal);
@@ -97,6 +113,9 @@ public class AttachmentService {
                 .map(AttachmentResponse::from).toList();
     }
 
+    /**
+     * Creates metadata-only attachments used for references or external files.
+     */
     @Transactional
     public AttachmentResponse create(String ticketKey, CreateAttachmentRequest request, AuthPrincipal principal) {
         Ticket ticket = findVisibleTicket(ticketKey, principal);
@@ -112,6 +131,9 @@ public class AttachmentService {
         return AttachmentResponse.from(saved);
     }
 
+    /**
+     * Removes the attachment row and deletes the stored file when one exists.
+     */
     @Transactional
     public void remove(String ticketKey, Long attachmentId, AuthPrincipal principal) {
         Ticket ticket = findVisibleTicket(ticketKey, principal);

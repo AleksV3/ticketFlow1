@@ -41,8 +41,7 @@ public class AuthController {
 
     @GetMapping("/users/me")
     public CurrentUserResponse me(@AuthenticationPrincipal AuthPrincipal principal, CsrfToken csrfToken) {
-        // Resolve Spring Security's deferred token so CookieCsrfTokenRepository
-        // emits the readable XSRF-TOKEN cookie used by the browser client.
+        // Resolve the deferred token so the browser receives its XSRF-TOKEN cookie.
         csrfToken.getToken();
         return authService.currentUser(principal);
     }

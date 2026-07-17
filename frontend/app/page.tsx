@@ -1,3 +1,8 @@
+/**
+ * Landing page placeholder for the Next.js app router.
+ *
+ * This page exists only to guide users to the authenticated application.
+ */
 export default function HomePage() {
   return (
     <main className="flex min-h-screen items-center justify-center p-8">

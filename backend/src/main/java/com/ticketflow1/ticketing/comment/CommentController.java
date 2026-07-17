@@ -16,6 +16,12 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
+/**
+ * Comment API for a ticket.
+ *
+ * The controller keeps HTTP concerns thin and delegates visibility rules and
+ * SLA side effects to {@link CommentService}.
+ */
 @RestController
 @RequestMapping("/api/tickets/{ticketKey}/comments")
 public class CommentController {
@@ -26,6 +32,9 @@ public class CommentController {
         this.commentService = commentService;
     }
 
+    /**
+     * Lists comments visible to the current user.
+     */
     @GetMapping
     @PreAuthorize("hasAuthority('TICKET_READ')")
     public List<CommentResponse> list(@PathVariable String ticketKey,
@@ -33,6 +42,9 @@ public class CommentController {
         return commentService.list(ticketKey, principal);
     }
 
+    /**
+     * Creates a new public or internal comment depending on permissions.
+     */
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
     @PreAuthorize("hasAuthority('COMMENT_PUBLIC_WRITE')")

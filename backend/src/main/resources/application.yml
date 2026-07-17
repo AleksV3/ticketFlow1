@@ -10,7 +10,7 @@ spring:
   # Defaults match docker-compose.yml, so `./mvnw spring-boot:run` works with no
   # .env exported. Override via env vars (POSTGRES_*, JWT_SECRET) in real setups.
   datasource:
-    url: jdbc:postgresql://localhost:${POSTGRES_PORT:5433}/${POSTGRES_DB:ticketflow1_ticketing}
+    url: jdbc:postgresql://${POSTGRES_HOST:localhost}:${POSTGRES_PORT:5433}/${POSTGRES_DB:ticketflow1_ticketing}
     username: ${POSTGRES_USER:ticketflow1}
     password: ${POSTGRES_PASSWORD:ticketflow1}
 
@@ -37,9 +37,8 @@ app:
   cors:
     allowed-origins: ${APP_CORS_ALLOWED_ORIGINS:http://localhost:3000}
   security:
-    # Production-safe default. Local/demo profiles explicitly opt out because
-    # browsers do not send Secure cookies over plain http://localhost.
-    secure-cookies: ${COOKIE_SECURE:true}
+    # HTTPS deployments keep this enabled. Plain-HTTP local development opts out.
+    secure-cookies: ${COOKIE_SECURE:false}
 
 springdoc:
   swagger-ui:
