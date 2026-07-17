@@ -3,6 +3,7 @@ package com.ticketflow1.ticketing.ticket.dto;
 import com.ticketflow1.ticketing.ticket.Ticket;
 import com.ticketflow1.ticketing.sla.SlaStatus;
 import java.time.Instant;
+import java.util.List;
 
 public record TicketSummaryResponse(
         Long id,
@@ -15,6 +16,7 @@ public record TicketSummaryResponse(
         String organizationName,
         String businessOwnerName,
         String ticketLeadName,
+        List<String> developerNames,
         String currentResponsibility,
         String slaStatus,
         Instant createdAt,
@@ -32,6 +34,7 @@ public record TicketSummaryResponse(
                 ticket.getOrganization().getName(),
                 ticket.getBusinessOwner().getDisplayName(),
                 ticket.getTicketLead() == null ? null : ticket.getTicketLead().getDisplayName(),
+                ticket.getDevelopers().stream().map(user -> user.getDisplayName()).sorted().toList(),
                 ticket.getCurrentResponsibility().name(),
                 slaStatus.name(),
                 ticket.getCreatedAt(),

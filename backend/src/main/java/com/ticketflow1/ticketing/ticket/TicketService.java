@@ -28,6 +28,7 @@ import java.util.List;
 import java.util.LinkedHashSet;
 import java.util.Set;
 import java.time.Clock;
+import jakarta.persistence.criteria.JoinType;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
@@ -357,10 +358,19 @@ public class TicketService {
         }
         if (q != null && !q.isBlank()) {
             String like = "%" + q.toLowerCase() + "%";
-            spec = spec.and((root, query, cb) -> cb.or(
-                    cb.like(cb.lower(root.get("title")), like),
-                    cb.like(cb.lower(root.get("description")), like),
-                    cb.like(cb.lower(root.get("ticketKey")), like)));
+            spec = spec.and((root, query, cb) -> {
+                query.distinct(true);
+                var lead = root.join("ticketLead", JoinType.LEFT);
+                var developers = root.join("developers", JoinType.LEFT);
+                return cb.or(
+                        cb.like(cb.lower(root.get("title")), like),
+                        cb.like(cb.lower(root.get("description")), like),
+                        cb.like(cb.lower(root.get("ticketKey")), like),
+                        cb.like(cb.lower(root.get("organization").get("name")), like),
+                        cb.like(cb.lower(root.get("businessOwner").get("displayName")), like),
+                        cb.like(cb.lower(lead.get("displayName")), like),
+                        cb.like(cb.lower(developers.get("displayName")), like));
+            });
         }
         if (requestedSlaStatus != null) {
             spec = spec.and(SlaSpecifications.hasStatus(requestedSlaStatus, clock.instant(), slaCalculator));
