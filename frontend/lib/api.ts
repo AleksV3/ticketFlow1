@@ -26,27 +26,39 @@ function cookie(name: string): string | undefined {
 
 export async function api<T>(path: string, init: RequestInit = {}): Promise<T> {
   const method = (init.method ?? "GET").toUpperCase();
-  const headers = new Headers(init.headers);
-  if (init.body && !(init.body instanceof FormData) && !headers.has("Content-Type")) headers.set("Content-Type", "application/json");
-  if (!["GET", "HEAD", "OPTIONS"].includes(method)) {
-    const token = cookie("XSRF-TOKEN");
-    if (token) headers.set("X-XSRF-TOKEN", decodeURIComponent(token));
+  const mutating = !["GET", "HEAD", "OPTIONS"].includes(method);
+
+  async function send(retriedAfterCsrfFailure: boolean): Promise<T> {
+    const headers = new Headers(init.headers);
+    if (init.body && !(init.body instanceof FormData) && !headers.has("Content-Type")) headers.set("Content-Type", "application/json");
+    if (mutating) {
+      const token = cookie("XSRF-TOKEN");
+      if (token) headers.set("X-XSRF-TOKEN", decodeURIComponent(token));
+    }
+    const response = await fetch(`${API_BASE}${path}`, {
+      ...init,
+      method,
+      headers,
+      credentials: "include",
+      cache: "no-store"
+    });
+    if (!response.ok) {
+      let body: Partial<ApiErrorBody> = {};
+      try { body = await response.json() as ApiErrorBody; } catch { /* non-JSON proxy error */ }
+      // A CSRF denial happens in Spring Security before the controller runs,
+      // so retrying once cannot duplicate a completed business operation.
+      if (mutating && !retriedAfterCsrfFailure && response.status === 403 && body.error === "CSRF_INVALID") {
+        await fetch(`${API_BASE}/users/me`, { credentials: "include", cache: "no-store" });
+        return send(true);
+      }
+      throw new ApiError(response.status, body.error ?? "HTTP_ERROR",
+        body.message ?? `Request failed with status ${response.status}.`, body.fieldErrors ?? []);
+    }
+    if (response.status === 204) return undefined as T;
+    return await response.json() as T;
   }
-  const response = await fetch(`${API_BASE}${path}`, {
-    ...init,
-    method,
-    headers,
-    credentials: "include",
-    cache: "no-store"
-  });
-  if (!response.ok) {
-    let body: Partial<ApiErrorBody> = {};
-    try { body = await response.json() as ApiErrorBody; } catch { /* non-JSON proxy error */ }
-    throw new ApiError(response.status, body.error ?? "HTTP_ERROR",
-      body.message ?? `Request failed with status ${response.status}.`, body.fieldErrors ?? []);
-  }
-  if (response.status === 204) return undefined as T;
-  return await response.json() as T;
+
+  return send(false);
 }
 
 export const get = <T>(path: string) => api<T>(path);
