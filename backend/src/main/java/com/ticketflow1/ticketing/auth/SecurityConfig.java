@@ -15,6 +15,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 import org.springframework.security.web.csrf.CookieCsrfTokenRepository;
+import org.springframework.security.web.csrf.CsrfTokenRequestAttributeHandler;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
@@ -53,6 +54,12 @@ class SecurityConfig {
         http
             .csrf(csrf -> csrf
                 .csrfTokenRepository(CookieCsrfTokenRepository.withHttpOnlyFalse())
+                // The browser sends the raw XSRF-TOKEN cookie value in the
+                // X-XSRF-TOKEN header. Spring Security's default XOR handler
+                // expects a masked request value and rejects that standard SPA
+                // pattern with a misleading 403. Resolve the raw header value
+                // directly; the token remains random and cookie-bound.
+                .csrfTokenRequestHandler(new CsrfTokenRequestAttributeHandler())
                 .ignoringRequestMatchers("/api/auth/login", "/api/auth/logout"))
             // CORS must be handled INSIDE the security chain (and before auth):
             // the browser's OPTIONS preflight carries no Authorization header,
