@@ -38,6 +38,16 @@ public class JwtAuthFilter extends OncePerRequestFilter {
         this.jwtService = jwtService;
     }
 
+    /**
+     * Long-poll responses complete on a second ASYNC servlet dispatch. That
+     * dispatch has a fresh SecurityContext, so it must authenticate from the
+     * cookie again instead of being skipped by OncePerRequestFilter's default.
+     */
+    @Override
+    protected boolean shouldNotFilterAsyncDispatch() {
+        return false;
+    }
+
     @Override
     protected void doFilterInternal(@NonNull HttpServletRequest request,
             @NonNull HttpServletResponse response, @NonNull FilterChain filterChain)
