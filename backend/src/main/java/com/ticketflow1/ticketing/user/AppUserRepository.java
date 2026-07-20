@@ -12,4 +12,6 @@ public interface AppUserRepository extends JpaRepository<AppUser, Long>, JpaSpec
 
     boolean existsByEmailIgnoreCase(String email);
     List<AppUser> findByActiveTrueAndPartyOrderByDisplayNameAsc(Responsibility party);
+    List<AppUser> findByActiveTrueOrderByDisplayNameAsc();
+    List<AppUser> findByActiveTrueAndOrganizationIdOrderByDisplayNameAsc(Long organizationId);
 }

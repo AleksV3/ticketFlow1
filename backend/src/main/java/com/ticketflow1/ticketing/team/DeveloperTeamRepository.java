@@ -5,4 +5,5 @@ import org.springframework.data.jpa.repository.JpaRepository;
 
 public interface DeveloperTeamRepository extends JpaRepository<DeveloperTeam,Long> {
     List<DeveloperTeam> findAllByOrderByNameAsc();
+    List<DeveloperTeam> findDistinctByLeaderIdOrMembersIdOrderByNameAsc(Long leaderId,Long memberId);
 }

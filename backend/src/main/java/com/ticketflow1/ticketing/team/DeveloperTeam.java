@@ -17,15 +17,15 @@ public class DeveloperTeam {
     @Column(columnDefinition = "TEXT") private String description;
     @ManyToOne(fetch = FetchType.LAZY, optional = false) @JoinColumn(name = "leader_id") private AppUser leader;
     @ManyToOne(fetch = FetchType.LAZY, optional = false) @JoinColumn(name = "created_by_id") private AppUser createdBy;
-    @ManyToMany(fetch = FetchType.LAZY) @JoinTable(name = "developer_team_member", joinColumns = @JoinColumn(name = "team_id"), inverseJoinColumns = @JoinColumn(name = "user_id")) private Set<AppUser> developers = new LinkedHashSet<>();
+    @ManyToMany(fetch = FetchType.LAZY) @JoinTable(name = "developer_team_member", joinColumns = @JoinColumn(name = "team_id"), inverseJoinColumns = @JoinColumn(name = "user_id")) private Set<AppUser> members = new LinkedHashSet<>();
     @ManyToMany(fetch = FetchType.LAZY) @JoinTable(name = "developer_team_ticket", joinColumns = @JoinColumn(name = "team_id"), inverseJoinColumns = @JoinColumn(name = "ticket_id")) private Set<Ticket> tickets = new LinkedHashSet<>();
     @CreationTimestamp @Column(name = "created_at", nullable = false, updatable = false) private Instant createdAt;
     @UpdateTimestamp @Column(name = "updated_at", nullable = false) private Instant updatedAt;
 
     protected DeveloperTeam() {}
     public DeveloperTeam(String name, String description, AppUser leader, AppUser createdBy) { this.name=name; this.description=description; this.leader=leader; this.createdBy=createdBy; }
-    public Long getId(){return id;} public String getName(){return name;} public String getDescription(){return description;} public AppUser getLeader(){return leader;} public AppUser getCreatedBy(){return createdBy;} public Set<AppUser> getDevelopers(){return developers;} public Set<Ticket> getTickets(){return tickets;} public Instant getCreatedAt(){return createdAt;} public Instant getUpdatedAt(){return updatedAt;}
-    public void update(String name,String description,AppUser leader,Set<AppUser> developers,Set<Ticket> tickets){this.name=name;this.description=description;this.leader=leader;this.developers.clear();this.developers.addAll(developers);this.tickets.clear();this.tickets.addAll(tickets);}
+    public Long getId(){return id;} public String getName(){return name;} public String getDescription(){return description;} public AppUser getLeader(){return leader;} public AppUser getCreatedBy(){return createdBy;} public Set<AppUser> getMembers(){return members;} public Set<Ticket> getTickets(){return tickets;} public Instant getCreatedAt(){return createdAt;} public Instant getUpdatedAt(){return updatedAt;}
+    public void update(String name,String description,AppUser leader,Set<AppUser> members,Set<Ticket> tickets){this.name=name;this.description=description;this.leader=leader;this.members.clear();this.members.addAll(members);this.members.add(leader);this.tickets.clear();this.tickets.addAll(tickets);}
     public void addTicket(Ticket ticket){tickets.add(ticket);}
     public void removeTicket(Ticket ticket){tickets.remove(ticket);}
 }

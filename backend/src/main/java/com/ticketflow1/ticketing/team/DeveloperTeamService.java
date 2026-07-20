@@ -14,12 +14,40 @@ public class DeveloperTeamService {
     private final DeveloperTeamRepository teams; private final AppUserRepository users; private final TicketRepository tickets; private final TicketTransitionService transitions;
     public DeveloperTeamService(DeveloperTeamRepository teams,AppUserRepository users,TicketRepository tickets,TicketTransitionService transitions){this.teams=teams;this.users=users;this.tickets=tickets;this.transitions=transitions;}
 
-    @Transactional(readOnly=true) public List<TeamDtos.TeamResponse> list(AuthPrincipal p){internal(p);return teams.findAllByOrderByNameAsc().stream().map(t->TeamDtos.TeamResponse.from(t,canEdit(t,p),ticket->transitions.allowedTransitions(ticket,p))).toList();}
-    @Transactional(readOnly=true) public TeamDtos.Options options(AuthPrincipal p){internal(p);var people=users.findByActiveTrueAndPartyOrderByDisplayNameAsc(Responsibility.TICKETFLOW1).stream().map(u->new TeamDtos.Person(u.getId(),u.getDisplayName())).toList();var refs=tickets.findAll().stream().map(t->new TeamDtos.TicketRef(t.getTicketKey(),t.getTitle(),t.getCurrentState().getKey(),transitions.allowedTransitions(t,p))).sorted(Comparator.comparing(TeamDtos.TicketRef::ticketKey)).toList();return new TeamDtos.Options(people,refs);}
-    @Transactional public TeamDtos.TeamResponse create(TeamDtos.SaveTeamRequest r,AuthPrincipal p){internal(p);AppUser actor=user(p.userId());AppUser leader=p.hasPermission("USER_MANAGE")&&r.leaderId()!=null?internalUser(r.leaderId()):actor;DeveloperTeam team=new DeveloperTeam(name(r.name()),text(r.description()),leader,actor);apply(team,r,leader);return TeamDtos.TeamResponse.from(teams.save(team),true,ticket->transitions.allowedTransitions(ticket,p));}
-    @Transactional public TeamDtos.TeamResponse update(Long id,TeamDtos.SaveTeamRequest r,AuthPrincipal p){internal(p);DeveloperTeam team=teams.findById(id).orElseThrow(()->ApiException.notFound("Team not found."));if(!canEdit(team,p))throw ApiException.forbidden("Only an administrator or this team's leader can edit it.");AppUser leader=r.leaderId()==null?team.getLeader():internalUser(r.leaderId());apply(team,r,leader);return TeamDtos.TeamResponse.from(teams.save(team),true,ticket->transitions.allowedTransitions(ticket,p));}
-    private void apply(DeveloperTeam team,TeamDtos.SaveTeamRequest r,AppUser leader){Set<Long> ids=r.developerIds()==null?Set.of():r.developerIds();Set<AppUser> developers=new LinkedHashSet<>(users.findAllById(ids));if(developers.size()!=ids.size()||developers.stream().anyMatch(u->u.getParty()!=Responsibility.TICKETFLOW1))throw ApiException.validation("All developers must be active TicketFlow1 users.");Set<String> keys=r.ticketKeys()==null?Set.of():r.ticketKeys();Set<Ticket> related=new LinkedHashSet<>();for(String key:keys)related.add(tickets.findByTicketKey(key).orElseThrow(()->ApiException.validation("Ticket not found: "+key)));team.update(name(r.name()),text(r.description()),leader,developers,related);}
-    private boolean canEdit(DeveloperTeam t,AuthPrincipal p){return p.hasPermission("USER_MANAGE")||t.getLeader().getId().equals(p.userId());}
-    private AppUser user(Long id){return users.findById(id).orElseThrow(()->ApiException.notFound("User not found."));} private AppUser internalUser(Long id){AppUser u=user(id);if(u.getParty()!=Responsibility.TICKETFLOW1)throw ApiException.validation("Team members must be TicketFlow1 users.");return u;}
-    private void internal(AuthPrincipal p){if(p.party()!=Responsibility.TICKETFLOW1)throw ApiException.forbidden("Developer teams are internal.");} private String name(String v){if(v==null||v.isBlank())throw ApiException.validation("Team name is required.");return v.trim();} private String text(String v){return v==null||v.isBlank()?null:v.trim();}
+    @Transactional(readOnly=true) public List<TeamDtos.TeamResponse> list(AuthPrincipal p){
+        List<DeveloperTeam> visible=p.party()==Responsibility.TICKETFLOW1?teams.findAllByOrderByNameAsc():teams.findDistinctByLeaderIdOrMembersIdOrderByNameAsc(p.userId(),p.userId());
+        return visible.stream().map(t->response(t,p)).toList();
+    }
+    @Transactional(readOnly=true) public TeamDtos.Options options(AuthPrincipal p){
+        var people=availablePeople(p).stream().map(TeamDtos.TeamResponse::person).toList();
+        var visibleTickets=p.party()==Responsibility.CLIENT?tickets.findByOrganizationId(p.organizationId()):tickets.findAll();
+        var refs=visibleTickets.stream().map(t->TeamDtos.TeamResponse.ticket(t,ticket->transitions.allowedTransitions(ticket,p))).sorted(Comparator.comparing(TeamDtos.TicketRef::ticketKey)).toList();
+        return new TeamDtos.Options(people,refs);
+    }
+    @Transactional public TeamDtos.TeamResponse create(TeamDtos.SaveTeamRequest r,AuthPrincipal p){
+        internal(p);AppUser actor=user(p.userId());AppUser leader=p.hasPermission("USER_MANAGE")&&r.leaderId()!=null?selectableUser(r.leaderId(),p):actor;
+        DeveloperTeam team=new DeveloperTeam(name(r.name()),text(r.description()),leader,actor);apply(team,r,leader,p);return response(teams.save(team),p);
+    }
+    @Transactional public TeamDtos.TeamResponse update(Long id,TeamDtos.SaveTeamRequest r,AuthPrincipal p){
+        DeveloperTeam team=teams.findById(id).orElseThrow(()->ApiException.notFound("Team not found."));
+        if(!canView(team,p))throw ApiException.notFound("Team not found.");
+        if(!canEdit(team,p))throw ApiException.forbidden("Only an administrator or this team's leader can edit it.");
+        AppUser leader=r.leaderId()==null?team.getLeader():selectableUser(r.leaderId(),p);apply(team,r,leader,p);return response(teams.save(team),p);
+    }
+    private void apply(DeveloperTeam team,TeamDtos.SaveTeamRequest r,AppUser leader,AuthPrincipal p){
+        Set<Long> ids=r.memberIds()==null?Set.of():r.memberIds();Set<AppUser> members=new LinkedHashSet<>(users.findAllById(ids));
+        if(members.size()!=ids.size()||members.stream().anyMatch(u->!u.isActive()||!canSelect(u,p)))throw ApiException.validation("All members must be active users available to you.");
+        Set<String> keys=r.ticketKeys()==null?Set.of():r.ticketKeys();Set<Ticket> related=new LinkedHashSet<>();
+        for(String key:keys){Ticket ticket=tickets.findByTicketKey(key).orElseThrow(()->ApiException.validation("Ticket not found: "+key));if(!ticketVisible(ticket,p))throw ApiException.validation("Ticket not found: "+key);related.add(ticket);}
+        team.update(name(r.name()),text(r.description()),leader,members,related);
+    }
+    private TeamDtos.TeamResponse response(DeveloperTeam t,AuthPrincipal p){return TeamDtos.TeamResponse.from(t,canEdit(t,p),ticket->ticketVisible(ticket,p),ticket->transitions.allowedTransitions(ticket,p));}
+    private boolean canView(DeveloperTeam t,AuthPrincipal p){return p.party()==Responsibility.TICKETFLOW1||t.getLeader().getId().equals(p.userId())||t.getMembers().stream().anyMatch(u->u.getId().equals(p.userId()));}
+    private boolean canEdit(DeveloperTeam t,AuthPrincipal p){return p.party()==Responsibility.TICKETFLOW1&&(p.hasPermission("USER_MANAGE")||t.getLeader().getId().equals(p.userId()));}
+    private boolean ticketVisible(Ticket t,AuthPrincipal p){return p.party()==Responsibility.TICKETFLOW1||t.getOrganization().getId().equals(p.organizationId());}
+    private List<AppUser> availablePeople(AuthPrincipal p){return p.party()==Responsibility.TICKETFLOW1?users.findByActiveTrueOrderByDisplayNameAsc():users.findByActiveTrueAndOrganizationIdOrderByDisplayNameAsc(p.organizationId());}
+    private boolean canSelect(AppUser u,AuthPrincipal p){return p.party()==Responsibility.TICKETFLOW1||(u.getOrganization()!=null&&u.getOrganization().getId().equals(p.organizationId()));}
+    private AppUser selectableUser(Long id,AuthPrincipal p){AppUser u=user(id);if(!u.isActive()||!canSelect(u,p))throw ApiException.validation("Team member is not available to you.");return u;}
+    private AppUser user(Long id){return users.findById(id).orElseThrow(()->ApiException.notFound("User not found."));}
+    private void internal(AuthPrincipal p){if(p.party()!=Responsibility.TICKETFLOW1)throw ApiException.forbidden("Only TicketFlow1 users can create teams.");} private String name(String v){if(v==null||v.isBlank())throw ApiException.validation("Team name is required.");return v.trim();} private String text(String v){return v==null||v.isBlank()?null:v.trim();}
 }
