@@ -1,30 +1,27 @@
 package com.ticketflow1.ticketing.realtime;
 
-import java.io.IOException;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
-import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
+import org.springframework.web.context.request.async.DeferredResult;
 
 @Service
 public class RealtimeEvents {
-    private final Set<SseEmitter> clients = ConcurrentHashMap.newKeySet();
+    private final Set<DeferredResult<ResponseEntity<Void>>> clients = ConcurrentHashMap.newKeySet();
 
-    public SseEmitter subscribe() {
-        SseEmitter emitter = new SseEmitter(0L);
-        clients.add(emitter);
-        emitter.onCompletion(() -> clients.remove(emitter));
-        emitter.onTimeout(() -> clients.remove(emitter));
-        emitter.onError(error -> clients.remove(emitter));
-        try { emitter.send(SseEmitter.event().name("connected").data("ready")); }
-        catch (IOException error) { clients.remove(emitter); }
-        return emitter;
+    public DeferredResult<ResponseEntity<Void>> subscribe() {
+        DeferredResult<ResponseEntity<Void>> result =
+                new DeferredResult<>(25_000L, ResponseEntity.noContent().build());
+        clients.add(result);
+        result.onCompletion(() -> clients.remove(result));
+        result.onTimeout(() -> clients.remove(result));
+        result.onError(error -> clients.remove(result));
+        return result;
     }
 
     public void ticketsChanged() {
-        clients.removeIf(emitter -> {
-            try { emitter.send(SseEmitter.event().name("tickets-changed").data("refresh")); return false; }
-            catch (IOException | IllegalStateException error) { emitter.complete(); return true; }
-        });
+        clients.forEach(result -> result.setResult(ResponseEntity.ok().build()));
+        clients.clear();
     }
 }
