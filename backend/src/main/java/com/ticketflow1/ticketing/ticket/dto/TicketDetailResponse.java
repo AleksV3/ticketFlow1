@@ -11,6 +11,7 @@ import com.ticketflow1.ticketing.proposal.dto.ChangeProposalResponse;
 import com.ticketflow1.ticketing.sla.SlaStatus;
 import com.ticketflow1.ticketing.workflow.WorkflowState;
 import com.ticketflow1.ticketing.workflow.WorkflowTransition;
+import com.ticketflow1.ticketing.team.DeveloperTeam;
 
 @JsonInclude(JsonInclude.Include.NON_NULL)
 public record TicketDetailResponse(
@@ -26,6 +27,7 @@ public record TicketDetailResponse(
         UserRef businessOwner,
         UserRef ticketLead,
         List<UserRef> developers,
+        List<TeamRef> teams,
         String assignedTeam,
         String currentResponsibility,
         Instant createdAt,
@@ -53,6 +55,8 @@ public record TicketDetailResponse(
                 UserRef.from(ticket.getTicketLead()),
                 ticket.getDevelopers().stream().map(UserRef::from)
                         .sorted(java.util.Comparator.comparing(UserRef::displayName)).toList(),
+                ticket.getTeams().stream().map(TeamRef::from)
+                        .sorted(java.util.Comparator.comparing(TeamRef::name)).toList(),
                 ticket.getAssignedTeam(),
                 ticket.getCurrentResponsibility().name(),
                 ticket.getCreatedAt(),
@@ -92,6 +96,9 @@ public record TicketDetailResponse(
             }
             return new UserRef(user.getId(), user.getDisplayName());
         }
+    }
+    public record TeamRef(Long id, String name) {
+        public static TeamRef from(DeveloperTeam team) { return new TeamRef(team.getId(), team.getName()); }
     }
 
     public record SlaRef(

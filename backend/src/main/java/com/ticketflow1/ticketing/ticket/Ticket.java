@@ -2,6 +2,7 @@ package com.ticketflow1.ticketing.ticket;
 
 import com.ticketflow1.ticketing.common.Auditable;
 import com.ticketflow1.ticketing.organization.Organization;
+import com.ticketflow1.ticketing.team.DeveloperTeam;
 import com.ticketflow1.ticketing.user.AppUser;
 import com.ticketflow1.ticketing.workflow.TicketType;
 import com.ticketflow1.ticketing.workflow.WorkflowState;
@@ -73,6 +74,9 @@ public class Ticket extends Auditable {
             joinColumns = @JoinColumn(name = "ticket_id"),
             inverseJoinColumns = @JoinColumn(name = "user_id"))
     private Set<AppUser> developers = new LinkedHashSet<>();
+
+    @ManyToMany(mappedBy = "tickets", fetch = FetchType.LAZY)
+    private Set<DeveloperTeam> teams = new LinkedHashSet<>();
 
     @Column(name = "assigned_team", length = 100)
     private String assignedTeam;
@@ -199,6 +203,8 @@ public class Ticket extends Auditable {
         this.developers.clear();
         this.developers.addAll(developers);
     }
+    public Set<DeveloperTeam> getTeams() { return teams; }
+    public void replaceTeams(Set<DeveloperTeam> teams) { this.teams.clear(); this.teams.addAll(teams); }
 
     public String getAssignedTeam() {
         return assignedTeam;

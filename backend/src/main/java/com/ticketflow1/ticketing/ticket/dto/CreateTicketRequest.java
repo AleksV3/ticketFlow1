@@ -15,5 +15,6 @@ public record CreateTicketRequest(
         Severity severity,
         Long organizationId,
         Long ticketLeadId,
-        Set<Long> developerIds) {
+        Set<Long> developerIds,
+        Set<Long> teamIds) {
 }

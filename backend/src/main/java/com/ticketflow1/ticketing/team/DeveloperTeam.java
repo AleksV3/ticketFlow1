@@ -26,4 +26,6 @@ public class DeveloperTeam {
     public DeveloperTeam(String name, String description, AppUser leader, AppUser createdBy) { this.name=name; this.description=description; this.leader=leader; this.createdBy=createdBy; }
     public Long getId(){return id;} public String getName(){return name;} public String getDescription(){return description;} public AppUser getLeader(){return leader;} public AppUser getCreatedBy(){return createdBy;} public Set<AppUser> getDevelopers(){return developers;} public Set<Ticket> getTickets(){return tickets;} public Instant getCreatedAt(){return createdAt;} public Instant getUpdatedAt(){return updatedAt;}
     public void update(String name,String description,AppUser leader,Set<AppUser> developers,Set<Ticket> tickets){this.name=name;this.description=description;this.leader=leader;this.developers.clear();this.developers.addAll(developers);this.tickets.clear();this.tickets.addAll(tickets);}
+    public void addTicket(Ticket ticket){tickets.add(ticket);}
+    public void removeTicket(Ticket ticket){tickets.remove(ticket);}
 }

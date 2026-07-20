@@ -24,6 +24,8 @@ import com.ticketflow1.ticketing.workflow.TicketTypeRepository;
 import com.ticketflow1.ticketing.workflow.TicketTransitionService;
 import com.ticketflow1.ticketing.workflow.WorkflowState;
 import com.ticketflow1.ticketing.workflow.WorkflowStateRepository;
+import com.ticketflow1.ticketing.team.DeveloperTeam;
+import com.ticketflow1.ticketing.team.DeveloperTeamRepository;
 import java.util.List;
 import java.util.LinkedHashSet;
 import java.util.Set;
@@ -64,6 +66,7 @@ public class TicketService {
     private final SlaCalculator slaCalculator;
     private final SlaStatusService slaStatusService;
     private final Clock clock;
+    private final DeveloperTeamRepository developerTeamRepository;
 
     public TicketService(TicketRepository ticketRepository,
             TicketTypeRepository ticketTypeRepository,
@@ -77,7 +80,7 @@ public class TicketService {
             ProposalDetailService proposalDetailService,
             SlaCalculator slaCalculator,
             SlaStatusService slaStatusService,
-            Clock clock) {
+            Clock clock, DeveloperTeamRepository developerTeamRepository) {
         this.ticketRepository = ticketRepository;
         this.ticketTypeRepository = ticketTypeRepository;
         this.workflowStateRepository = workflowStateRepository;
@@ -91,6 +94,7 @@ public class TicketService {
         this.slaCalculator = slaCalculator;
         this.slaStatusService = slaStatusService;
         this.clock = clock;
+        this.developerTeamRepository = developerTeamRepository;
     }
 
     /**
@@ -143,6 +147,10 @@ public class TicketService {
         }
 
         Ticket saved = ticketRepository.saveAndFlush(ticket);
+        if (request.teamIds() != null) {
+            requireAssignmentPermission(principal);
+            syncTeams(saved, request.teamIds());
+        }
         if (DEFECT_TYPE_KEY.equals(ticketType.getKey())) {
             applyDeadlines(saved, saved.getSeverity(), saved.getCreatedAt());
             saved = ticketRepository.saveAndFlush(saved);
@@ -174,7 +182,8 @@ public class TicketService {
             throw ApiException.validation("status must be changed via /transition.");
         }
         boolean changesContent = request.title() != null || request.description() != null
-                || request.priority() != null || request.severity() != null || request.assignedTeam() != null;
+                || request.priority() != null || request.severity() != null || request.assignedTeam() != null
+                || request.teamIds() != null;
         if (changesContent && !principal.hasPermission("TICKET_UPDATE")) {
             throw ApiException.forbidden("TICKET_UPDATE permission is required.");
         }
@@ -268,6 +277,12 @@ public class TicketService {
             changed = true;
         }
 
+        if (request.teamIds() != null) {
+            requireAssignmentPermission(principal);
+            syncTeams(ticket, request.teamIds());
+            changed = true;
+        }
+
         if (request.assignedTeam() != null) {
             requireTicketflow1Party(principal, "assignedTeam");
             String assignedTeam = request.assignedTeam().trim();
@@ -293,6 +308,20 @@ public class TicketService {
         if (!principal.hasPermission("TICKET_ASSIGN")) {
             throw ApiException.forbidden("TICKET_ASSIGN permission is required.");
         }
+    }
+
+    private void syncTeams(Ticket ticket, Set<Long> teamIds) {
+        Set<Long> requested = teamIds == null ? Set.of() : teamIds;
+        Set<DeveloperTeam> selected = new LinkedHashSet<>(developerTeamRepository.findAllById(requested));
+        if (selected.size() != requested.size()) {
+            throw ApiException.validation("One or more teamIds do not exist.");
+        }
+        Set<DeveloperTeam> previous = new LinkedHashSet<>(ticket.getTeams());
+        previous.stream().filter(team -> !selected.contains(team)).forEach(team -> team.removeTicket(ticket));
+        selected.stream().filter(team -> !previous.contains(team)).forEach(team -> team.addTicket(ticket));
+        developerTeamRepository.saveAll(previous);
+        developerTeamRepository.saveAll(selected);
+        ticket.replaceTeams(selected);
     }
 
     private AppUser internalUser(Long userId, String fieldName) {

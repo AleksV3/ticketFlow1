@@ -14,6 +14,7 @@ import type { CurrentUser } from "@/lib/auth";
 import type { TicketDetail } from "@/lib/types";
 
 type Ref = { id: number; key?: string; name: string };
+type Team = { id: number; name: string };
 
 export default function NewTicketPage() {
   return <AppShell require="TICKET_CREATE">{user => <TicketForm user={user}/>}</AppShell>;
@@ -22,16 +23,18 @@ export default function NewTicketPage() {
 function TicketForm({ user }: { user: CurrentUser }) {
   const router = useRouter();
   const canAssign = user.permissions.includes("TICKET_ASSIGN");
-  const [orgs, setOrgs] = useState<Ref[]>([]), [types, setTypes] = useState<Ref[]>([]), [people, setPeople] = useState<Ref[]>([]);
+  const [orgs, setOrgs] = useState<Ref[]>([]), [types, setTypes] = useState<Ref[]>([]), [people, setPeople] = useState<Ref[]>([]), [teams,setTeams]=useState<Team[]>([]);
   const [org, setOrg] = useState(user.organizationId ? String(user.organizationId) : ""), [type, setType] = useState("");
   const [title, setTitle] = useState(""), [description, setDescription] = useState(""), [priority, setPriority] = useState("MEDIUM"), [severity, setSeverity] = useState("SEV_3");
-  const [leadId, setLeadId] = useState(""), [developerIds, setDeveloperIds] = useState<number[]>([]), [error, setError] = useState("");
+  const [leadId, setLeadId] = useState(""), [developerIds, setDeveloperIds] = useState<number[]>([]), [teamIds,setTeamIds]=useState<number[]>([]), [error, setError] = useState("");
 
   useEffect(() => { if (user.party === "TICKETFLOW1") void get<Ref[]>("/reference/organizations").then(setOrgs); }, [user.party]);
   useEffect(() => { if (canAssign) void get<Ref[]>("/reference/ticket-leads").then(setPeople); }, [canAssign]);
+  useEffect(() => { if (canAssign) void get<Team[]>("/teams").then(setTeams); }, [canAssign]);
   useEffect(() => { if (org) void get<Ref[]>(`/reference/ticket-types?organizationId=${org}`).then(values => { setTypes(values); setType(""); }); }, [org]);
 
   function toggleDeveloper(id: number) { setDeveloperIds(values => values.includes(id) ? values.filter(value => value !== id) : [...values, id]); }
+  function toggleTeam(id:number){setTeamIds(values=>values.includes(id)?values.filter(value=>value!==id):[...values,id])}
   async function submit(event: FormEvent) {
     event.preventDefault(); setError("");
     const selectedType = types.find(item => item.key === type || item.name.toLowerCase() === type.toLowerCase());
@@ -39,7 +42,8 @@ function TicketForm({ user }: { user: CurrentUser }) {
     try {
       const ticket = await post<TicketDetail>("/tickets", { type: selectedType.key, title, description, priority,
         severity: selectedType.key === "DEFECT" ? severity : null, organizationId: user.party === "TICKETFLOW1" ? Number(org) : null,
-        ticketLeadId: canAssign && leadId ? Number(leadId) : null, developerIds: canAssign ? developerIds : null });
+        ticketLeadId: canAssign && leadId ? Number(leadId) : null, developerIds: canAssign ? developerIds : null,
+        teamIds: canAssign ? teamIds : null });
       router.push(`/tickets/${ticket.ticketKey}`);
     } catch (cause) { setError(cause instanceof Error ? cause.message : "Could not create ticket."); }
   }
@@ -51,7 +55,7 @@ function TicketForm({ user }: { user: CurrentUser }) {
     <label className="block"><span>Description</span><textarea className="field mt-1 min-h-32" required value={description} onChange={event => setDescription(event.target.value)}/></label>
     <Select label="Priority" value={priority} set={setPriority} options={["LOW","MEDIUM","HIGH","CRITICAL"].map(value => [value,value])}/>
     {type === "DEFECT" ? <Select label="Severity" value={severity} set={setSeverity} options={["SEV_1","SEV_2","SEV_3","SEV_4"].map(value => [value,value])}/> : null}
-    {canAssign ? <fieldset className="rounded-lg border p-4"><legend className="px-2 font-bold">Assign ticket team now</legend><label className="block">Ticket team lead<select className="field mt-1" value={leadId} onChange={event => setLeadId(event.target.value)}><option value="">Assign later</option>{people.map(person => <option key={person.id} value={person.id}>{person.name}</option>)}</select></label><div className="mt-3"><span className="text-sm">Developers</span><div className="mt-2 grid gap-2 sm:grid-cols-2">{people.map(person => <label className={`permission-option ${developerIds.includes(person.id) ? "permission-option-selected" : ""}`} key={person.id}><input type="checkbox" checked={developerIds.includes(person.id)} onChange={() => toggleDeveloper(person.id)}/><span><strong>{person.name}</strong><small>Developer</small></span></label>)}</div></div></fieldset> : null}
+    {canAssign ? <fieldset className="rounded-lg border p-4"><legend className="px-2 font-bold">Assign ticket team now</legend><label className="block">Ticket team lead<select className="field mt-1" value={leadId} onChange={event => setLeadId(event.target.value)}><option value="">Assign later</option>{people.map(person => <option key={person.id} value={person.id}>{person.name}</option>)}</select></label><div className="mt-3"><span className="text-sm">Developer teams</span><div className="mt-2 grid gap-2 sm:grid-cols-2">{teams.map(team=><label className={`permission-option ${teamIds.includes(team.id)?"permission-option-selected":""}`} key={team.id}><input type="checkbox" checked={teamIds.includes(team.id)} onChange={()=>toggleTeam(team.id)}/><span><strong>{team.name}</strong><small>{teamIds.includes(team.id)?"Assigned team":"Assign team"}</small></span></label>)}</div></div><div className="mt-3"><span className="text-sm">Developers</span><div className="mt-2 grid gap-2 sm:grid-cols-2">{people.map(person => <label className={`permission-option ${developerIds.includes(person.id) ? "permission-option-selected" : ""}`} key={person.id}><input type="checkbox" checked={developerIds.includes(person.id)} onChange={() => toggleDeveloper(person.id)}/><span><strong>{person.name}</strong><small>Developer</small></span></label>)}</div></div></fieldset> : null}
     {error ? <p role="alert" className="text-red-700">{error}</p> : null}<button className="btn-primary">Create ticket</button>
   </form></div>;
 }

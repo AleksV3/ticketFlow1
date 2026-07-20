@@ -12,5 +12,6 @@ public record UpdateTicketRequest(
         Severity severity,
         Long ticketLeadId,
         Set<Long> developerIds,
-        String assignedTeam) {
+        String assignedTeam,
+        Set<Long> teamIds) {
 }
