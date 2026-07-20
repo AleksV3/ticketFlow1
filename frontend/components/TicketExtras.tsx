@@ -2,6 +2,7 @@
 
 import { ChangeEvent, FormEvent, useCallback, useEffect, useRef, useState } from "react";
 import { api, get, post } from "@/lib/api";
+import { useTicketEvents } from "@/lib/realtime";
 
 /**
  * Shared ticket detail widgets for activity, attachments, history, and change
@@ -35,6 +36,7 @@ function useTicketActivity(ticketKey: string) {
     } catch (e) { setError(e instanceof Error ? e.message : "Could not load activity"); }
   }, [ticketKey]);
   useEffect(() => { void load(); }, [load]);
+  useTicketEvents(load);
   async function addComment(e: FormEvent) {
     e.preventDefault(); if (!body.trim()) return;
     try { await post(`/tickets/${ticketKey}/comments`, { body, visibility }); setBody(""); await load(); }

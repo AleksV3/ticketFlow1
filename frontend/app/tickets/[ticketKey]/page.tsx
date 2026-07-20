@@ -7,6 +7,7 @@ import { ProposalActions, TicketCommunication, TicketHistory } from "@/component
 import { SlaBadge, StatusBadge, TransitionButtons } from "@/components/TicketUi";
 import { get, patch, post } from "@/lib/api";
 import type { TicketDetail } from "@/lib/types";
+import { useTicketEvents } from "@/lib/realtime";
 
 type History = { id: number; fromStatus: string | null; toStatus: string; createdAt: string };
 
@@ -24,6 +25,7 @@ function Detail({ canEdit, canAssign, internal }: { canEdit: boolean; canAssign:
   const [ticket, setTicket] = useState<TicketDetail | null>(null), [history, setHistory] = useState<History[]>([]), [error, setError] = useState(""), [editing, setEditing] = useState(false);
   const load = useCallback(async () => { try { const [detail, events] = await Promise.all([get<TicketDetail>(`/tickets/${ticketKey}`), get<History[]>(`/tickets/${ticketKey}/status-history`)]); setTicket(detail); setHistory(events); } catch (error) { setError(error instanceof Error ? error.message : "Could not load ticket."); } }, [ticketKey]);
   useEffect(() => { void load(); }, [load]);
+  useTicketEvents(load);
   if (error) return <div className="card text-red-700">{error}</div>;
   if (!ticket) return <div className="card">Loading ticket…</div>;
   return <div className="space-y-4">

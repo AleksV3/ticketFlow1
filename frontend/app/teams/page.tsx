@@ -1,8 +1,9 @@
 "use client";
 import Link from "next/link";
-import { FormEvent, useEffect, useMemo, useState } from "react";
+import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import { AppShell } from "@/components/AppShell";
 import { get, post, put } from "@/lib/api";
+import { useTicketEvents } from "@/lib/realtime";
 
 type Person={id:number;name:string}; type TicketRef={ticketKey:string;title:string;status:string};
 type Team={id:number;name:string;description:string|null;leader:Person;developers:Person[];tickets:TicketRef[];editable:boolean};
@@ -12,8 +13,9 @@ export default function TeamsPage(){return <AppShell require="TICKET_READ">{user
 function Teams({currentUserId}:{currentUserId:number}){
   const [teams,setTeams]=useState<Team[]>([]),[options,setOptions]=useState<Options>({people:[],tickets:[]}),[selectedId,setSelectedId]=useState<number|null>(null),[creating,setCreating]=useState(false),[error,setError]=useState("");
   const selected=teams.find(t=>t.id===selectedId)??null;
-  async function load(){try{const [list,opts]=await Promise.all([get<Team[]>("/teams"),get<Options>("/teams/options")]);setTeams(list);setOptions(opts);if(selectedId&&!list.some(t=>t.id===selectedId))setSelectedId(null)}catch(e){setError(e instanceof Error?e.message:"Could not load teams.")}}
-  useEffect(()=>{void load()},[]);
+  const load=useCallback(async()=>{try{const [list,opts]=await Promise.all([get<Team[]>("/teams"),get<Options>("/teams/options")]);setTeams(list);setOptions(opts);setError("");if(selectedId&&!list.some(t=>t.id===selectedId))setSelectedId(null)}catch(e){setError(e instanceof Error?e.message:"Could not load teams.")}},[selectedId]);
+  useEffect(()=>{void load()},[load]);
+  useTicketEvents(load);
   return <div className="space-y-6"><header className="flex flex-wrap items-end justify-between gap-4"><div><p className="eyebrow">Delivery workspace</p><h1 className="mt-1 text-3xl font-bold">Developer teams</h1><p className="mt-2 text-slate-500">Group developers and keep every ticket related to a team’s work in one place.</p></div><button className="btn-primary" onClick={()=>{setCreating(true);setSelectedId(null)}}>+ Create team</button></header>
     {error?<p className="card text-red-400">{error}</p>:null}
     <div className="grid gap-5 lg:grid-cols-[300px_minmax(0,1fr)]"><aside className="card self-start"><div className="mb-3 flex justify-between"><h2 className="font-bold">All teams</h2><span className="badge bg-slate-100 text-slate-700">{teams.length}</span></div><div className="space-y-2">{teams.map(team=><button className={`block w-full rounded-lg border p-3 text-left ${selectedId===team.id?"border-blue-500 bg-blue-950/30":""}`} key={team.id} onClick={()=>{setSelectedId(team.id);setCreating(false)}}><strong className="text-sm">{team.name}</strong><span className="mt-1 block text-xs text-slate-500">{team.developers.length} developers · {team.tickets.length} tickets</span></button>)}</div></aside>

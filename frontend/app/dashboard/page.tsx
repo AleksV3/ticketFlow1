@@ -1,10 +1,11 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { AppShell } from "@/components/AppShell";
 import { SlaBadge, StatusBadge } from "@/components/TicketUi";
 import { ApiError, get } from "@/lib/api";
+import { useTicketEvents } from "@/lib/realtime";
 
 type Ticket = { ticketKey: string; title: string; type: string; status: string; slaStatus: string };
 type Dashboard = { activeCount: number; closedCount: number; byType: Record<string, number>; byStatus: Record<string, number>; defectsBySeverity: Record<string, number>; slaBreached: Ticket[]; slaDueSoon: Ticket[]; waitingForClientApproval: Ticket[]; waitingForClientConfirmation: Ticket[]; myAssignedTickets: Ticket[] };
@@ -18,7 +19,9 @@ export default function DashboardPage() {
 function DashboardContent() {
   const [data, setData] = useState<Dashboard | null>(null);
   const [error, setError] = useState("");
-  useEffect(() => { get<Dashboard>("/dashboard").then(setData).catch(e => setError(e instanceof ApiError ? e.message : "Could not load dashboard.")); }, []);
+  const load = useCallback(() => { get<Dashboard>("/dashboard").then(value => { setData(value); setError(""); }).catch(e => setError(e instanceof ApiError ? e.message : "Could not load dashboard.")); }, []);
+  useEffect(() => { void load(); }, [load]);
+  useTicketEvents(load);
   if (error) return <div className="card text-red-400" role="alert">{error}</div>;
   if (!data) return <div className="card" role="status">Loading dashboard…</div>;
 
