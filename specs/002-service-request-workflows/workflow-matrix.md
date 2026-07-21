@@ -47,3 +47,25 @@ Protected operations never execute through the generic transition endpoint.
 Every reason, decision, actor, relationship resolution, state change, history
 entry, and audit entry is persisted atomically.
 
+## Exact authorization rules
+
+- `TICKET_APPROVE` is required for TASI/USR approve and reject; the actor must
+  also be TICKETFLOW1 and equal the ticket's resolved approver. Resolution is
+  the explicit active approver from the routing rule, otherwise the assigned
+  active team's leader. The assigned analyst may approve only when that exact
+  relationship also holds.
+- `REQUEST_ACCEPT` is required for REQ acceptance approve and reject; the actor
+  must also be CLIENT, belong to the ticket organization, and be either the
+  ticket business owner or an explicitly stored delegate for that ticket.
+- Ordinary internal edges require TICKETFLOW1, `TICKET_TRANSITION`, and either
+  assigned developer membership or membership/leadership of an assigned team.
+- Correction and deployment rejection reasons are trimmed plain text of 2–2000
+  characters. Client correction reasons are PUBLIC; internal approval and
+  deployment reasons are INTERNAL unless the matrix states client-visible.
+- `APPROVAL_SUBMIT`, `APPROVAL_APPROVE`, `APPROVAL_REJECT`,
+  `ACCEPTANCE_SUBMIT`, `ACCEPTANCE_APPROVE`, `ACCEPTANCE_REJECT`, and
+  `CORRECTION_RETURN` are protected operations. They are never advertised in
+  `allowedTransitions` or accepted by the generic transition endpoint.
+- Responsibility changes only as listed in the matrix. The assigned analysis
+  team/developer are preserved into implementation unless a caller holding
+  `TICKET_ASSIGN` performs a separately audited reassignment.

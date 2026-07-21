@@ -50,6 +50,9 @@ can be deleted. The capability is code-owned and cannot be invented by admins.
   same tenant/scope, visibility, no self-parenting, and no ancestor cycle.
 - `routing_rule_id` nullable FK records the rule snapshot source.
 - `resolved_approver_id` nullable FK to `app_user`.
+- `client_acceptance_approver_id` nullable FK to `app_user`; when present this
+  is the explicit same-organization REQ delegate. The business owner remains
+  independently eligible.
 - `target_user_id` nullable FK to `app_user` plus `target_user_display_snapshot`.
 
 Indexes: subtype, parent, target user, resolved approver, and
@@ -91,4 +94,3 @@ user changes, decisions, and transitions.
 - Configuration updates never rewrite existing ticket values or assignments.
 - All repository reads used for mutation include tenant/type ownership checks;
   foreign IDs supplied by clients are never accepted solely because they exist.
-
