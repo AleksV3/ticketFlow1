@@ -76,7 +76,7 @@ dependency; all tasks remain unchecked until implemented and verified.
 - [x] T047 Implement TASI/USR submit/approve/reject domain commands; resolve assigned team leader/designated approver and prevent unauthorized self-approval.
 - [x] T048 Implement REQ client acceptance/rejection command; require same-org business owner or approved permission rule.
 - [x] T049 Ensure protected transitions never appear in or execute through the generic transition endpoint.
-- [ ] T050 [P] Matrix-test every legal/illegal transition, repeated loop, permission, party, relationship, stale decision, and rollback case.
+- [x] T050 [P] Matrix-test every legal/illegal transition, repeated loop, permission, party, relationship, stale decision, and rollback case.
 - [ ] T051 **Verify**: execute complete TASI, USR, DFCT, and REQ happy paths plus correction/rejection loops using multiple actors.
 
 ## Phase 6: Administration and ticket UI

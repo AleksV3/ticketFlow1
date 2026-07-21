@@ -200,6 +200,47 @@ class TicketTransitionServiceTest {
         assertThat(ticketTransitionService.allowedTransitions(fixture.ticket(), principal)).isEmpty();
     }
 
+    @Test
+    void workflowApproval_succeedsOnlyForResolvedApprover() {
+        Fixture fixture = fixture("TASI Workflow", "PENDING_APPROVAL", "IMPLEMENTATION",
+                "TICKET_TRANSITION", Responsibility.TICKETFLOW1, null);
+        ReflectionTestUtils.setField(fixture.ticket(), "resolvedApprover", fixture.actor());
+        WorkflowTransition edge = new WorkflowTransition(fixture.workflow(), fixture.fromState(), fixture.toState(),
+                new Permission("TICKET_TRANSITION"), Responsibility.TICKETFLOW1, null,
+                TransitionOperationKind.WORKFLOW_APPROVE);
+        when(workflowTransitionRepository.findByWorkflowIdAndFromStateId(fixture.workflow().getId(), fixture.fromState().getId()))
+                .thenReturn(List.of(edge));
+        when(appUserRepository.findById(fixture.actor().getId())).thenReturn(java.util.Optional.of(fixture.actor()));
+        when(ticketRepository.save(any(Ticket.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        AuthPrincipal principal = new AuthPrincipal(fixture.actor().getId(), Responsibility.TICKETFLOW1,
+                fixture.organization().getId(), Set.of("TICKET_TRANSITION"));
+
+        ticketTransitionService.transitionOwned(fixture.ticket(), TransitionOperationKind.WORKFLOW_APPROVE, principal);
+
+        assertThat(fixture.ticket().getCurrentState().getKey()).isEqualTo("IMPLEMENTATION");
+    }
+
+    @Test
+    void clientAcceptance_requiresTheBusinessOwner() {
+        Fixture fixture = fixture("REQ Workflow", "CLIENT_ACCEPTANCE", "DEPLOYMENT",
+                "TICKET_TRANSITION", Responsibility.CLIENT, Responsibility.TICKETFLOW1);
+        ReflectionTestUtils.setField(fixture.ticket(), "businessOwner", fixture.actor());
+        WorkflowTransition edge = new WorkflowTransition(fixture.workflow(), fixture.fromState(), fixture.toState(),
+                new Permission("TICKET_TRANSITION"), Responsibility.CLIENT, Responsibility.TICKETFLOW1,
+                TransitionOperationKind.CLIENT_ACCEPT);
+        when(workflowTransitionRepository.findByWorkflowIdAndFromStateId(fixture.workflow().getId(), fixture.fromState().getId()))
+                .thenReturn(List.of(edge));
+        when(appUserRepository.findById(fixture.actor().getId())).thenReturn(java.util.Optional.of(fixture.actor()));
+        when(ticketRepository.save(any(Ticket.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        AuthPrincipal principal = new AuthPrincipal(fixture.actor().getId(), Responsibility.CLIENT,
+                fixture.organization().getId(), Set.of("TICKET_TRANSITION"));
+
+        ticketTransitionService.transitionOwned(fixture.ticket(), TransitionOperationKind.CLIENT_ACCEPT, principal);
+
+        assertThat(fixture.ticket().getCurrentState().getKey()).isEqualTo("DEPLOYMENT");
+        assertThat(fixture.ticket().getCurrentResponsibility()).isEqualTo(Responsibility.TICKETFLOW1);
+    }
+
     private void stubSuccessPath(Fixture fixture, AuthPrincipal principal, String toKey) {
         stubLookupPath(fixture, principal, toKey);
         when(appUserRepository.findById(fixture.actor().getId())).thenReturn(java.util.Optional.of(fixture.actor()));

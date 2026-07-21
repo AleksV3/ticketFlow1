@@ -95,6 +95,25 @@ public class TicketTransitionService {
                 proposalDetailService.detail(saved, principal), slaStatusService.status(saved));
     }
 
+    @Transactional
+    public TicketDetailResponse protectedDecision(String ticketKey, TransitionOperationKind operation,
+            String reason, AuthPrincipal principal) {
+        boolean rejection = operation == TransitionOperationKind.WORKFLOW_REJECT
+                || operation == TransitionOperationKind.CLIENT_REJECT;
+        if (rejection && (reason == null || reason.isBlank())) {
+            throw ApiException.validation("A rejection reason is required.");
+        }
+        Ticket ticket = findVisibleTicket(ticketKey, principal);
+        Ticket saved = transitionOwned(ticket, operation, principal);
+        if (reason != null && !reason.isBlank()) {
+            CommentVisibility visibility = principal.party() == Responsibility.CLIENT
+                    ? CommentVisibility.PUBLIC : CommentVisibility.INTERNAL;
+            commentService.createForTicket(saved, reason.trim(), visibility, principal);
+        }
+        return TicketDetailResponse.from(saved, allowedTransitions(saved, principal),
+                proposalDetailService.detail(saved, principal), slaStatusService.status(saved));
+    }
+
     /**
      * Applies the single owned transition that matches the requested operation.
      */

@@ -4,6 +4,8 @@ import com.ticketflow1.ticketing.auth.AuthPrincipal;
 import com.ticketflow1.ticketing.common.PagedResponse;
 import com.ticketflow1.ticketing.ticket.dto.CreateTicketRequest;
 import com.ticketflow1.ticketing.ticket.dto.CorrectionReturnRequest;
+import com.ticketflow1.ticketing.ticket.dto.WorkflowDecisionRequest;
+import com.ticketflow1.ticketing.workflow.TransitionOperationKind;
 import com.ticketflow1.ticketing.ticket.dto.TicketDetailResponse;
 import com.ticketflow1.ticketing.ticket.dto.TicketSummaryResponse;
 import com.ticketflow1.ticketing.ticket.dto.TransitionTicketRequest;
@@ -113,5 +115,41 @@ public class TicketController {
             @Valid @RequestBody CorrectionReturnRequest request,
             @AuthenticationPrincipal AuthPrincipal principal) {
         return ticketTransitionService.correctionReturn(ticketKey, request.reason(), principal);
+    }
+
+    @PostMapping("/{ticketKey}/workflow-approve")
+    @PreAuthorize("hasAuthority('TICKET_TRANSITION')")
+    public TicketDetailResponse workflowApprove(@PathVariable String ticketKey,
+            @RequestBody(required = false) WorkflowDecisionRequest request,
+            @AuthenticationPrincipal AuthPrincipal principal) {
+        return ticketTransitionService.protectedDecision(ticketKey, TransitionOperationKind.WORKFLOW_APPROVE,
+                request == null ? null : request.reason(), principal);
+    }
+
+    @PostMapping("/{ticketKey}/workflow-reject")
+    @PreAuthorize("hasAuthority('TICKET_TRANSITION')")
+    public TicketDetailResponse workflowReject(@PathVariable String ticketKey,
+            @Valid @RequestBody WorkflowDecisionRequest request,
+            @AuthenticationPrincipal AuthPrincipal principal) {
+        return ticketTransitionService.protectedDecision(ticketKey, TransitionOperationKind.WORKFLOW_REJECT,
+                request.reason(), principal);
+    }
+
+    @PostMapping("/{ticketKey}/client-accept")
+    @PreAuthorize("hasAuthority('TICKET_TRANSITION')")
+    public TicketDetailResponse clientAccept(@PathVariable String ticketKey,
+            @RequestBody(required = false) WorkflowDecisionRequest request,
+            @AuthenticationPrincipal AuthPrincipal principal) {
+        return ticketTransitionService.protectedDecision(ticketKey, TransitionOperationKind.CLIENT_ACCEPT,
+                request == null ? null : request.reason(), principal);
+    }
+
+    @PostMapping("/{ticketKey}/client-reject")
+    @PreAuthorize("hasAuthority('TICKET_TRANSITION')")
+    public TicketDetailResponse clientReject(@PathVariable String ticketKey,
+            @Valid @RequestBody WorkflowDecisionRequest request,
+            @AuthenticationPrincipal AuthPrincipal principal) {
+        return ticketTransitionService.protectedDecision(ticketKey, TransitionOperationKind.CLIENT_REJECT,
+                request.reason(), principal);
     }
 }

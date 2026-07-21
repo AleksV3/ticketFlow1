@@ -981,6 +981,127 @@ class TicketControllerIntegrationTest {
                 .andExpect(jsonPath("$[?(@.action == 'DYNAMIC_FIELDS_CAPTURED' && @.newValue == 'do-not-leak')]").isEmpty());
     }
 
+    @Test
+    void serviceRequestTypesSubtypesAndChildTicket_areCreatedWithTenantAuditContext() throws Exception {
+        Cookie admin = login("admin@ticketflow1.demo", "admin123");
+        Long orgId = jdbcTemplate.queryForObject("select id from organization where name='Client A'", Long.class);
+        Long tasiSubtype = jdbcTemplate.queryForObject("""
+                select s.id from ticket_subtype s join ticket_type t on t.id=s.ticket_type_id
+                where t.organization_id=? and t.key='TASI' and s.key='FIREWALL'
+                """, Long.class, orgId);
+        Long usrNewSubtype = jdbcTemplate.queryForObject("""
+                select s.id from ticket_subtype s join ticket_type t on t.id=s.ticket_type_id
+                where t.organization_id=? and t.key='USR' and s.key='NEW'
+                """, Long.class, orgId);
+        Long usrModifySubtype = jdbcTemplate.queryForObject("""
+                select s.id from ticket_subtype s join ticket_type t on t.id=s.ticket_type_id
+                where t.organization_id=? and t.key='USR' and s.key='MODIFY'
+                """, Long.class, orgId);
+        Long targetUser = jdbcTemplate.queryForObject("select id from app_user where email='client-a@demo.test'", Long.class);
+
+        String tasi = createTicketWithCsrf(admin, """
+                {"type":"TASI","organizationId":%d,"subtypeId":%d,"title":"Firewall action","description":"Inspect firewall rule","priority":"HIGH"}
+                """.formatted(orgId, tasiSubtype), "NEW");
+        String usrNew = createTicketWithCsrf(admin, """
+                {"type":"USR","organizationId":%d,"subtypeId":%d,"title":"New user","description":"Provision user","priority":"MEDIUM"}
+                """.formatted(orgId, usrNewSubtype), "NEW");
+        String usrModify = createTicketWithCsrf(admin, """
+                {"type":"USR","organizationId":%d,"subtypeId":%d,"targetUserId":%d,"title":"Modify user","description":"Change access","priority":"MEDIUM"}
+                """.formatted(orgId, usrModifySubtype, targetUser), "NEW");
+
+        String child = createTicketWithCsrf(admin, """
+                {"type":"TASI","organizationId":%d,"subtypeId":%d,"parentTicketKey":"%s","title":"Firewall follow-up","description":"Follow-up action","priority":"MEDIUM"}
+                """.formatted(orgId, tasiSubtype, tasi), "NEW");
+
+        mockMvc.perform(get("/api/tickets/{ticketKey}", child).cookie(admin))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.parentTicketKey").value(tasi))
+                .andExpect(jsonPath("$.subtype").value("FIREWALL"));
+        mockMvc.perform(get("/api/tickets/{ticketKey}/audit-log", usrModify).cookie(admin))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].action").value("TICKET_CREATED"));
+        assertThat(jdbcTemplate.queryForObject("select count(*) from ticket where ticket_key in (?, ?, ?, ?)",
+                Long.class, tasi, usrNew, usrModify, child)).isEqualTo(4L);
+    }
+
+    @Test
+    void allServiceRequestWorkflows_executeHappyPathsAndDecisionCommands() throws Exception {
+        Cookie admin = login("admin@ticketflow1.demo", "admin123");
+        Cookie client = login("client-a@demo.test", "client123");
+        Long orgId = jdbcTemplate.queryForObject("select id from organization where name='Client A'", Long.class);
+        Long adminId = jdbcTemplate.queryForObject("select id from app_user where email='admin@ticketflow1.demo'", Long.class);
+        Long firewall = jdbcTemplate.queryForObject("""
+                select s.id from ticket_subtype s join ticket_type t on t.id=s.ticket_type_id
+                where t.organization_id=? and t.key='TASI' and s.key='FIREWALL'""", Long.class, orgId);
+        Long modify = jdbcTemplate.queryForObject("""
+                select s.id from ticket_subtype s join ticket_type t on t.id=s.ticket_type_id
+                where t.organization_id=? and t.key='USR' and s.key='MODIFY'""", Long.class, orgId);
+        Long target = jdbcTemplate.queryForObject("select id from app_user where email='client-a@demo.test'", Long.class);
+
+        String tasi = createTicketWithCsrf(admin, """
+                {"type":"TASI","organizationId":%d,"subtypeId":%d,"title":"TASI path","description":"TASI","priority":"MEDIUM"}
+                """.formatted(orgId, firewall), "NEW");
+        String usr = createTicketWithCsrf(admin, """
+                {"type":"USR","organizationId":%d,"subtypeId":%d,"targetUserId":%d,"title":"USR path","description":"USR","priority":"MEDIUM"}
+                """.formatted(orgId, modify, target), "NEW");
+        jdbcTemplate.update("update ticket set resolved_approver_id=? where ticket_key in (?,?)", adminId, tasi, usr);
+
+        transitionWithCsrf(tasi, "ANALYSIS", admin);
+        transitionWithCsrf(tasi, "PENDING_APPROVAL", admin);
+        decide(tasi, "workflow-approve", admin, null);
+        transitionWithCsrf(tasi, "CLOSED", admin);
+        assertStatus(tasi, "CLOSED", admin);
+
+        transitionWithCsrf(usr, "ANALYSIS", admin);
+        transitionWithCsrf(usr, "PENDING_APPROVAL", admin);
+        decide(usr, "workflow-reject", admin, "Needs more information");
+        assertStatus(usr, "ANALYSIS", admin);
+
+        String defect = createTicketWithCsrf(client, """
+                {"type":"DFCT","title":"DFCT path","description":"Defect","priority":"HIGH","severity":"SEV_3"}
+                """, "REPORTED");
+        transitionWithCsrf(defect, "ANALYSIS", admin);
+        transitionWithCsrf(defect, "FIX_IN_PROGRESS", admin);
+        transitionWithCsrf(defect, "CLIENT_CONFIRMATION", admin);
+        transitionWithCsrf(defect, "FIX_IN_PROGRESS", client);
+        transitionWithCsrf(defect, "CLIENT_CONFIRMATION", admin);
+        transitionWithCsrf(defect, "CLOSED", client);
+
+        String request = createTicketWithCsrf(client, """
+                {"type":"REQ","title":"REQ path","description":"Request","priority":"MEDIUM"}
+                """, "SUBMITTED");
+        transitionWithCsrf(request, "ANALYSIS", admin);
+        transitionWithCsrf(request, "CLIENT_ACCEPTANCE", admin);
+        decide(request, "client-accept", client, null);
+        transitionWithCsrf(request, "CLOSED", admin);
+        assertStatus(request, "CLOSED", admin);
+    }
+
+    private void transitionWithCsrf(String key, String state, Cookie cookie) throws Exception {
+        mockMvc.perform(post("/api/tickets/{ticketKey}/transition", key).with(csrf()).cookie(cookie)
+                        .contentType("application/json").content("{\"toStatus\":\"" + state + "\"}"))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.status").value(state));
+    }
+
+    private void decide(String key, String command, Cookie cookie, String reason) throws Exception {
+        String body = reason == null ? "{}" : "{\"reason\":\"" + reason + "\"}";
+        mockMvc.perform(post("/api/tickets/{ticketKey}/" + command, key).with(csrf()).cookie(cookie)
+                        .contentType("application/json").content(body))
+                .andExpect(status().isOk());
+    }
+
+    private void assertStatus(String key, String state, Cookie cookie) throws Exception {
+        mockMvc.perform(get("/api/tickets/{ticketKey}", key).cookie(cookie))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.status").value(state));
+    }
+
+    private String createTicketWithCsrf(Cookie authCookie, String body, String expectedInitialState) throws Exception {
+        MvcResult result = mockMvc.perform(post("/api/tickets").with(csrf()).cookie(authCookie)
+                        .contentType("application/json").content(body))
+                .andExpect(status().isCreated()).andExpect(jsonPath("$.status").value(expectedInitialState)).andReturn();
+        return objectMapper.readTree(result.getResponse().getContentAsString()).path("ticketKey").asText();
+    }
+
     private String createTicket(Cookie authCookie, String body, String expectedInitialState) throws Exception {
         MvcResult createResult = mockMvc.perform(post("/api/tickets")
                         .cookie(authCookie)
