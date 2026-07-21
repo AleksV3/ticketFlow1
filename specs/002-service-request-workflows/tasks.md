@@ -73,9 +73,9 @@ dependency; all tasks remain unchecked until implemented and verified.
 - [ ] T044 Seed/migrate approved DFCT workflow while preserving fixed severity/SLA behavior via capability rather than literal `DEFECT` checks.
 - [ ] T045 Seed/migrate approved REQ workflow with client acceptance and implementation/deployment loop.
 - [x] T046 Implement correction-return command/reason persistence atomically with transition/history/audit/comment visibility.
-- [ ] T047 Implement TASI/USR submit/approve/reject domain commands; resolve assigned team leader/designated approver and prevent unauthorized self-approval.
-- [ ] T048 Implement REQ client acceptance/rejection command; require same-org business owner or approved permission rule.
-- [ ] T049 Ensure protected transitions never appear in or execute through the generic transition endpoint.
+- [x] T047 Implement TASI/USR submit/approve/reject domain commands; resolve assigned team leader/designated approver and prevent unauthorized self-approval.
+- [x] T048 Implement REQ client acceptance/rejection command; require same-org business owner or approved permission rule.
+- [x] T049 Ensure protected transitions never appear in or execute through the generic transition endpoint.
 - [ ] T050 [P] Matrix-test every legal/illegal transition, repeated loop, permission, party, relationship, stale decision, and rollback case.
 - [ ] T051 **Verify**: execute complete TASI, USR, DFCT, and REQ happy paths plus correction/rejection loops using multiple actors.
 

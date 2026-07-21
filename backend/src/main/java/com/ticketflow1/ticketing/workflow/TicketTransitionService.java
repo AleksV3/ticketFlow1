@@ -124,7 +124,7 @@ public class TicketTransitionService {
         WorkflowTransition transition = workflowTransitionRepository
                 .findByWorkflowIdAndFromStateIdAndToStateId(workflowId, fromState.getId(), toState.getId())
                 .orElseThrow(() -> illegalTransition(ticket.getTicketKey(), fromState.getKey(), toStateKey));
-        if (transition.getOperationKind() != operationKind || !isAllowed(transition, principal)) {
+        if (transition.getOperationKind() != operationKind || !isAllowed(ticket, transition, principal)) {
             throw illegalTransition(ticket.getTicketKey(), fromState.getKey(), toStateKey);
         }
 
@@ -136,7 +136,7 @@ public class TicketTransitionService {
                 .orElseThrow(() -> ApiException.notFound("Current user no longer exists."));
         WorkflowState fromState = ticket.getCurrentState();
         WorkflowState toState = transition.getToState();
-        if (!isAllowed(transition, principal)) {
+        if (!isAllowed(ticket, transition, principal)) {
             throw illegalTransition(ticket.getTicketKey(), fromState.getKey(), toState.getKey());
         }
 
@@ -166,18 +166,33 @@ public class TicketTransitionService {
         Long workflowId = ticket.getTicketType().getWorkflow().getId();
         Long fromStateId = ticket.getCurrentState().getId();
         return workflowTransitionRepository.findByWorkflowIdAndFromStateId(workflowId, fromStateId).stream()
-                .filter(transition -> isAllowed(transition, principal))
+                .filter(transition -> isAllowed(ticket, transition, principal))
                 .filter(transition -> transition.getOperationKind() == TransitionOperationKind.STANDARD)
                 .map(transition -> transition.getToState().getKey())
                 .toList();
     }
 
-    private boolean isAllowed(WorkflowTransition transition, AuthPrincipal principal) {
+    private boolean isAllowed(Ticket ticket, WorkflowTransition transition, AuthPrincipal principal) {
         if (!principal.hasPermission(transition.getRequiredPermission().getKey())) {
             return false;
         }
         Responsibility requiredParty = transition.getRequiredParty();
-        return requiredParty == null || requiredParty == principal.party();
+        if (requiredParty != null && requiredParty != principal.party()) return false;
+        TransitionOperationKind operation = transition.getOperationKind();
+        if (operation == TransitionOperationKind.WORKFLOW_APPROVE
+                || operation == TransitionOperationKind.WORKFLOW_REJECT) {
+            return principal.party() == Responsibility.TICKETFLOW1
+                    && ticket.getResolvedApprover() != null
+                    && ticket.getResolvedApprover().getId().equals(principal.userId());
+        }
+        if (operation == TransitionOperationKind.CLIENT_ACCEPT
+                || operation == TransitionOperationKind.CLIENT_REJECT) {
+            return principal.party() == Responsibility.CLIENT
+                    && ticket.getBusinessOwner() != null
+                    && ticket.getBusinessOwner().getId().equals(principal.userId())
+                    && ticket.getOrganization().getId().equals(principal.organizationId());
+        }
+        return true;
     }
 
     private Ticket findVisibleTicket(String ticketKey, AuthPrincipal principal) {
