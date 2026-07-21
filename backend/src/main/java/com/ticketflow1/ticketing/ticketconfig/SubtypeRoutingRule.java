@@ -19,4 +19,7 @@ public class SubtypeRoutingRule extends Auditable {
     public Long getId(){return id;} public TicketSubtype getSubtype(){return subtype;} public Organization getOrganization(){return organization;}
     public DeveloperTeam getTeam(){return team;} public AppUser getPrimaryDeveloper(){return primaryDeveloper;} public AppUser getFallbackDeveloper(){return fallbackDeveloper;}
     public AppUser getApprover(){return approver;} public boolean isActive(){return active;} public long getVersion(){return version;} public void setActive(boolean active){this.active=active;}
+    public void update(Organization organization,DeveloperTeam team,AppUser primaryDeveloper,AppUser fallbackDeveloper,AppUser approver,boolean active){
+        this.organization=organization;this.team=team;this.primaryDeveloper=primaryDeveloper;this.fallbackDeveloper=fallbackDeveloper;this.approver=approver;this.active=active;
+    }
 }

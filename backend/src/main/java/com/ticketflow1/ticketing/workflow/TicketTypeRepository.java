@@ -11,4 +11,7 @@ public interface TicketTypeRepository extends JpaRepository<TicketType, Long> {
     List<TicketType> findByOrganizationIsNull();
 
     Optional<TicketType> findByOrganizationIdAndKey(Long organizationId, String key);
+    Optional<TicketType> findByOrganizationIsNullAndKey(String key);
+    List<TicketType> findByOrganizationIdAndActiveTrueOrderBySortOrderAscIdAsc(Long organizationId);
+    List<TicketType> findByOrganizationIsNullAndActiveTrueOrderBySortOrderAscIdAsc();
 }

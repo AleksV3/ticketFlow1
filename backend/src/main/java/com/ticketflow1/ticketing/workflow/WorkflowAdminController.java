@@ -58,4 +58,10 @@ public class WorkflowAdminController {
      */
     @PatchMapping("/ticket-types/{id}") @PreAuthorize("hasAuthority('TYPE_MANAGE')")
     TicketTypeAdminResponse updateType(@AuthenticationPrincipal AuthPrincipal p,@PathVariable Long id,@RequestBody WorkflowRequests.UpdateType r){return service.updateType(p,id,r);}
+    @PostMapping("/ticket-types/{id}/activate") @PreAuthorize("hasAuthority('TYPE_MANAGE')")
+    TicketTypeAdminResponse activateType(@AuthenticationPrincipal AuthPrincipal p,@PathVariable Long id){return service.setTypeActive(p,id,true);}
+    @PostMapping("/ticket-types/{id}/deactivate") @PreAuthorize("hasAuthority('TYPE_MANAGE')")
+    TicketTypeAdminResponse deactivateType(@AuthenticationPrincipal AuthPrincipal p,@PathVariable Long id){return service.setTypeActive(p,id,false);}
+    @DeleteMapping("/ticket-types/{id}") @ResponseStatus(HttpStatus.NO_CONTENT) @PreAuthorize("hasAuthority('TYPE_MANAGE')")
+    void deleteType(@AuthenticationPrincipal AuthPrincipal p,@PathVariable Long id){service.deleteType(p,id);}
 }

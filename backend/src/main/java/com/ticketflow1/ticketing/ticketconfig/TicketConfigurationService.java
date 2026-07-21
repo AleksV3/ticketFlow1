@@ -3,6 +3,9 @@ package com.ticketflow1.ticketing.ticketconfig;
 import com.fasterxml.jackson.core.JsonProcessingException; import com.fasterxml.jackson.databind.ObjectMapper;
 import com.ticketflow1.ticketing.auth.AuthPrincipal; import com.ticketflow1.ticketing.common.ApiException;
 import com.ticketflow1.ticketing.configaudit.ConfigurationAuditService; import com.ticketflow1.ticketing.organization.Organization;
+import com.ticketflow1.ticketing.organization.OrganizationRepository; import com.ticketflow1.ticketing.team.DeveloperTeam;
+import com.ticketflow1.ticketing.team.DeveloperTeamRepository; import com.ticketflow1.ticketing.user.AppUser;
+import com.ticketflow1.ticketing.user.AppUserRepository;
 import com.ticketflow1.ticketing.ticket.Responsibility; import com.ticketflow1.ticketing.workflow.TicketType;
 import com.ticketflow1.ticketing.workflow.TicketTypeRepository; import jakarta.persistence.EntityManager;
 import java.math.BigDecimal; import java.util.*; import org.springframework.stereotype.Service; import org.springframework.transaction.annotation.Transactional;
@@ -11,11 +14,14 @@ import java.math.BigDecimal; import java.util.*; import org.springframework.ster
 public class TicketConfigurationService {
     private final TicketSubtypeRepository subtypes; private final SubtypeFieldDefinitionRepository fields;
     private final SubtypeFieldOptionRepository options; private final TicketTypeRepository types;
+    private final SubtypeRoutingRuleRepository routing; private final DeveloperTeamRepository teams;
+    private final AppUserRepository users; private final OrganizationRepository organizations;
     private final ConfigurationAuditService audit; private final EntityManager entityManager; private final ObjectMapper json;
     public TicketConfigurationService(TicketSubtypeRepository subtypes,SubtypeFieldDefinitionRepository fields,
-            SubtypeFieldOptionRepository options,TicketTypeRepository types,ConfigurationAuditService audit,
-            EntityManager entityManager,ObjectMapper json){this.subtypes=subtypes;this.fields=fields;this.options=options;
-        this.types=types;this.audit=audit;this.entityManager=entityManager;this.json=json;}
+            SubtypeFieldOptionRepository options,TicketTypeRepository types,SubtypeRoutingRuleRepository routing,
+            DeveloperTeamRepository teams,AppUserRepository users,OrganizationRepository organizations,
+            ConfigurationAuditService audit,EntityManager entityManager,ObjectMapper json){this.subtypes=subtypes;this.fields=fields;this.options=options;
+        this.types=types;this.routing=routing;this.teams=teams;this.users=users;this.organizations=organizations;this.audit=audit;this.entityManager=entityManager;this.json=json;}
 
     @Transactional(readOnly=true) public List<TicketSubtype> listSubtypes(AuthPrincipal p,Long typeId){requireManage(p);type(typeId);return subtypes.findByTicketTypeIdOrderBySortOrderAscIdAsc(typeId);}
 
@@ -50,12 +56,48 @@ public class TicketConfigurationService {
     @Transactional public void deleteField(AuthPrincipal p,Long id){requireManage(p);SubtypeFieldDefinition f=field(id);if(count("ticket_field_value","field_definition_id",id)>0||count("subtype_field_option","field_definition_id",id)>0)throw ApiException.conflict("Field is referenced and can only be deactivated.");fields.delete(f);record(p,organization(f.getSubtype()),"SUBTYPE_FIELD",id,"DELETED",Map.of("key",f.getKey()));}
     @Transactional public void deleteOption(AuthPrincipal p,Long id){requireManage(p);SubtypeFieldOption o=option(id);if(count("ticket_field_value","selected_option_id",id)>0||count("ticket_field_value_option","option_id",id)>0)throw ApiException.conflict("Option is referenced and can only be deactivated.");options.delete(o);record(p,organization(o.getFieldDefinition().getSubtype()),"FIELD_OPTION",id,"DELETED",Map.of("key",o.getKey()));}
 
+    @Transactional(readOnly=true) public SubtypeRoutingRule getRouting(AuthPrincipal p,Long subtypeId,Long organizationId){
+        requireManage(p);TicketSubtype subtype=subtype(subtypeId);Organization scope=routingScope(subtype,organizationId);
+        return rule(subtypeId,scope);
+    }
+    @Transactional public SubtypeRoutingRule putRouting(AuthPrincipal p,Long subtypeId,Long organizationId,Long teamId,
+            Long primaryId,Long fallbackId,Long approverId,boolean active,Long suppliedVersion){
+        requireManage(p);TicketSubtype subtype=subtype(subtypeId);Organization scope=routingScope(subtype,organizationId);
+        if(teamId==null)throw ApiException.validation("teamId is required.");
+        DeveloperTeam team=teams.findById(teamId)
+                .orElseThrow(()->ApiException.notFound("Team not found: "+teamId));
+        AppUser primary=selectableMember(primaryId,team,"Primary developer");
+        AppUser fallback=selectableMember(fallbackId,team,"Fallback developer");
+        AppUser approver=selectableMember(approverId,team,"Approver");
+        Optional<SubtypeRoutingRule> existing=findRule(subtypeId,scope);
+        SubtypeRoutingRule saved;
+        if(existing.isPresent()){
+            saved=existing.get();version(suppliedVersion,saved.getVersion());saved.update(scope,team,primary,fallback,approver,active);routing.flush();
+        }else{
+            if(suppliedVersion!=null)throw ApiException.conflict("Routing configuration does not exist.");
+            saved=routing.saveAndFlush(new SubtypeRoutingRule(subtype,scope,team,primary,fallback,approver));saved.setActive(active);routing.flush();
+        }
+        record(p,organization(subtype),"SUBTYPE_ROUTING",saved.getId(),existing.isPresent()?"UPDATED":"CREATED",Map.of("teamId",teamId,"active",active));return saved;
+    }
+    @Transactional public void deactivateRouting(AuthPrincipal p,Long subtypeId,Long organizationId){
+        requireManage(p);TicketSubtype subtype=subtype(subtypeId);Organization scope=routingScope(subtype,organizationId);SubtypeRoutingRule rule=rule(subtypeId,scope);
+        rule.setActive(false);routing.flush();record(p,organization(subtype),"SUBTYPE_ROUTING",rule.getId(),"DEACTIVATED",Map.of("active",false));
+    }
+
     private long count(String table,String column,Long id){return ((Number)entityManager.createNativeQuery("select count(*) from "+table+" where "+column+" = :id").setParameter("id",id).getSingleResult()).longValue();}
     private void requireManage(AuthPrincipal p){if(p.party()!=Responsibility.TICKETFLOW1||!p.hasPermission("TYPE_MANAGE"))throw ApiException.forbidden("TYPE_MANAGE permission is required.");}
     private TicketType type(Long id){return types.findById(id).orElseThrow(()->ApiException.notFound("Ticket type not found: "+id));}
     private TicketSubtype subtype(Long id){return subtypes.findById(id).orElseThrow(()->ApiException.notFound("Subtype not found: "+id));}
     private SubtypeFieldDefinition field(Long id){return fields.findById(id).orElseThrow(()->ApiException.notFound("Field not found: "+id));}
     private SubtypeFieldOption option(Long id){return options.findById(id).orElseThrow(()->ApiException.notFound("Option not found: "+id));}
+    private Organization routingScope(TicketSubtype subtype,Long requested){
+        Organization owner=organization(subtype);if(owner!=null){if(requested!=null&&!owner.getId().equals(requested))throw ApiException.notFound("Organization not found: "+requested);return owner;}
+        if(requested==null)return null;return organizations.findById(requested).filter(Organization::isActive).orElseThrow(()->ApiException.notFound("Organization not found: "+requested));
+    }
+    private Optional<SubtypeRoutingRule> findRule(Long subtypeId,Organization scope){return scope==null?routing.findBySubtypeIdAndOrganizationIsNull(subtypeId):routing.findBySubtypeIdAndOrganizationId(subtypeId,scope.getId());}
+    private SubtypeRoutingRule rule(Long subtypeId,Organization scope){return findRule(subtypeId,scope).orElseThrow(()->ApiException.notFound("Routing rule not found for subtype: "+subtypeId));}
+    private AppUser selectableMember(Long id,DeveloperTeam team,String label){if(id==null)return null;AppUser user=users.findById(id).filter(AppUser::isActive).filter(u->u.getParty()==Responsibility.TICKETFLOW1).orElseThrow(()->ApiException.notFound("User not found: "+id));
+        if(!team.getLeader().getId().equals(id)&&team.getMembers().stream().noneMatch(m->m.getId().equals(id)))throw ApiException.validation(label+" must be an active member of the selected team.");return user;}
     private Organization organization(TicketSubtype s){return s.getTicketType().getOrganization();}
     private int order(int v){if(v<0)throw ApiException.validation("sortOrder cannot be negative.");return v;}
     private void version(Long supplied,long current){if(supplied==null||supplied!=current)throw ApiException.conflict("Configuration was modified by another user.");}

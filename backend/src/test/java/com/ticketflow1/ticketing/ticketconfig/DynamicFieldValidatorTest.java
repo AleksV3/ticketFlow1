@@ -10,6 +10,9 @@ import com.ticketflow1.ticketing.auth.AuthPrincipal;
 import com.ticketflow1.ticketing.common.ApiException;
 import com.ticketflow1.ticketing.configaudit.ConfigurationAuditService;
 import com.ticketflow1.ticketing.ticket.Responsibility;
+import com.ticketflow1.ticketing.organization.OrganizationRepository;
+import com.ticketflow1.ticketing.team.DeveloperTeamRepository;
+import com.ticketflow1.ticketing.user.AppUserRepository;
 import com.ticketflow1.ticketing.workflow.TicketTypeRepository;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.Query;
@@ -26,6 +29,8 @@ import org.springframework.test.util.ReflectionTestUtils;
 class DynamicFieldValidatorTest {
     @Mock TicketSubtypeRepository subtypes; @Mock SubtypeFieldDefinitionRepository fields;
     @Mock SubtypeFieldOptionRepository options; @Mock TicketTypeRepository types;
+    @Mock SubtypeRoutingRuleRepository routing; @Mock DeveloperTeamRepository teams;
+    @Mock AppUserRepository users; @Mock OrganizationRepository organizations;
     @Mock ConfigurationAuditService audit; @Mock EntityManager entityManager; @Mock Query query;
     private final DynamicFieldValidator validator=new DynamicFieldValidator();
 
@@ -56,7 +61,7 @@ class DynamicFieldValidatorTest {
         service().reorderSubtypes(principal(),type.getId(),List.of(2L,1L));
         org.assertj.core.api.Assertions.assertThat(second.getSortOrder()).isZero();org.assertj.core.api.Assertions.assertThat(first.getSortOrder()).isEqualTo(10);
     }
-    private TicketConfigurationService service(){return new TicketConfigurationService(subtypes,fields,options,types,audit,entityManager,new ObjectMapper());}
+    private TicketConfigurationService service(){return new TicketConfigurationService(subtypes,fields,options,types,routing,teams,users,organizations,audit,entityManager,new ObjectMapper());}
     private AuthPrincipal principal(){return new AuthPrincipal(99L,Responsibility.TICKETFLOW1,null,Set.of("TYPE_MANAGE"));}
     private SubtypeFieldDefinition field(String key,FieldKind kind,boolean required){return new SubtypeFieldDefinition(orgSubtype(1L),key,key,null,kind,required,FieldVisibility.INTERNAL,0);}
     private TicketSubtype orgSubtype(Long id){var org=new com.ticketflow1.ticketing.organization.Organization("Internal");ReflectionTestUtils.setField(org,"id",7L);

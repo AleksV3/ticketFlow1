@@ -35,5 +35,9 @@ public class TicketConfigurationController {
     @PostMapping("/field-options/{id}/activate") @ResponseStatus(HttpStatus.NO_CONTENT) public void activateOption(@AuthenticationPrincipal AuthPrincipal p,@PathVariable Long id){service.setOptionActive(p,id,true);}
     @PostMapping("/field-options/{id}/deactivate") @ResponseStatus(HttpStatus.NO_CONTENT) public void deactivateOption(@AuthenticationPrincipal AuthPrincipal p,@PathVariable Long id){service.setOptionActive(p,id,false);}
     @DeleteMapping("/field-options/{id}") @ResponseStatus(HttpStatus.NO_CONTENT) public void deleteOption(@AuthenticationPrincipal AuthPrincipal p,@PathVariable Long id){service.deleteOption(p,id);}
+
+    @GetMapping("/subtypes/{subtypeId}/routing") public RoutingResponse routing(@AuthenticationPrincipal AuthPrincipal p,@PathVariable Long subtypeId,@RequestParam(required=false) Long organizationId){return RoutingResponse.from(service.getRouting(p,subtypeId,organizationId));}
+    @PutMapping("/subtypes/{subtypeId}/routing") public RoutingResponse putRouting(@AuthenticationPrincipal AuthPrincipal p,@PathVariable Long subtypeId,@RequestBody PutRouting r){return RoutingResponse.from(service.putRouting(p,subtypeId,r.organizationId(),r.teamId(),r.primaryDeveloperId(),r.fallbackDeveloperId(),r.approverId(),r.active(),r.version()));}
+    @DeleteMapping("/subtypes/{subtypeId}/routing") @ResponseStatus(HttpStatus.NO_CONTENT) public void deleteRouting(@AuthenticationPrincipal AuthPrincipal p,@PathVariable Long subtypeId,@RequestParam(required=false) Long organizationId){service.deactivateRouting(p,subtypeId,organizationId);}
     private int value(Integer v){return v==null?0:v;}
 }

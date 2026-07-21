@@ -5,6 +5,7 @@ import com.ticketflow1.ticketing.common.ApiException;
 import com.ticketflow1.ticketing.organization.OrganizationRepository;
 import com.ticketflow1.ticketing.rbac.RoleRepository;
 import com.ticketflow1.ticketing.ticket.Responsibility;
+import com.ticketflow1.ticketing.ticketconfig.*;
 import com.ticketflow1.ticketing.user.AppUserRepository;
 import com.ticketflow1.ticketing.workflow.TicketTypeRepository;
 import java.util.List;
@@ -16,10 +17,26 @@ import org.springframework.web.bind.annotation.*;
 public class ReferenceController {
     private final TicketTypeRepository types; private final OrganizationRepository organizations;
     private final AppUserRepository users; private final RoleRepository roles;
+    private final TicketSubtypeRepository subtypes; private final SubtypeFieldDefinitionRepository fields;
+    private final SubtypeFieldOptionRepository options;
     public ReferenceController(TicketTypeRepository types,OrganizationRepository organizations,
-            AppUserRepository users,RoleRepository roles){this.types=types;this.organizations=organizations;this.users=users;this.roles=roles;}
+            AppUserRepository users,RoleRepository roles,TicketSubtypeRepository subtypes,
+            SubtypeFieldDefinitionRepository fields,SubtypeFieldOptionRepository options){this.types=types;this.organizations=organizations;this.users=users;this.roles=roles;this.subtypes=subtypes;this.fields=fields;this.options=options;}
     @GetMapping("/ticket-types") @PreAuthorize("hasAuthority('TICKET_CREATE')")
     public List<TypeRef> types(@AuthenticationPrincipal AuthPrincipal p,@RequestParam(required=false)Long organizationId){Long id=p.party()==Responsibility.CLIENT?p.organizationId():organizationId;if(id==null)throw ApiException.validation("organizationId is required.");return types.findByOrganizationId(id).stream().map(t->new TypeRef(t.getId(),t.getKey(),t.getName())).toList();}
+    @GetMapping("/ticket-types/{typeId}/creation-form") @PreAuthorize("hasAuthority('TICKET_CREATE')")
+    public CreationForm creationForm(@AuthenticationPrincipal AuthPrincipal p,@PathVariable Long typeId){
+        var type=types.findById(typeId).filter(t->t.isActive()&&authorized(p,t.getOrganization()==null?null:t.getOrganization().getId()))
+                .orElseThrow(()->ApiException.notFound("Ticket type not found: "+typeId));
+        List<SubtypeForm> subtypeForms=subtypes.findByTicketTypeIdAndActiveTrueOrderBySortOrderAscIdAsc(typeId).stream().map(s->{
+            List<FieldForm> fieldForms=fields.findBySubtypeIdAndActiveTrueOrderBySortOrderAscIdAsc(s.getId()).stream()
+                    .filter(f->p.party()==Responsibility.TICKETFLOW1||f.getVisibility()==FieldVisibility.PUBLIC)
+                    .map(f->new FieldForm(f.getId(),f.getKey(),f.getLabel(),f.getHelpText(),f.getFieldKind(),f.isRequired(),f.getVisibility(),f.getSortOrder(),f.getMinLength(),f.getMaxLength(),f.getMinNumber(),f.getMaxNumber(),f.getVersion(),
+                            options.findByFieldDefinitionIdAndActiveTrueOrderBySortOrderAscIdAsc(f.getId()).stream().map(o->new OptionForm(o.getId(),o.getKey(),o.getLabel(),o.getSortOrder(),o.getVersion())).toList())).toList();
+            return new SubtypeForm(s.getId(),s.getKey(),s.getName(),s.getDescription(),s.getSortOrder(),s.getVersion(),fieldForms);
+        }).toList();
+        return new CreationForm(type.getId(),type.getKey(),type.getName(),type.getVersion(),subtypeForms);
+    }
     @GetMapping("/organizations") @PreAuthorize("hasAuthority('TICKET_CREATE')")
     public List<IdName> organizations(@AuthenticationPrincipal AuthPrincipal p){requireInternal(p);return organizations.findByActiveTrueOrderByNameAsc().stream().map(o->new IdName(o.getId(),o.getName())).toList();}
     @GetMapping("/ticket-leads") @PreAuthorize("hasAuthority('TICKET_ASSIGN')")
@@ -27,5 +44,12 @@ public class ReferenceController {
     @GetMapping("/assignable-roles") @PreAuthorize("hasAuthority('USER_MANAGE')")
     public List<RoleRef> roles(@AuthenticationPrincipal AuthPrincipal p,@RequestParam(required=false)Long organizationId){Long id=p.party()==Responsibility.CLIENT?p.organizationId():organizationId;return (id==null?roles.findByOrganizationIsNull():roles.findByOrganizationId(id)).stream().map(r->new RoleRef(r.getId(),r.getName(),r.getParty().name())).toList();}
     private void requireInternal(AuthPrincipal p){if(p.party()!=Responsibility.TICKETFLOW1)throw ApiException.forbidden("TICKETFLOW1 party is required.");}
+    private boolean authorized(AuthPrincipal p,Long organizationId){return p.party()==Responsibility.TICKETFLOW1||organizationId!=null&&organizationId.equals(p.organizationId());}
     public record IdName(Long id,String name){} public record TypeRef(Long id,String key,String name){} public record RoleRef(Long id,String name,String party){}
+    public record CreationForm(Long id,String key,String name,long version,List<SubtypeForm> subtypes){}
+    public record SubtypeForm(Long id,String key,String name,String description,int sortOrder,long version,List<FieldForm> fields){}
+    public record FieldForm(Long id,String key,String label,String helpText,FieldKind fieldKind,boolean required,
+            FieldVisibility visibility,int sortOrder,Integer minLength,Integer maxLength,java.math.BigDecimal minNumber,
+            java.math.BigDecimal maxNumber,long version,List<OptionForm> options){}
+    public record OptionForm(Long id,String key,String label,int sortOrder,long version){}
 }

@@ -3,4 +3,6 @@ import java.util.List; import java.util.Optional; import org.springframework.dat
 public interface TicketSubtypeRepository extends JpaRepository<TicketSubtype,Long>{
     List<TicketSubtype> findByTicketTypeIdOrderBySortOrderAscIdAsc(Long ticketTypeId);
     Optional<TicketSubtype> findByTicketTypeIdAndKey(Long ticketTypeId,String key);
+    boolean existsByTicketTypeId(Long ticketTypeId);
+    List<TicketSubtype> findByTicketTypeIdAndActiveTrueOrderBySortOrderAscIdAsc(Long ticketTypeId);
 }
