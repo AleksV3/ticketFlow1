@@ -18,12 +18,12 @@ dependency; all tasks remain unchecked until implemented and verified.
 - [x] T004 Define the first field templates for every seeded TASI and USR subtype, including required flags and public/internal visibility.
 - [x] T005 Amend constitution Principle VI to permit bounded fixed-schema subtype forms and deterministic routing metadata; bump the constitution minor version and record template/spec impacts.
 - [x] T006 Review and approve the four workflow diagrams and transition actor matrix as the implementation baseline; final mentor acceptance remains T068.
-- [ ] T007 **Verify**: no implementation begins while T001–T006 contain unresolved decisions.
+- [x] T007 **Verify**: no implementation begins while T001–T006 contain unresolved decisions.
 
 ## Phase 1: Detailed design and contracts
 
-- [ ] T008 Write `data-model.md` for subtype, field definition/option/value, routing, approval, type availability, and parent-ticket relationships, indexes, deletion rules, and audit targets.
-- [ ] T009 [P] Write admin contracts for subtype, field, option, routing, activation, safe deletion, and organization type availability.
+- [x] T008 Write `data-model.md` for subtype, field definition/option/value, routing, approval, type availability, and parent-ticket relationships, indexes, deletion rules, and audit targets.
+- [x] T009 [P] Write admin contracts for subtype, field, option, routing, activation, safe deletion, and organization type availability.
 - [ ] T010 [P] Write ticket contracts for dynamic creation form retrieval/submission, target-user search, parent/subticket creation, approval commands, and enriched detail/list responses.
 - [ ] T011 [P] Write the exact transition matrix with required permission, party, responsibility-after, reason rule, and protected operation kind for every edge.
 - [ ] T012 Threat-model tenant data leaks, target-user enumeration, dynamic-value injection, mass assignment, approval bypass, cyclic parents, and unsafe configuration deletion.
