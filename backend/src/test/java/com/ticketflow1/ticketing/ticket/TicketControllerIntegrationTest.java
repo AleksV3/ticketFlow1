@@ -5,6 +5,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -810,6 +811,107 @@ class TicketControllerIntegrationTest {
         return mockMvc.perform(post("/api/tickets/{ticketKey}/proposals", key).cookie(cookie)
                 .contentType("application/json").content("{\"description\":\"" + description + "\"}"))
                 .andExpect(expected).andReturn();
+    }
+
+    @Test
+    void targetUserAutocompleteIsBoundedAndTenantSafe() throws Exception {
+        Cookie clientA=login("client-a@demo.test","client123");
+        Cookie internal=login("admin@ticketflow1.demo","admin123");
+        Long orgA=organizationRepository.findAll().stream().filter(o->"Client A".equals(o.getName())).findFirst().orElseThrow().getId();
+        Long orgB=organizationRepository.findAll().stream().filter(o->"Client B".equals(o.getName())).findFirst().orElseThrow().getId();
+
+        mockMvc.perform(get("/api/reference/users").cookie(clientA).param("q","c").param("purpose","USR_TARGET"))
+                .andExpect(status().isBadRequest());
+        mockMvc.perform(get("/api/reference/users").cookie(clientA).param("q","Client").param("purpose","USR_TARGET").param("organizationId",orgB.toString()))
+                .andExpect(status().isNotFound());
+        mockMvc.perform(get("/api/reference/users").cookie(clientA).param("q","Client").param("purpose","USR_TARGET").param("organizationId",orgA.toString()))
+                .andExpect(status().isOk()).andExpect(jsonPath("$[0].displayName").exists())
+                .andExpect(jsonPath("$[?(@.displayName == 'Client B')]").isEmpty());
+        mockMvc.perform(get("/api/reference/users").cookie(internal).param("q","Client").param("purpose","USR_TARGET"))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void configurationCanBeBuiltThroughApisAndRejectsCrossScopeIds() throws Exception {
+        Cookie admin=login("admin@ticketflow1.demo","admin123");
+        Organization orgA=organizationRepository.findAll().stream().filter(o->"Client A".equals(o.getName())).findFirst().orElseThrow();
+        Organization orgB=organizationRepository.findAll().stream().filter(o->"Client B".equals(o.getName())).findFirst().orElseThrow();
+        Long typeId=jdbcTemplate.queryForObject("select id from ticket_type where organization_id=? order by id limit 1",Long.class,orgA.getId());
+        Long adminId=appUserRepository.findByEmail("admin@ticketflow1.demo").orElseThrow().getId();
+
+        JsonNode team=json(mockMvc.perform(post("/api/teams").with(csrf()).cookie(admin).contentType("application/json").content("""
+                {"name":"Configuration Test Team","description":"routing verification","leaderId":%d,"memberIds":[%d],"ticketKeys":[]}
+                """.formatted(adminId,adminId))).andExpect(status().isOk()).andReturn());
+        Long teamId=team.path("id").asLong();
+
+        JsonNode subtype=json(mockMvc.perform(post("/api/admin/ticket-types/{id}/subtypes",typeId).with(csrf()).cookie(admin).contentType("application/json").content("""
+                {"key":"API_VERIFY","name":"API verification","description":"created without schema changes","sortOrder":900}
+                """)).andExpect(status().isCreated()).andReturn());
+        Long subtypeId=subtype.path("id").asLong();
+
+        JsonNode updatedSubtype=json(mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put("/api/admin/subtypes/{id}",subtypeId).with(csrf()).cookie(admin).contentType("application/json").content("""
+                {"version":%d,"name":"API verification renamed","description":"updated","sortOrder":910}
+                """.formatted(subtype.path("version").asLong()))).andExpect(status().isOk()).andReturn());
+
+        JsonNode field=json(mockMvc.perform(post("/api/admin/subtypes/{id}/fields",subtypeId).with(csrf()).cookie(admin).contentType("application/json").content("""
+                {"key":"environment","label":"Environment","helpText":"Choose environment","fieldKind":"SINGLE_SELECT","required":true,"visibility":"PUBLIC","sortOrder":0}
+                """)).andExpect(status().isCreated()).andReturn());
+        Long fieldId=field.path("id").asLong();
+        JsonNode updatedField=json(mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put("/api/admin/fields/{id}",fieldId).with(csrf()).cookie(admin).contentType("application/json").content("""
+                {"version":%d,"label":"Target environment","helpText":"Choose environment","required":true,"visibility":"PUBLIC","sortOrder":0}
+                """.formatted(field.path("version").asLong()))).andExpect(status().isOk()).andReturn());
+        mockMvc.perform(post("/api/admin/fields/{id}/deactivate",fieldId).with(csrf()).cookie(admin)).andExpect(status().isNoContent());
+        mockMvc.perform(post("/api/admin/fields/{id}/activate",fieldId).with(csrf()).cookie(admin)).andExpect(status().isNoContent());
+        mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put("/api/admin/subtypes/{id}/fields/order",subtypeId).with(csrf()).cookie(admin).contentType("application/json").content("{\"ids\":[%d]}".formatted(fieldId))).andExpect(status().isNoContent());
+        JsonNode option=json(mockMvc.perform(post("/api/admin/fields/{id}/options",fieldId).with(csrf()).cookie(admin).contentType("application/json").content("""
+                {"key":"PRODUCTION","label":"Production","sortOrder":0}
+                """)).andExpect(status().isCreated()).andReturn());
+        Long optionId=option.path("id").asLong();
+
+        mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put("/api/admin/field-options/{id}",optionId).with(csrf()).cookie(admin).contentType("application/json").content("""
+                {"version":%d,"label":"Production system","sortOrder":0}
+                """.formatted(option.path("version").asLong()))).andExpect(status().isOk());
+        mockMvc.perform(post("/api/admin/field-options/{id}/deactivate",optionId).with(csrf()).cookie(admin)).andExpect(status().isNoContent());
+        mockMvc.perform(post("/api/admin/field-options/{id}/activate",optionId).with(csrf()).cookie(admin)).andExpect(status().isNoContent());
+        mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put("/api/admin/fields/{id}/options/order",fieldId).with(csrf()).cookie(admin).contentType("application/json").content("{\"ids\":[%d]}".formatted(optionId))).andExpect(status().isNoContent());
+
+        mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put("/api/admin/subtypes/{id}/routing",subtypeId).with(csrf()).cookie(admin).contentType("application/json").content("""
+                {"teamId":%d,"primaryDeveloperId":%d,"approverId":%d,"active":true}
+                """.formatted(teamId,adminId,adminId))).andExpect(status().isOk()).andExpect(jsonPath("$.teamId").value(teamId));
+        mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put("/api/admin/subtypes/{id}/routing",subtypeId).with(csrf()).cookie(admin).contentType("application/json").content("""
+                {"organizationId":%d,"teamId":%d,"active":true}
+                """.formatted(orgB.getId(),teamId))).andExpect(status().isNotFound());
+
+        JsonNode creationForm=json(mockMvc.perform(get("/api/reference/ticket-types/{id}/creation-form",typeId).cookie(admin))
+                .andExpect(status().isOk()).andReturn());
+        JsonNode configuredSubtype=java.util.stream.StreamSupport.stream(creationForm.path("subtypes").spliterator(),false)
+                .filter(item->item.path("id").asLong()==subtypeId).findFirst().orElseThrow();
+        assertThat(configuredSubtype.path("name").asText()).isEqualTo("API verification renamed");
+        assertThat(configuredSubtype.path("fields").get(0).path("options").get(0).path("key").asText()).isEqualTo("PRODUCTION");
+        mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete("/api/admin/subtypes/{id}",subtypeId).with(csrf()).cookie(admin))
+                .andExpect(status().isConflict());
+        mockMvc.perform(post("/api/admin/fields/999999/options").with(csrf()).cookie(admin).contentType("application/json").content("{\"key\":\"BAD\",\"label\":\"Bad\"}"))
+                .andExpect(status().isNotFound());
+        assertThat(jdbcTemplate.queryForObject("select count(*) from configuration_audit_log where target_type in ('TICKET_SUBTYPE','SUBTYPE_FIELD','FIELD_OPTION','SUBTYPE_ROUTING') and actor_id=?",Long.class,adminId)).isGreaterThanOrEqualTo(6L);
+        assertThat(updatedSubtype.path("version").asLong()).isGreaterThan(subtype.path("version").asLong());
+        assertThat(updatedField.path("version").asLong()).isGreaterThan(field.path("version").asLong());
+
+        Long workflowId=jdbcTemplate.queryForObject("select workflow_id from ticket_type where id=?",Long.class,typeId);
+        JsonNode customType=json(mockMvc.perform(post("/api/admin/ticket-types").with(csrf()).cookie(admin).contentType("application/json").content("""
+                {"key":"API_TYPE","name":"API Type","workflowId":%d,"organizationId":%d,"active":true,"sortOrder":990,"capability":"STANDARD"}
+                """.formatted(workflowId,orgA.getId()))).andExpect(status().isCreated()).andReturn());
+        Long customTypeId=customType.path("id").asLong();
+        JsonNode renamedType=json(mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch("/api/admin/ticket-types/{id}",customTypeId).with(csrf()).cookie(admin).contentType("application/json").content("""
+                {"version":%d,"name":"API Type Renamed","workflowId":%d,"active":true,"sortOrder":991,"capability":"STANDARD"}
+                """.formatted(customType.path("version").asLong(),workflowId))).andExpect(status().isOk()).andReturn());
+        mockMvc.perform(post("/api/admin/ticket-types/{id}/deactivate",customTypeId).with(csrf()).cookie(admin)).andExpect(status().isOk());
+        mockMvc.perform(post("/api/admin/ticket-types/{id}/activate",customTypeId).with(csrf()).cookie(admin)).andExpect(status().isOk());
+        mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete("/api/admin/ticket-types/{id}",customTypeId).with(csrf()).cookie(admin)).andExpect(status().isNoContent());
+        assertThat(renamedType.path("name").asText()).isEqualTo("API Type Renamed");
+    }
+
+    private JsonNode json(MvcResult result) throws Exception {
+        return objectMapper.readTree(result.getResponse().getContentAsString());
     }
 
     private Cookie login(String email, String password) throws Exception {

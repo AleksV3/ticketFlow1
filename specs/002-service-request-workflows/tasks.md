@@ -51,9 +51,9 @@ dependency; all tasks remain unchecked until implemented and verified.
 - [x] T028 Implement routing-rule administration with active/same-scope team, developer, fallback, and approver validation.
 - [x] T029 Implement organization type add/rename/workflow/activation and unused-only hard deletion.
 - [x] T030 Implement creation-form reference endpoint returning only active authorized definitions/options.
-- [ ] T031 Implement tenant-safe target-user autocomplete with minimum query length, bounded results, and no cross-org leakage.
-- [ ] T032 [P] Integration-test every admin mutation, audit entry, cross-scope denial, manipulated ID, and referenced-delete conflict.
-- [ ] T033 **Verify**: configure a new subtype, select field, option, and routing rule entirely through APIs without schema/code changes.
+- [x] T031 Implement tenant-safe target-user autocomplete with minimum query length, bounded results, and no cross-org leakage.
+- [x] T032 [P] Integration-test every admin mutation, audit entry, cross-scope denial, manipulated ID, and referenced-delete conflict.
+- [x] T033 **Verify**: configure a new subtype, select field, option, and routing rule entirely through APIs without schema/code changes.
 
 ## Phase 4: Dynamic ticket creation, routing, and subtickets
 
