@@ -36,9 +36,9 @@ dependency; all tasks remain unchecked until implemented and verified.
 - [x] T016 Add routing-rule and explicit approval/decision tables with tenant-safe foreign keys and audit metadata.
 - [x] T017 Add nullable `parent_ticket_id` and subtype reference to ticket with safe indexes; leave existing tickets valid.
 - [x] T018 Add active/capability metadata needed for organization type availability and DFCT SLA behavior without runtime DDL.
-- [ ] T019 [P] Implement subtype/field/option entities and repositories.
-- [ ] T020 [P] Implement typed field-value entities/repositories and fixed field-kind enum.
-- [ ] T021 [P] Implement routing and approval entities/repositories.
+- [x] T019 [P] Implement subtype/field/option entities and repositories.
+- [x] T020 [P] Implement typed field-value entities/repositories and fixed field-kind enum.
+- [x] T021 [P] Implement routing and approval entities/repositories.
 - [ ] T022 Implement safe delete/deactivate reference checks and immutable-used-key rules.
 - [ ] T023 Record every new configuration mutation in configuration audit.
 - [ ] T024 [P] Unit-test typed validation, option membership, safe deletion, active state, and ordering.
