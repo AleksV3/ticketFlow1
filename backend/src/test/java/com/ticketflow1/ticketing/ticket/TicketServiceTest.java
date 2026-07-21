@@ -60,6 +60,7 @@ class TicketServiceTest {
     @Mock
     private TicketTransitionService ticketTransitionService;
     @Mock private ProposalDetailService proposalDetailService;
+    @Mock private com.ticketflow1.ticketing.team.DeveloperTeamRepository developerTeamRepository;
     private com.ticketflow1.ticketing.sla.SlaCalculator slaCalculator;
     private com.ticketflow1.ticketing.sla.SlaStatusService slaStatusService;
 
@@ -73,7 +74,7 @@ class TicketServiceTest {
         ticketService = new TicketService(ticketRepository, ticketTypeRepository, workflowStateRepository,
                 appUserRepository, organizationRepository, ticketKeyGenerator, auditService,
                 statusHistoryService, ticketTransitionService, proposalDetailService,
-                slaCalculator, slaStatusService, java.time.Clock.systemUTC());
+                slaCalculator, slaStatusService, java.time.Clock.systemUTC(), developerTeamRepository);
     }
 
     @ParameterizedTest
@@ -92,7 +93,7 @@ class TicketServiceTest {
         AuthPrincipal principal = new AuthPrincipal(actor.getId(), actor.getParty(), organization.getId(),
                 Set.of("TICKET_CREATE", "TICKET_READ"));
         CreateTicketRequest request = new CreateTicketRequest(typeKey, "Test title", "Test description",
-                Priority.HIGH, defectType ? Severity.SEV_2 : null, null);
+                Priority.HIGH, defectType ? Severity.SEV_2 : null, null, null, null, null);
 
         when(appUserRepository.findById(actor.getId())).thenReturn(java.util.Optional.of(actor));
         when(ticketTypeRepository.findByOrganizationIdAndKey(organization.getId(), typeKey))
@@ -138,7 +139,7 @@ class TicketServiceTest {
         AuthPrincipal principal = new AuthPrincipal(actor.getId(), actor.getParty(), organization.getId(),
                 Set.of("TICKET_CREATE"));
         CreateTicketRequest request = new CreateTicketRequest("TASK", "Task", "Desc", Priority.MEDIUM,
-                Severity.SEV_1, null);
+                Severity.SEV_1, null, null, null, null);
 
         when(appUserRepository.findById(actor.getId())).thenReturn(java.util.Optional.of(actor));
         when(ticketTypeRepository.findByOrganizationIdAndKey(organization.getId(), "TASK"))
@@ -173,7 +174,7 @@ class TicketServiceTest {
 
         ticketService.updateTicket("TF-1002",
                 new com.ticketflow1.ticketing.ticket.dto.UpdateTicketRequest(
-                        null, null, null, null, Severity.SEV_3, null, null), principal);
+                        null, null, null, null, Severity.SEV_3, null, null, null, null), principal);
 
         assertThat(ticket.getSeverity()).isEqualTo(Severity.SEV_3);
         assertThat(ticket.getResponseDueAt()).isEqualTo(createdAt.plusSeconds(60 * 60));

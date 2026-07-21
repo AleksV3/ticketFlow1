@@ -39,9 +39,9 @@ dependency; all tasks remain unchecked until implemented and verified.
 - [x] T019 [P] Implement subtype/field/option entities and repositories.
 - [x] T020 [P] Implement typed field-value entities/repositories and fixed field-kind enum.
 - [x] T021 [P] Implement routing and approval entities/repositories.
-- [ ] T022 Implement safe delete/deactivate reference checks and immutable-used-key rules.
-- [ ] T023 Record every new configuration mutation in configuration audit.
-- [ ] T024 [P] Unit-test typed validation, option membership, safe deletion, active state, and ordering.
+- [x] T022 Implement safe delete/deactivate reference checks and immutable-used-key rules.
+- [x] T023 Record every new configuration mutation in configuration audit.
+- [x] T024 [P] Unit-test typed validation, option membership, safe deletion, active state, and ordering.
 - [ ] T025 **Verify**: migrate a fresh DB and a current DB snapshot; Hibernate validation and rollback rehearsal pass.
 
 ## Phase 3: Configuration APIs
