@@ -15,6 +15,10 @@ services:
         value: true
       - key: APP_CORS_ALLOWED_ORIGINS
         value: https://ticketflow1-web.onrender.com
+      # The free Render filesystem is ephemeral, but /tmp is writable by the
+      # non-root container user. Files are lost whenever the API restarts.
+      - key: ATTACHMENT_STORAGE_DIRECTORY
+        value: /tmp/ticketflow1-attachments
       - key: JWT_SECRET
         generateValue: true
       - key: POSTGRES_HOST
