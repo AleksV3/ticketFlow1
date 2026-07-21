@@ -135,6 +135,7 @@ public class TicketService {
         } else if (request.dynamicValues() != null && !request.dynamicValues().isEmpty()) {
             throw ApiException.validation("dynamicValues requires subtypeId.");
         }
+        AppUser targetUser = validateUsrTarget(ticketType, subtype, request, organization, principal);
         WorkflowState initialState = workflowStateRepository
                 .findByWorkflowIdAndInitialTrue(ticketType.getWorkflow().getId())
                 .orElseThrow(() -> ApiException.validation(
@@ -154,9 +155,15 @@ public class TicketService {
                 actor,
                 Responsibility.TICKETFLOW1);
         ticket.setSubtype(subtype);
+        if (targetUser != null) { ticket.setTargetUser(targetUser); ticket.setTargetUserDisplaySnapshot(targetUser.getDisplayName()); }
         if (request.parentTicketKey() != null && !request.parentTicketKey().isBlank()) {
             Ticket parent = ticketRepository.findByTicketKeyAndOrganizationId(request.parentTicketKey().trim(), organization.getId())
                     .orElseThrow(() -> ApiException.notFound("Parent ticket not found: " + request.parentTicketKey()));
+            if (principal.party() == Responsibility.CLIENT && !Set.of("DFCT", "REQ", "DEFECT", "REQUEST").contains(parent.getTicketType().getKey()))
+                throw ApiException.notFound("Parent ticket not found: " + request.parentTicketKey());
+            for (Ticket ancestor = parent; ancestor != null; ancestor = ancestor.getParentTicket()) {
+                if (ancestor.getId() != null && ancestor.getId().equals(ticket.getId())) throw ApiException.validation("A ticket cannot be its own ancestor.");
+            }
             ticket.setParentTicket(parent);
         }
         applyRouting(ticket, subtype, organization);
@@ -384,6 +391,26 @@ public class TicketService {
         ticket.setAssignedTeam(rule.getTeam().getName()); ticket.replaceTeams(Set.of(rule.getTeam()));
     }
 
+    private AppUser validateUsrTarget(TicketType type, TicketSubtype subtype, CreateTicketRequest request,
+            Organization organization, AuthPrincipal principal) {
+        if (!"USR".equals(type.getKey())) return null;
+        String subtypeKey = subtype == null ? "" : subtype.getKey().toUpperCase(java.util.Locale.ROOT);
+        Long supplied = request.targetUserId();
+        if (supplied == null && request.dynamicValues() != null) {
+            Object value = request.dynamicValues().getOrDefault("targetUserId", request.dynamicValues().get("target_user_id"));
+            if (value instanceof Number number) supplied = number.longValue();
+        }
+        boolean requiresTarget = "MODIFY".equals(subtypeKey) || "DELETE".equals(subtypeKey);
+        if (requiresTarget && supplied == null) throw ApiException.validation("targetUserId is required for USR " + subtypeKey + ".");
+        if (!requiresTarget && supplied != null) throw ApiException.validation("targetUserId is only allowed for USR MODIFY or DELETE.");
+        if (supplied == null) return null;
+        AppUser target = appUserRepository.findById(supplied).filter(AppUser::isActive)
+                .filter(user -> user.getOrganization() != null && user.getOrganization().getId().equals(organization.getId()))
+                .orElseThrow(() -> ApiException.notFound("Target user not found: " + supplied));
+        if (principal.party() != Responsibility.TICKETFLOW1) throw ApiException.forbidden("Only TICKETFLOW1 users may create USR tickets.");
+        return target;
+    }
+
     private void syncTeams(Ticket ticket, Set<Long> teamIds) {
         Set<Long> requested = teamIds == null ? Set.of() : teamIds;
         Set<DeveloperTeam> selected = new LinkedHashSet<>(developerTeamRepository.findAllById(requested));
@@ -499,7 +526,17 @@ public class TicketService {
 
     private TicketDetailResponse detail(Ticket ticket, AuthPrincipal principal) {
         return TicketDetailResponse.from(ticket, ticketTransitionService.allowedTransitions(ticket, principal),
-                proposalDetailService.detail(ticket, principal), slaStatusService.status(ticket));
+                proposalDetailService.detail(ticket, principal), slaStatusService.status(ticket), dynamicValues(ticket, principal));
+    }
+
+    private Map<String,Object> dynamicValues(Ticket ticket, AuthPrincipal principal) {
+        Map<String,Object> values = new java.util.LinkedHashMap<>();
+        for (TicketFieldValue value : fieldValueRepository.findByTicketId(ticket.getId())) {
+            if (principal.party() != Responsibility.TICKETFLOW1 && value.getFieldDefinition().getVisibility() != FieldVisibility.PUBLIC) continue;
+            Object raw = value.getTextValue()!=null ? value.getTextValue() : value.getNumberValue()!=null ? value.getNumberValue() : value.getDateValue()!=null ? value.getDateValue().toString() : value.getBooleanValue()!=null ? value.getBooleanValue() : value.getSelectedOption()!=null ? value.getSelectedOption().getKey() : value.getUserValue()!=null ? value.getUserValue().getId() : value.getTeamValue()!=null ? value.getTeamValue().getId() : value.getSelectedOptions().stream().map(SubtypeFieldOption::getKey).toList();
+            values.put(value.getFieldDefinition().getKey(), raw);
+        }
+        return values;
     }
 
     private void applyDeadlines(Ticket ticket, Severity severity, java.time.Instant updateBase) {

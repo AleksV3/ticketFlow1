@@ -60,9 +60,9 @@ dependency; all tasks remain unchecked until implemented and verified.
 - [x] T034 Extend create-ticket DTO/domain service with subtype ID, dynamic values, and optional parent ticket key.
 - [x] T035 Validate required/unknown/type/length/option/reference values against one server-loaded definition snapshot.
 - [x] T036 Resolve routing deterministically and atomically assign team/developer/approver; allow audited authorized overrides only.
-- [ ] T037 Enforce USR NEW versus MODIFY/DELETE target-user rules and store immutable ID plus display snapshot.
-- [ ] T038 Enforce parent tenant/type visibility, prevent self-parenting and ancestor cycles, and define inheritance allowlist.
-- [ ] T039 Extend detail/list/board responses and filters with subtype, dynamic values as authorized, routing, parent, and child progress.
+- [x] T037 Enforce USR NEW versus MODIFY/DELETE target-user rules and store immutable ID plus display snapshot.
+- [x] T038 Enforce parent tenant/type visibility, prevent self-parenting and ancestor cycles, and define inheritance allowlist.
+- [x] T039 Extend detail/list/board responses and filters with subtype, dynamic values as authorized, routing, parent, and child progress.
 - [ ] T040 Audit creation values without leaking internal/sensitive values to client-visible feeds.
 - [ ] T041 [P] Test routing, dynamic validation, USR search/reference rules, inheritance, cycles, tenant isolation, and transactional rollback.
 - [ ] T042 **Verify**: create TASI/FIREWALL, USR/NEW, USR/MODIFY, and a child ticket through API and inspect assignments/audit.

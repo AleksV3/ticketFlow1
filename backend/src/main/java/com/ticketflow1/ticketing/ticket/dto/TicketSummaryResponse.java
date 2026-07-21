@@ -20,7 +20,10 @@ public record TicketSummaryResponse(
         String currentResponsibility,
         String slaStatus,
         Instant createdAt,
-        Instant updatedAt) {
+        Instant updatedAt,
+        String subtype,
+        String parentTicketKey,
+        String targetUserDisplaySnapshot) {
 
     public static TicketSummaryResponse from(Ticket ticket, SlaStatus slaStatus) {
         return new TicketSummaryResponse(
@@ -38,6 +41,9 @@ public record TicketSummaryResponse(
                 ticket.getCurrentResponsibility().name(),
                 slaStatus.name(),
                 ticket.getCreatedAt(),
-                ticket.getUpdatedAt());
+                ticket.getUpdatedAt(),
+                ticket.getSubtype() == null ? null : ticket.getSubtype().getKey(),
+                ticket.getParentTicket() == null ? null : ticket.getParentTicket().getTicketKey(),
+                ticket.getTargetUserDisplaySnapshot());
     }
 }

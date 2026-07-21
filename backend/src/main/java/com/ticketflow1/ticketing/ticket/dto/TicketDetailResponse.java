@@ -6,6 +6,7 @@ import com.ticketflow1.ticketing.ticket.Ticket;
 import com.ticketflow1.ticketing.user.AppUser;
 import java.time.Instant;
 import java.util.List;
+import java.util.Map;
 import com.ticketflow1.ticketing.proposal.ProposalDetailService.ProposalDetail;
 import com.ticketflow1.ticketing.proposal.dto.ChangeProposalResponse;
 import com.ticketflow1.ticketing.sla.SlaStatus;
@@ -37,10 +38,17 @@ public record TicketDetailResponse(
         ProcessMap processMap,
         List<String> allowedTransitions,
         ChangeProposalResponse latestProposal,
-        List<String> proposalCommands) {
+        List<String> proposalCommands,
+        String subtype,
+        Long subtypeId,
+        String parentTicketKey,
+        UserRef targetUser,
+        String targetUserDisplaySnapshot,
+        Long routingRuleId,
+        Long resolvedApproverId) {
 
     public static TicketDetailResponse from(Ticket ticket, List<String> allowedTransitions, ProposalDetail proposal,
-            SlaStatus slaStatus) {
+            SlaStatus slaStatus, Map<String,Object> dynamicValues) {
         return new TicketDetailResponse(
                 ticket.getId(),
                 ticket.getTicketKey(),
@@ -66,7 +74,13 @@ public record TicketDetailResponse(
                 ProcessMap.from(ticket),
                 allowedTransitions,
                 proposal == null ? null : proposal.latestProposal(),
-                proposal == null ? List.of() : proposal.permittedCommands());
+                proposal == null ? List.of() : proposal.permittedCommands(),
+                ticket.getSubtype() == null ? null : ticket.getSubtype().getKey(),
+                ticket.getSubtype() == null ? null : ticket.getSubtype().getId(),
+                ticket.getParentTicket() == null ? null : ticket.getParentTicket().getTicketKey(),
+                UserRef.from(ticket.getTargetUser()), ticket.getTargetUserDisplaySnapshot(),
+                ticket.getRoutingRule() == null ? null : ticket.getRoutingRule().getId(),
+                ticket.getResolvedApprover() == null ? null : ticket.getResolvedApprover().getId(), dynamicValues);
     }
 
     public record ProcessMap(String name, List<ProcessState> states, List<ProcessTransition> transitions) {

@@ -45,6 +45,8 @@ public class Ticket extends Auditable {
     @ManyToOne(fetch = FetchType.LAZY) @JoinColumn(name = "parent_ticket_id") private Ticket parentTicket;
     @ManyToOne(fetch = FetchType.LAZY) @JoinColumn(name = "routing_rule_id") private SubtypeRoutingRule routingRule;
     @ManyToOne(fetch = FetchType.LAZY) @JoinColumn(name = "resolved_approver_id") private AppUser resolvedApprover;
+    @ManyToOne(fetch = FetchType.LAZY) @JoinColumn(name = "target_user_id") private AppUser targetUser;
+    @Column(name = "target_user_display_snapshot", length = 255) private String targetUserDisplaySnapshot;
 
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "current_state_id")
@@ -156,6 +158,8 @@ public class Ticket extends Auditable {
     public Ticket getParentTicket(){return parentTicket;} public void setParentTicket(Ticket value){parentTicket=value;}
     public SubtypeRoutingRule getRoutingRule(){return routingRule;} public void setRoutingRule(SubtypeRoutingRule value){routingRule=value;}
     public AppUser getResolvedApprover(){return resolvedApprover;} public void setResolvedApprover(AppUser value){resolvedApprover=value;}
+    public AppUser getTargetUser(){return targetUser;} public void setTargetUser(AppUser value){targetUser=value;}
+    public String getTargetUserDisplaySnapshot(){return targetUserDisplaySnapshot;} public void setTargetUserDisplaySnapshot(String value){targetUserDisplaySnapshot=value;}
 
     public void setCurrentState(WorkflowState currentState) {
         this.currentState = currentState;

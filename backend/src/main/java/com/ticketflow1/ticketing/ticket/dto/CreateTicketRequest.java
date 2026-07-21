@@ -20,5 +20,6 @@ public record CreateTicketRequest(
         Set<Long> teamIds,
         Long subtypeId,
         Map<String,Object> dynamicValues,
-        String parentTicketKey) {
+        String parentTicketKey,
+        Long targetUserId) {
 }
