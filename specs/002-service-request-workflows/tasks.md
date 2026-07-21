@@ -27,12 +27,12 @@ dependency; all tasks remain unchecked until implemented and verified.
 - [x] T010 [P] Write ticket contracts for dynamic creation form retrieval/submission, target-user search, parent/subticket creation, approval commands, and enriched detail/list responses.
 - [x] T011 [P] Write the exact transition matrix with required permission, party, responsibility-after, reason rule, and protected operation kind for every edge.
 - [x] T012 Threat-model tenant data leaks, target-user enumeration, dynamic-value injection, mass assignment, approval bypass, cyclic parents, and unsafe configuration deletion.
-- [ ] T013 Define migration/backfill mapping from `CHANGE_REQUEST`/`TASK`/`DEFECT` to the approved new configuration without losing existing history.
-- [ ] T014 **Verify**: contracts and data model satisfy every FR and constitution check.
+- [x] T013 Define migration/backfill mapping from `CHANGE_REQUEST`/`TASK`/`DEFECT` to the approved new configuration without losing existing history.
+- [x] T014 **Verify**: contracts and data model satisfy every FR and constitution check.
 
 ## Phase 2: Configuration schema and domain
 
-- [ ] T015 Add an additive Flyway migration for ticket subtype definitions, active/order metadata, field definitions, options, typed values, and required constraints/indexes.
+- [x] T015 Add an additive Flyway migration for ticket subtype definitions, active/order metadata, field definitions, options, typed values, and required constraints/indexes.
 - [ ] T016 Add routing-rule and explicit approval/decision tables with tenant-safe foreign keys and audit metadata.
 - [ ] T017 Add nullable `parent_ticket_id` and subtype reference to ticket with safe indexes; leave existing tickets valid.
 - [ ] T018 Add active/capability metadata needed for organization type availability and DFCT SLA behavior without runtime DDL.
