@@ -23,7 +23,7 @@ public class SlaStatusService {
 
     public SlaStatus status(Ticket ticket) {
         return status(new SlaSnapshot(
-                "DEFECT".equals(ticket.getTicketType().getKey()),
+                ticket.getTicketType().getCapability() == com.ticketflow1.ticketing.workflow.TicketTypeCapability.DEFECT_SLA,
                 ticket.getCurrentState().isTerminal(),
                 ticket.getSeverity(),
                 ticket.getResponseDueAt(),

@@ -95,7 +95,7 @@ public class CommentService {
     private void applySlaUpdate(Ticket ticket, AppUser author, CommentVisibility visibility) {
         if (visibility != CommentVisibility.PUBLIC
                 || author.getParty() != Responsibility.TICKETFLOW1
-                || !"DEFECT".equals(ticket.getTicketType().getKey())) {
+                || ticket.getTicketType().getCapability() != com.ticketflow1.ticketing.workflow.TicketTypeCapability.DEFECT_SLA) {
             return;
         }
         java.time.Instant now = clock.instant();

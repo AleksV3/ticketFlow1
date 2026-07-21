@@ -191,7 +191,7 @@ public class TicketService {
             requireAssignmentPermission(principal);
             syncTeams(saved, request.teamIds());
         }
-        if (DEFECT_TYPE_KEY.equals(ticketType.getKey())) {
+        if (ticketType.getCapability() == com.ticketflow1.ticketing.workflow.TicketTypeCapability.DEFECT_SLA) {
             applyDeadlines(saved, saved.getSeverity(), saved.getCreatedAt());
             saved = ticketRepository.saveAndFlush(saved);
         }
@@ -274,7 +274,7 @@ public class TicketService {
 
         if (request.severity() != null) {
             requireTicketflow1Party(principal, "severity");
-            if (!DEFECT_TYPE_KEY.equals(ticket.getTicketType().getKey())) {
+            if (ticket.getTicketType().getCapability() != com.ticketflow1.ticketing.workflow.TicketTypeCapability.DEFECT_SLA) {
                 throw ApiException.validation("severity is allowed only when type is DEFECT.");
             }
             if (!"ANALYSIS".equals(ticket.getCurrentState().getKey())) {
@@ -580,7 +580,7 @@ public class TicketService {
     }
 
     private void validateSeverityRules(TicketType ticketType, CreateTicketRequest request) {
-        boolean isDefect = DEFECT_TYPE_KEY.equals(ticketType.getKey());
+        boolean isDefect = ticketType.getCapability() == com.ticketflow1.ticketing.workflow.TicketTypeCapability.DEFECT_SLA;
         if (isDefect && request.severity() == null) {
             throw ApiException.validation("severity is required when type is DEFECT.");
         }

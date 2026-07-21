@@ -69,9 +69,9 @@ dependency; all tasks remain unchecked until implemented and verified.
 
 ## Phase 5: Workflow migration and relationship-aware approvals
 
-- [ ] T043 Seed/migrate approved TASI and USR workflows with correction loops and protected approval operations.
-- [ ] T044 Seed/migrate approved DFCT workflow while preserving fixed severity/SLA behavior via capability rather than literal `DEFECT` checks.
-- [ ] T045 Seed/migrate approved REQ workflow with client acceptance and implementation/deployment loop.
+- [x] T043 Seed/migrate approved TASI and USR workflows with correction loops and protected approval operations.
+- [x] T044 Seed/migrate approved DFCT workflow while preserving fixed severity/SLA behavior via capability rather than literal `DEFECT` checks.
+- [x] T045 Seed/migrate approved REQ workflow with client acceptance and implementation/deployment loop.
 - [x] T046 Implement correction-return command/reason persistence atomically with transition/history/audit/comment visibility.
 - [x] T047 Implement TASI/USR submit/approve/reject domain commands; resolve assigned team leader/designated approver and prevent unauthorized self-approval.
 - [x] T048 Implement REQ client acceptance/rejection command; require same-org business owner or approved permission rule.

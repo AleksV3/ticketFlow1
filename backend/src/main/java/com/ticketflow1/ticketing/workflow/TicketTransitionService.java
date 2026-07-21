@@ -141,7 +141,7 @@ public class TicketTransitionService {
         }
 
         ticket.setCurrentState(toState);
-        if ("DEFECT".equals(ticket.getTicketType().getKey())
+        if (ticket.getTicketType().getCapability() == TicketTypeCapability.DEFECT_SLA
                 && "REPORTED".equals(fromState.getKey())
                 && "ANALYSIS".equals(toState.getKey())
                 && ticket.getRespondedAt() == null) {

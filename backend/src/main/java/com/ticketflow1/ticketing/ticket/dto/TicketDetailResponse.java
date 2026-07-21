@@ -71,7 +71,7 @@ public record TicketDetailResponse(
                 ticket.getCreatedAt(),
                 ticket.getUpdatedAt(),
                 ticket.getClosedAt(),
-                "DEFECT".equals(ticket.getTicketType().getKey()) ? SlaRef.from(ticket, slaStatus) : null,
+                ticket.getTicketType().getCapability() == com.ticketflow1.ticketing.workflow.TicketTypeCapability.DEFECT_SLA ? SlaRef.from(ticket, slaStatus) : null,
                 ProcessMap.from(ticket),
                 allowedTransitions,
                 proposal == null ? null : proposal.latestProposal(),

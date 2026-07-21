@@ -43,3 +43,51 @@ SELECT x.key,x.name,w.id,NULL,true,false FROM (VALUES
 WHERE NOT EXISTS (SELECT 1 FROM ticket_type t WHERE t.organization_id IS NULL AND t.key=x.key);
 
 SELECT clone_org_templates(id) FROM organization;
+
+-- The legacy clone function predates protected operations/capabilities. Restore
+-- those template attributes on each organization-owned copy after cloning.
+UPDATE ticket_type copy
+SET capability = template.capability
+FROM ticket_type template
+WHERE template.organization_id IS NULL
+  AND copy.organization_id IS NOT NULL
+  AND copy.key = template.key;
+
+UPDATE workflow_transition copy
+SET operation_kind = template.operation_kind
+FROM workflow_transition template
+JOIN workflow template_workflow ON template_workflow.id = template.workflow_id
+JOIN workflow copy_workflow ON copy_workflow.organization_id IS NOT NULL
+    AND copy_workflow.name = template_workflow.name
+JOIN workflow_state copy_from ON copy_from.workflow_id = copy_workflow.id
+    AND copy_from.key = (SELECT key FROM workflow_state WHERE id = template.from_state_id)
+JOIN workflow_state copy_to ON copy_to.workflow_id = copy_workflow.id
+    AND copy_to.key = (SELECT key FROM workflow_state WHERE id = template.to_state_id)
+WHERE template_workflow.organization_id IS NULL
+  AND copy.workflow_id = copy_workflow.id
+  AND copy.from_state_id = copy_from.id
+  AND copy.to_state_id = copy_to.id;
+
+-- Starter subtype choices remain editable through the administration API.
+INSERT INTO ticket_subtype(ticket_type_id,key,name,description,sort_order)
+SELECT t.id,s.key,s.name,s.description,s.sort_order
+FROM ticket_type t
+JOIN (VALUES
+ ('TASI','FIREWALL','Firewall','Firewall service action',10),
+ ('TASI','NETWORK','Network','Network service action',20),
+ ('TASI','APPLICATION','Application','Application service action',30),
+ ('TASI','HARDWARE','Hardware','Hardware service action',40),
+ ('USR','NEW','New user','Create a user',10),
+ ('USR','MODIFY','Modify user','Change an existing user',20),
+ ('USR','DELETE','Delete user','Remove an existing user',30)
+) s(type_key,key,name,description,sort_order) ON s.type_key=t.key
+WHERE t.organization_id IS NULL
+  AND NOT EXISTS (SELECT 1 FROM ticket_subtype e WHERE e.ticket_type_id=t.id AND e.key=s.key);
+
+INSERT INTO ticket_subtype(ticket_type_id,key,name,description,sort_order)
+SELECT t.id,s_template.key,s_template.name,s_template.description,s_template.sort_order
+FROM ticket_type t
+JOIN ticket_subtype s_template ON s_template.ticket_type_id =
+    (SELECT id FROM ticket_type WHERE organization_id IS NULL AND key=t.key)
+WHERE t.organization_id IS NOT NULL
+  AND NOT EXISTS (SELECT 1 FROM ticket_subtype e WHERE e.ticket_type_id=t.id AND e.key=s_template.key);
