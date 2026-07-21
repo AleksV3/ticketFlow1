@@ -5,14 +5,15 @@ import com.ticketflow1.ticketing.common.ApiException;
 import com.ticketflow1.ticketing.ticket.*;
 import com.ticketflow1.ticketing.user.*;
 import java.util.*;
+import jakarta.persistence.EntityManager;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import com.ticketflow1.ticketing.workflow.TicketTransitionService;
 
 @Service
 public class DeveloperTeamService {
-    private final DeveloperTeamRepository teams; private final AppUserRepository users; private final TicketRepository tickets; private final TicketTransitionService transitions;
-    public DeveloperTeamService(DeveloperTeamRepository teams,AppUserRepository users,TicketRepository tickets,TicketTransitionService transitions){this.teams=teams;this.users=users;this.tickets=tickets;this.transitions=transitions;}
+    private final DeveloperTeamRepository teams; private final AppUserRepository users; private final TicketRepository tickets; private final TicketTransitionService transitions; private final EntityManager entityManager;
+    public DeveloperTeamService(DeveloperTeamRepository teams,AppUserRepository users,TicketRepository tickets,TicketTransitionService transitions,EntityManager entityManager){this.teams=teams;this.users=users;this.tickets=tickets;this.transitions=transitions;this.entityManager=entityManager;}
 
     @Transactional(readOnly=true) public List<TeamDtos.TeamResponse> list(AuthPrincipal p){
         List<DeveloperTeam> visible=p.party()==Responsibility.TICKETFLOW1?teams.findAllByOrderByNameAsc():teams.findDistinctByLeaderIdOrMembersIdOrderByNameAsc(p.userId(),p.userId());
@@ -43,7 +44,9 @@ public class DeveloperTeamService {
         Map<String,Ticket> byKey=visible.stream().collect(java.util.stream.Collectors.toMap(Ticket::getTicketKey,java.util.function.Function.identity()));
         Iterator<Ticket> reorderedVisible=keys.stream().map(byKey::get).iterator();List<Ticket> merged=new ArrayList<>();
         for(Ticket ticket:team.getTickets())merged.add(ticketVisible(ticket,p)?reorderedVisible.next():ticket);
-        team.reorderTickets(merged);return response(teams.save(team),p);
+        teams.parkTicketPositions(team.getId());
+        for(int position=0;position<merged.size();position++)teams.updateTicketPosition(team.getId(),merged.get(position).getId(),position);
+        entityManager.clear();DeveloperTeam reordered=teams.findById(id).orElseThrow(()->ApiException.notFound("Team not found."));return response(reordered,p);
     }
     private void apply(DeveloperTeam team,TeamDtos.SaveTeamRequest r,AppUser leader,AuthPrincipal p){
         Set<Long> ids=r.memberIds()==null?Set.of():r.memberIds();Set<AppUser> members=new LinkedHashSet<>(users.findAllById(ids));
