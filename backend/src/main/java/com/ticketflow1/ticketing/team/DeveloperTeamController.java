@@ -13,4 +13,5 @@ public class DeveloperTeamController {
     @GetMapping("/options") public TeamDtos.Options options(@AuthenticationPrincipal AuthPrincipal p){return service.options(p);}
     @PostMapping public TeamDtos.TeamResponse create(@RequestBody TeamDtos.SaveTeamRequest r,@AuthenticationPrincipal AuthPrincipal p){return service.create(r,p);}
     @PutMapping("/{id}") public TeamDtos.TeamResponse update(@PathVariable Long id,@RequestBody TeamDtos.SaveTeamRequest r,@AuthenticationPrincipal AuthPrincipal p){return service.update(id,r,p);}
+    @PutMapping("/{id}/ticket-order") public TeamDtos.TeamResponse reorder(@PathVariable Long id,@RequestBody TeamDtos.ReorderTicketsRequest r,@AuthenticationPrincipal AuthPrincipal p){return service.reorder(id,r,p);}
 }

@@ -6,13 +6,14 @@ import java.util.Set;
 
 public final class TeamDtos {
     private TeamDtos() {}
-    public record SaveTeamRequest(String name,String description,Long leaderId,Set<Long> memberIds,Set<String> ticketKeys) {}
+    public record SaveTeamRequest(String name,String description,Long leaderId,Set<Long> memberIds,List<String> ticketKeys) {}
+    public record ReorderTicketsRequest(List<String> ticketKeys) {}
     public record Person(Long id,String name,String party,String organizationName) {}
     public record TicketRef(String ticketKey,String title,String status,String type,String severity,String priority,String responsibility,String organizationName,List<String> allowedTransitions) {}
     public record Options(List<Person> people,List<TicketRef> tickets) {}
     public record TeamResponse(Long id,String name,String description,Person leader,List<Person> members,List<TicketRef> tickets,Long createdById,boolean editable,Instant updatedAt) {
         static Person person(com.ticketflow1.ticketing.user.AppUser user){return new Person(user.getId(),user.getDisplayName(),user.getParty().name(),user.getOrganization()==null?null:user.getOrganization().getName());}
         static TicketRef ticket(com.ticketflow1.ticketing.ticket.Ticket t,java.util.function.Function<com.ticketflow1.ticketing.ticket.Ticket,List<String>> transitions){return new TicketRef(t.getTicketKey(),t.getTitle(),t.getCurrentState().getKey(),t.getTicketType().getKey(),t.getSeverity()==null?null:t.getSeverity().name(),t.getPriority().name(),t.getCurrentResponsibility().name(),t.getOrganization().getName(),transitions.apply(t));}
-        static TeamResponse from(DeveloperTeam team,boolean editable,java.util.function.Predicate<com.ticketflow1.ticketing.ticket.Ticket> visible,java.util.function.Function<com.ticketflow1.ticketing.ticket.Ticket,List<String>> transitions){return new TeamResponse(team.getId(),team.getName(),team.getDescription(),person(team.getLeader()),team.getMembers().stream().map(TeamResponse::person).sorted(java.util.Comparator.comparing(Person::name)).toList(),team.getTickets().stream().filter(visible).map(t->ticket(t,transitions)).sorted(java.util.Comparator.comparing(TicketRef::ticketKey)).toList(),team.getCreatedBy().getId(),editable,team.getUpdatedAt());}
+        static TeamResponse from(DeveloperTeam team,boolean editable,java.util.function.Predicate<com.ticketflow1.ticketing.ticket.Ticket> visible,java.util.function.Function<com.ticketflow1.ticketing.ticket.Ticket,List<String>> transitions){return new TeamResponse(team.getId(),team.getName(),team.getDescription(),person(team.getLeader()),team.getMembers().stream().map(TeamResponse::person).sorted(java.util.Comparator.comparing(Person::name)).toList(),team.getTickets().stream().filter(visible).map(t->ticket(t,transitions)).toList(),team.getCreatedBy().getId(),editable,team.getUpdatedAt());}
     }
 }

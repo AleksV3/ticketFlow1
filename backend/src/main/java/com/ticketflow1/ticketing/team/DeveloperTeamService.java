@@ -34,10 +34,21 @@ public class DeveloperTeamService {
         if(!canEdit(team,p))throw ApiException.forbidden("Only an administrator or this team's leader can edit it.");
         AppUser leader=r.leaderId()==null?team.getLeader():selectableUser(r.leaderId(),p);apply(team,r,leader,p);return response(teams.save(team),p);
     }
+    @Transactional public TeamDtos.TeamResponse reorder(Long id,TeamDtos.ReorderTicketsRequest r,AuthPrincipal p){
+        DeveloperTeam team=teams.findById(id).orElseThrow(()->ApiException.notFound("Team not found."));
+        if(!canView(team,p))throw ApiException.notFound("Team not found.");
+        List<Ticket> visible=team.getTickets().stream().filter(ticket->ticketVisible(ticket,p)).toList();
+        List<String> keys=r.ticketKeys()==null?List.of():r.ticketKeys();
+        if(keys.size()!=visible.size()||new HashSet<>(keys).size()!=keys.size()||!new HashSet<>(keys).equals(visible.stream().map(Ticket::getTicketKey).collect(java.util.stream.Collectors.toSet())))throw ApiException.validation("ticketKeys must contain every visible team ticket exactly once.");
+        Map<String,Ticket> byKey=visible.stream().collect(java.util.stream.Collectors.toMap(Ticket::getTicketKey,java.util.function.Function.identity()));
+        Iterator<Ticket> reorderedVisible=keys.stream().map(byKey::get).iterator();List<Ticket> merged=new ArrayList<>();
+        for(Ticket ticket:team.getTickets())merged.add(ticketVisible(ticket,p)?reorderedVisible.next():ticket);
+        team.reorderTickets(merged);return response(teams.save(team),p);
+    }
     private void apply(DeveloperTeam team,TeamDtos.SaveTeamRequest r,AppUser leader,AuthPrincipal p){
         Set<Long> ids=r.memberIds()==null?Set.of():r.memberIds();Set<AppUser> members=new LinkedHashSet<>(users.findAllById(ids));
         if(members.size()!=ids.size()||members.stream().anyMatch(u->!u.isActive()||!canSelect(u,p)))throw ApiException.validation("All members must be active users available to you.");
-        Set<String> keys=r.ticketKeys()==null?Set.of():r.ticketKeys();Set<Ticket> related=new LinkedHashSet<>();
+        List<String> keys=r.ticketKeys()==null?List.of():r.ticketKeys();if(new HashSet<>(keys).size()!=keys.size())throw ApiException.validation("A ticket can only be added to a team once.");List<Ticket> related=new ArrayList<>();
         for(String key:keys){Ticket ticket=tickets.findByTicketKey(key).orElseThrow(()->ApiException.validation("Ticket not found: "+key));if(!ticketVisible(ticket,p))throw ApiException.validation("Ticket not found: "+key);related.add(ticket);}
         team.update(name(r.name()),text(r.description()),leader,members,related);
     }
