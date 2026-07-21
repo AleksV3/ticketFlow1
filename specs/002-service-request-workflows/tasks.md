@@ -63,8 +63,8 @@ dependency; all tasks remain unchecked until implemented and verified.
 - [x] T037 Enforce USR NEW versus MODIFY/DELETE target-user rules and store immutable ID plus display snapshot.
 - [x] T038 Enforce parent tenant/type visibility, prevent self-parenting and ancestor cycles, and define inheritance allowlist.
 - [x] T039 Extend detail/list/board responses and filters with subtype, dynamic values as authorized, routing, parent, and child progress.
-- [ ] T040 Audit creation values without leaking internal/sensitive values to client-visible feeds.
-- [ ] T041 [P] Test routing, dynamic validation, USR search/reference rules, inheritance, cycles, tenant isolation, and transactional rollback.
+- [x] T040 Audit creation values without leaking internal/sensitive values to client-visible feeds.
+- [x] T041 [P] Test routing, dynamic validation, USR search/reference rules, inheritance, cycles, tenant isolation, and transactional rollback.
 - [ ] T042 **Verify**: create TASI/FIREWALL, USR/NEW, USR/MODIFY, and a child ticket through API and inspect assignments/audit.
 
 ## Phase 5: Workflow migration and relationship-aware approvals
@@ -72,7 +72,7 @@ dependency; all tasks remain unchecked until implemented and verified.
 - [ ] T043 Seed/migrate approved TASI and USR workflows with correction loops and protected approval operations.
 - [ ] T044 Seed/migrate approved DFCT workflow while preserving fixed severity/SLA behavior via capability rather than literal `DEFECT` checks.
 - [ ] T045 Seed/migrate approved REQ workflow with client acceptance and implementation/deployment loop.
-- [ ] T046 Implement correction-return command/reason persistence atomically with transition/history/audit/comment visibility.
+- [x] T046 Implement correction-return command/reason persistence atomically with transition/history/audit/comment visibility.
 - [ ] T047 Implement TASI/USR submit/approve/reject domain commands; resolve assigned team leader/designated approver and prevent unauthorized self-approval.
 - [ ] T048 Implement REQ client acceptance/rejection command; require same-org business owner or approved permission rule.
 - [ ] T049 Ensure protected transitions never appear in or execute through the generic transition endpoint.

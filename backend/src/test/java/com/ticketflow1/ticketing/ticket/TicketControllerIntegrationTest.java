@@ -957,6 +957,30 @@ class TicketControllerIntegrationTest {
         return count;
     }
 
+    @Test
+    void dynamicCreationValidatesAndAuditDoesNotExposeSubmittedValue() throws Exception {
+        Cookie admin = login("admin@ticketflow1.demo", "admin123");
+        Long orgId = organizationRepository.findAll().stream().filter(o -> "Client A".equals(o.getName())).findFirst().orElseThrow().getId();
+        Long typeId = jdbcTemplate.queryForObject("select id from ticket_type where organization_id=? order by id limit 1", Long.class, orgId);
+        JsonNode subtype = json(mockMvc.perform(post("/api/admin/ticket-types/{id}/subtypes", typeId).with(csrf()).cookie(admin)
+                .contentType("application/json").content("{\"key\":\"DYNAMIC_AUDIT\",\"name\":\"Dynamic audit\"}"))
+                .andExpect(status().isCreated()).andReturn());
+        JsonNode field = json(mockMvc.perform(post("/api/admin/subtypes/{id}/fields", subtype.path("id").asLong()).with(csrf()).cookie(admin)
+                .contentType("application/json").content("{\"key\":\"secret\",\"label\":\"Secret\",\"fieldKind\":\"SHORT_TEXT\",\"required\":true,\"visibility\":\"INTERNAL\"}"))
+                .andExpect(status().isCreated()).andReturn());
+        mockMvc.perform(post("/api/tickets").with(csrf()).cookie(admin).contentType("application/json").content("""
+                {"type":"CHANGE_REQUEST","organizationId":%d,"title":"Dynamic test","description":"Dynamic test","priority":"MEDIUM","subtypeId":%d,"dynamicValues":{"secret":"do-not-leak"}}
+                """.formatted(orgId, subtype.path("id").asLong())))
+                .andExpect(status().isCreated()).andExpect(jsonPath("$.dynamicValues.secret").value("do-not-leak"));
+        mockMvc.perform(post("/api/tickets").with(csrf()).cookie(admin).contentType("application/json").content("""
+                {"type":"CHANGE_REQUEST","organizationId":%d,"title":"Bad dynamic","description":"Bad dynamic","priority":"MEDIUM","subtypeId":%d,"dynamicValues":{"unknown":"x"}}
+                """.formatted(orgId, subtype.path("id").asLong())))
+                .andExpect(status().isBadRequest());
+        String key = jdbcTemplate.queryForObject("select ticket_key from ticket where title='Dynamic test' order by id desc limit 1", String.class);
+        mockMvc.perform(get("/api/tickets/{key}/audit-log", key).cookie(admin)).andExpect(status().isOk())
+                .andExpect(jsonPath("$[?(@.action == 'DYNAMIC_FIELDS_CAPTURED' && @.newValue == 'do-not-leak')]").isEmpty());
+    }
+
     private String createTicket(Cookie authCookie, String body, String expectedInitialState) throws Exception {
         MvcResult createResult = mockMvc.perform(post("/api/tickets")
                         .cookie(authCookie)

@@ -45,7 +45,8 @@ public record TicketDetailResponse(
         UserRef targetUser,
         String targetUserDisplaySnapshot,
         Long routingRuleId,
-        Long resolvedApproverId) {
+        Long resolvedApproverId,
+        Map<String,Object> dynamicValues) {
 
     public static TicketDetailResponse from(Ticket ticket, List<String> allowedTransitions, ProposalDetail proposal,
             SlaStatus slaStatus, Map<String,Object> dynamicValues) {
@@ -81,6 +82,10 @@ public record TicketDetailResponse(
                 UserRef.from(ticket.getTargetUser()), ticket.getTargetUserDisplaySnapshot(),
                 ticket.getRoutingRule() == null ? null : ticket.getRoutingRule().getId(),
                 ticket.getResolvedApprover() == null ? null : ticket.getResolvedApprover().getId(), dynamicValues);
+    }
+    public static TicketDetailResponse from(Ticket ticket, List<String> allowedTransitions, ProposalDetail proposal,
+            SlaStatus slaStatus) {
+        return from(ticket, allowedTransitions, proposal, slaStatus, Map.of());
     }
 
     public record ProcessMap(String name, List<ProcessState> states, List<ProcessTransition> transitions) {

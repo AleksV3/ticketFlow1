@@ -196,6 +196,12 @@ public class TicketService {
             saved = ticketRepository.saveAndFlush(saved);
         }
         auditService.record(saved, actor.getId(), AuditAction.TICKET_CREATED);
+        if (subtype != null && request.dynamicValues() != null && !request.dynamicValues().isEmpty()) {
+            // Never persist submitted values in the audit feed: dynamic fields may
+            // contain internal infrastructure details or directory references.
+            auditService.record(saved, actor.getId(), AuditAction.DYNAMIC_FIELDS_CAPTURED,
+                    "dynamicValues", null, "captured");
+        }
         statusHistoryService.record(saved, null, initialState, actor.getId());
         return detail(saved, principal);
     }
@@ -404,9 +410,10 @@ public class TicketService {
         if (requiresTarget && supplied == null) throw ApiException.validation("targetUserId is required for USR " + subtypeKey + ".");
         if (!requiresTarget && supplied != null) throw ApiException.validation("targetUserId is only allowed for USR MODIFY or DELETE.");
         if (supplied == null) return null;
-        AppUser target = appUserRepository.findById(supplied).filter(AppUser::isActive)
+        final Long targetId = supplied;
+        AppUser target = appUserRepository.findById(targetId).filter(AppUser::isActive)
                 .filter(user -> user.getOrganization() != null && user.getOrganization().getId().equals(organization.getId()))
-                .orElseThrow(() -> ApiException.notFound("Target user not found: " + supplied));
+                .orElseThrow(() -> ApiException.notFound("Target user not found: " + targetId));
         if (principal.party() != Responsibility.TICKETFLOW1) throw ApiException.forbidden("Only TICKETFLOW1 users may create USR tickets.");
         return target;
     }

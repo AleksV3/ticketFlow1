@@ -3,6 +3,7 @@ package com.ticketflow1.ticketing.ticket;
 import com.ticketflow1.ticketing.auth.AuthPrincipal;
 import com.ticketflow1.ticketing.common.PagedResponse;
 import com.ticketflow1.ticketing.ticket.dto.CreateTicketRequest;
+import com.ticketflow1.ticketing.ticket.dto.CorrectionReturnRequest;
 import com.ticketflow1.ticketing.ticket.dto.TicketDetailResponse;
 import com.ticketflow1.ticketing.ticket.dto.TicketSummaryResponse;
 import com.ticketflow1.ticketing.ticket.dto.TransitionTicketRequest;
@@ -104,5 +105,13 @@ public class TicketController {
             @Valid @RequestBody TransitionTicketRequest request,
             @AuthenticationPrincipal AuthPrincipal principal) {
         return ticketTransitionService.transition(ticketKey, request.toStatus(), request.comment(), principal);
+    }
+
+    @PostMapping("/{ticketKey}/correction-return")
+    @PreAuthorize("hasAuthority('TICKET_TRANSITION')")
+    public TicketDetailResponse correctionReturn(@PathVariable String ticketKey,
+            @Valid @RequestBody CorrectionReturnRequest request,
+            @AuthenticationPrincipal AuthPrincipal principal) {
+        return ticketTransitionService.correctionReturn(ticketKey, request.reason(), principal);
     }
 }

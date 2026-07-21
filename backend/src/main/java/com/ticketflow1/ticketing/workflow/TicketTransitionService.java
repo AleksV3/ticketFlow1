@@ -79,6 +79,22 @@ public class TicketTransitionService {
                 proposalDetailService.detail(saved, principal), slaStatusService.status(saved));
     }
 
+    @Transactional
+    public TicketDetailResponse correctionReturn(String ticketKey, String reason, AuthPrincipal principal) {
+        if (reason == null || reason.isBlank() || reason.trim().length() > 10000) {
+            throw ApiException.validation("A correction reason is required (maximum 10000 characters).");
+        }
+        Ticket ticket = findVisibleTicket(ticketKey, principal);
+        AppUser actor = appUserRepository.findById(principal.userId())
+                .orElseThrow(() -> ApiException.notFound("Current user no longer exists."));
+        Ticket saved = transitionOwned(ticket, TransitionOperationKind.CORRECTION_RETURN, principal);
+        commentService.createForTicket(saved, reason.trim(), CommentVisibility.INTERNAL, principal);
+        auditService.record(saved, actor.getId(), AuditAction.CORRECTION_RETURN,
+                "reason", null, "recorded");
+        return TicketDetailResponse.from(saved, allowedTransitions(saved, principal),
+                proposalDetailService.detail(saved, principal), slaStatusService.status(saved));
+    }
+
     /**
      * Applies the single owned transition that matches the requested operation.
      */
