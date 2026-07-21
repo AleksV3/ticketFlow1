@@ -49,3 +49,19 @@ with new creation disabled; do not drop new tables. Database recovery uses the
 pre-migration backup plus replayed business events, not a destructive Flyway
 undo. A sanitized current-schema rehearsal is required by T064.
 
+An older application artifact does not contain the newer migration files, so
+its normal Flyway validation intentionally rejects the newer history rows. For
+an emergency application-only rollback, start that older artifact with
+`--spring.flyway.validate-on-migrate=false`. Flyway then leaves the newer schema
+untouched and Hibernate still validates the older entity model. Restore normal
+Flyway validation when rolling forward again; never run `repair`, delete schema
+history, or drop the additive tables as part of an application rollback.
+
+## T025 verification record (2026-07-21)
+
+- Existing local schema migrated from v13 through v19; all 20 migrations and
+  Hibernate validation passed.
+- Disposable empty database `ticketflow1_feature_verify` migrated from empty to
+  v19; all migrations and Hibernate validation passed.
+- Detached pre-feature commit `4a45bf5` started successfully against the v19
+  database with the explicit rollback setting above; no schema change ran.

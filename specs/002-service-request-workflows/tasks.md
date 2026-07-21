@@ -42,12 +42,12 @@ dependency; all tasks remain unchecked until implemented and verified.
 - [x] T022 Implement safe delete/deactivate reference checks and immutable-used-key rules.
 - [x] T023 Record every new configuration mutation in configuration audit.
 - [x] T024 [P] Unit-test typed validation, option membership, safe deletion, active state, and ordering.
-- [ ] T025 **Verify**: migrate a fresh DB and a current DB snapshot; Hibernate validation and rollback rehearsal pass.
+- [x] T025 **Verify**: migrate a fresh DB and a current DB snapshot; Hibernate validation and rollback rehearsal pass.
 
 ## Phase 3: Configuration APIs
 
-- [ ] T026 Implement tenant-scoped subtype CRUD/reorder/activation endpoints gated by `TYPE_MANAGE`.
-- [ ] T027 Implement tenant-scoped field/option CRUD/reorder/activation endpoints with length/count bounds and allowlisted kinds.
+- [x] T026 Implement tenant-scoped subtype CRUD/reorder/activation endpoints gated by `TYPE_MANAGE`.
+- [x] T027 Implement tenant-scoped field/option CRUD/reorder/activation endpoints with length/count bounds and allowlisted kinds.
 - [ ] T028 Implement routing-rule administration with active/same-scope team, developer, fallback, and approver validation.
 - [ ] T029 Implement organization type add/rename/workflow/activation and unused-only hard deletion.
 - [ ] T030 Implement creation-form reference endpoint returning only active authorized definitions/options.
