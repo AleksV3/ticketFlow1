@@ -1,8 +1,7 @@
 <!--
 Sync Impact Report
-- Version change: 1.1.0 → 1.2.0
-- Modified principles: I (protected business transitions), II (audit target and
-  visibility), VIII (CSRF/cookies/demo isolation/admin tenant scope)
+- Version change: 1.2.0 → 1.3.0
+- Modified principles: VI (bounded subtype forms and deterministic routing)
 - Added sections: none
 - Removed sections: none
 - Templates requiring updates:
@@ -11,7 +10,7 @@ Sync Impact Report
   - .specify/templates/spec-template.md ✅ compatible
   - .specify/templates/tasks-template.md ✅ compatible
   - .specify/templates/checklist-template.md ✅ compatible
-- Follow-up TODOs: none; the active plan/tasks were synchronized in the same change
+- Follow-up TODOs: none; feature 002 plan/tasks were synchronized in the same change
 -->
 
 # TicketFlow1 Ticketing Tool Constitution
@@ -92,10 +91,17 @@ half-built state.
 
 ### VI. Bounded Configurability, No Overengineering
 Configuration is data within a fixed schema — nothing more. Ticket **types**,
-**workflows** (states + transitions), and **roles** (as permission bundles) MAY
-be defined per organization at runtime. This is deliberately bounded:
+**workflows** (states + transitions), **subtypes**, **fixed-kind subtype form
+definitions**, **deterministic assignment/approver routing references**, and
+**roles** (as permission bundles) MAY be defined per organization at runtime.
+This is deliberately bounded:
 
 - NO per-tenant code, NO plugin system, NO scripting/rules engine.
+- Form fields MUST use a developer-owned kind allowlist and bounded validation
+  metadata; configuration cannot contain executable expressions, HTML, or SQL.
+- Routing MAY only reference active, in-scope users and teams through explicit
+  foreign keys; it cannot execute arbitrary conditions or invent permissions.
+- Runtime configuration MUST NOT add physical columns or otherwise perform DDL.
 - NO runtime-invented permission types — the permission catalog is fixed in code.
 - The **party axis** (CLIENT/TICKETFLOW1) and the **defect severity** set stay
   fixed (severity drives the SLA formulas and is not configurable).
@@ -204,4 +210,4 @@ Constitution Check against these principles before task breakdown begins. Any
 violation must be justified explicitly in that plan's Complexity Tracking
 section or the plan must be revised.
 
-**Version**: 1.2.0 | **Ratified**: 2026-07-02 | **Last Amended**: 2026-07-10
+**Version**: 1.3.0 | **Ratified**: 2026-07-02 | **Last Amended**: 2026-07-21

@@ -4,8 +4,7 @@
 
 **Created**: 2026-07-21
 
-**Status**: Draft — initial product decisions confirmed; field templates,
-constitution amendment, and workflow review pending
+**Status**: Approved for detailed design
 
 **Input**: Add internal TASI and USR ticket processes, revise client DFCT and
 REQ processes, provide configurable subtypes and subtype-specific forms,
@@ -253,10 +252,9 @@ date, boolean, single select, multi-select, user reference, and team reference.
    approval permission.
 4. A parent ticket cannot close while any child ticket is non-terminal.
 
-## Remaining Decisions
-
-1. Confirm which TASI subtype fields are public to the client and which are
-   internal-only as part of the initial field templates.
+The initial templates and field visibility are defined in `field-templates.md`.
+The exact transition actors and protected operations are defined in
+`workflow-matrix.md`.
 
 ## Success Criteria
 

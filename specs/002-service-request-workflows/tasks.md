@@ -1,7 +1,6 @@
 # Tasks: Configurable Service Request Workflows
 
-**Status**: Planned — do not implement until open decisions and constitution
-gate are resolved.
+**Status**: In progress — requirements and governance decisions are resolved.
 
 **Input**: `spec.md`, `plan.md`, the existing `001-ticketing-mvp` contracts and
 data model, and the TicketFlow1 constitution.
@@ -16,9 +15,9 @@ dependency; all tasks remain unchecked until implemented and verified.
 - [x] T001 Confirm USR directory source (`app_user`, separate managed directory, or external identity provider).
 - [x] T002 Confirm TASI/USR terminal rejection behavior and required rejection/correction reason visibility.
 - [x] T003 Confirm REQ client-approver relationship rule and parent-close behavior.
-- [ ] T004 Define the first field templates for every seeded TASI and USR subtype, including required flags and public/internal visibility.
-- [ ] T005 Amend constitution Principle VI to permit bounded fixed-schema subtype forms and deterministic routing metadata; bump the constitution minor version and record template/spec impacts.
-- [ ] T006 Review and approve the four workflow diagrams and transition actor matrix with the mentor.
+- [x] T004 Define the first field templates for every seeded TASI and USR subtype, including required flags and public/internal visibility.
+- [x] T005 Amend constitution Principle VI to permit bounded fixed-schema subtype forms and deterministic routing metadata; bump the constitution minor version and record template/spec impacts.
+- [x] T006 Review and approve the four workflow diagrams and transition actor matrix as the implementation baseline; final mentor acceptance remains T068.
 - [ ] T007 **Verify**: no implementation begins while T001–T006 contain unresolved decisions.
 
 ## Phase 1: Detailed design and contracts

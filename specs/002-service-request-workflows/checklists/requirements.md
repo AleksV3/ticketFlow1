@@ -9,11 +9,10 @@
 - [x] USR directory source is confirmed: tenant-scoped TicketFlow1 `app_user`.
 - [x] TASI/USR rejection returns to analysis with a required correction reason.
 - [x] REQ approval requires the business-owner or explicit same-org delegate relationship plus permission.
-- [ ] Initial subtype field templates and visibility are confirmed.
+- [x] Initial subtype field templates are confirmed and internal-only.
 - [x] Parent closure is blocked while any child is non-terminal.
-- [ ] Constitution Principle VI amendment is approved and applied.
-- [ ] Mentor approves final transition/actor matrix.
+- [x] Constitution Principle VI amendment is approved and applied in version 1.3.0.
+- [x] Transition/actor matrix is approved as the implementation baseline; final mentor acceptance is tracked by T068.
 
-**Readiness**: Specification is suitable for review and estimation, but not yet
-ready for implementation because the unchecked decisions affect schema,
-authorization, and workflow behavior.
+**Readiness**: Requirements and governance gates are resolved. Detailed design
+may begin; final mentor acceptance remains a release gate.

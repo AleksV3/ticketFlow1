@@ -36,13 +36,10 @@ Boot/JPA/Flyway/PostgreSQL and Next.js/TypeScript/Tailwind.
 - **IV Backend before UI**: Plan order complies.
 - **V Small verified steps**: Each phase ends with a runnable seeded vertical
   slice and verification task.
-- **VI Bounded configurability**: **BLOCKED/PENDING AMENDMENT.** The current
-  constitution permits runtime configuration only for ticket types, workflows,
-  and roles. This feature explicitly requires subtype form definitions and
-  routing rules. Before implementation, amend Principle VI narrowly to permit
-  fixed-schema, fixed-kind form metadata and deterministic routing references;
-  scripts, expressions, SQL, runtime permissions, and arbitrary code remain
-  prohibited.
+- **VI Bounded configurability**: Pass under constitution 1.3.0. Fixed-schema,
+  fixed-kind form metadata and deterministic routing references are permitted;
+  scripts, expressions, SQL, runtime permissions, arbitrary code, and runtime
+  DDL remain prohibited.
 - **VII Teach**: Add migration/domain explanations and an updated deep-dive.
 - **VIII Secure by default**: Threat-model directory search, dynamic inputs,
   reference IDs, tenant scope, mass assignment, and approval bypass.
