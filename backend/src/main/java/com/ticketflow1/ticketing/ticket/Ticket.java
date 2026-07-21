@@ -6,6 +6,8 @@ import com.ticketflow1.ticketing.team.DeveloperTeam;
 import com.ticketflow1.ticketing.user.AppUser;
 import com.ticketflow1.ticketing.workflow.TicketType;
 import com.ticketflow1.ticketing.workflow.WorkflowState;
+import com.ticketflow1.ticketing.ticketconfig.TicketSubtype;
+import com.ticketflow1.ticketing.ticketconfig.SubtypeRoutingRule;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
@@ -38,6 +40,11 @@ public class Ticket extends Auditable {
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "ticket_type_id")
     private TicketType ticketType;
+
+    @ManyToOne(fetch = FetchType.LAZY) @JoinColumn(name = "subtype_id") private TicketSubtype subtype;
+    @ManyToOne(fetch = FetchType.LAZY) @JoinColumn(name = "parent_ticket_id") private Ticket parentTicket;
+    @ManyToOne(fetch = FetchType.LAZY) @JoinColumn(name = "routing_rule_id") private SubtypeRoutingRule routingRule;
+    @ManyToOne(fetch = FetchType.LAZY) @JoinColumn(name = "resolved_approver_id") private AppUser resolvedApprover;
 
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "current_state_id")
@@ -145,6 +152,10 @@ public class Ticket extends Auditable {
     public WorkflowState getCurrentState() {
         return currentState;
     }
+    public TicketSubtype getSubtype(){return subtype;} public void setSubtype(TicketSubtype value){subtype=value;}
+    public Ticket getParentTicket(){return parentTicket;} public void setParentTicket(Ticket value){parentTicket=value;}
+    public SubtypeRoutingRule getRoutingRule(){return routingRule;} public void setRoutingRule(SubtypeRoutingRule value){routingRule=value;}
+    public AppUser getResolvedApprover(){return resolvedApprover;} public void setResolvedApprover(AppUser value){resolvedApprover=value;}
 
     public void setCurrentState(WorkflowState currentState) {
         this.currentState = currentState;

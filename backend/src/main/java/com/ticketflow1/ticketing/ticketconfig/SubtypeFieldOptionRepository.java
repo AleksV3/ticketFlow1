@@ -4,4 +4,5 @@ public interface SubtypeFieldOptionRepository extends JpaRepository<SubtypeField
     List<SubtypeFieldOption> findByFieldDefinitionIdOrderBySortOrderAscIdAsc(Long fieldDefinitionId);
     Optional<SubtypeFieldOption> findByFieldDefinitionIdAndKey(Long fieldDefinitionId,String key);
     List<SubtypeFieldOption> findByFieldDefinitionIdAndActiveTrueOrderBySortOrderAscIdAsc(Long fieldDefinitionId);
+    Optional<SubtypeFieldOption> findByFieldDefinitionIdAndKeyAndActiveTrue(Long fieldDefinitionId,String key);
 }

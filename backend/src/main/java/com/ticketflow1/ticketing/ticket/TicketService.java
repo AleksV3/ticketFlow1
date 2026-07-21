@@ -24,11 +24,15 @@ import com.ticketflow1.ticketing.workflow.TicketTypeRepository;
 import com.ticketflow1.ticketing.workflow.TicketTransitionService;
 import com.ticketflow1.ticketing.workflow.WorkflowState;
 import com.ticketflow1.ticketing.workflow.WorkflowStateRepository;
+import com.ticketflow1.ticketing.ticketconfig.*;
 import com.ticketflow1.ticketing.team.DeveloperTeam;
 import com.ticketflow1.ticketing.team.DeveloperTeamRepository;
 import java.util.List;
 import java.util.LinkedHashSet;
 import java.util.Set;
+import java.util.Map;
+import java.util.Collection;
+import java.time.LocalDate;
 import java.time.Clock;
 import jakarta.persistence.criteria.JoinType;
 import org.springframework.data.domain.PageRequest;
@@ -67,6 +71,12 @@ public class TicketService {
     private final SlaStatusService slaStatusService;
     private final Clock clock;
     private final DeveloperTeamRepository developerTeamRepository;
+    private final TicketSubtypeRepository subtypeRepository;
+    private final SubtypeRoutingRuleRepository routingRuleRepository;
+    private final SubtypeFieldDefinitionRepository fieldDefinitionRepository;
+    private final SubtypeFieldOptionRepository fieldOptionRepository;
+    private final TicketFieldValueRepository fieldValueRepository;
+    private final DynamicFieldValidator dynamicFieldValidator;
 
     public TicketService(TicketRepository ticketRepository,
             TicketTypeRepository ticketTypeRepository,
@@ -80,7 +90,10 @@ public class TicketService {
             ProposalDetailService proposalDetailService,
             SlaCalculator slaCalculator,
             SlaStatusService slaStatusService,
-            Clock clock, DeveloperTeamRepository developerTeamRepository) {
+            Clock clock, DeveloperTeamRepository developerTeamRepository,
+            TicketSubtypeRepository subtypeRepository, SubtypeRoutingRuleRepository routingRuleRepository,
+            SubtypeFieldDefinitionRepository fieldDefinitionRepository, SubtypeFieldOptionRepository fieldOptionRepository,
+            TicketFieldValueRepository fieldValueRepository, DynamicFieldValidator dynamicFieldValidator) {
         this.ticketRepository = ticketRepository;
         this.ticketTypeRepository = ticketTypeRepository;
         this.workflowStateRepository = workflowStateRepository;
@@ -95,6 +108,8 @@ public class TicketService {
         this.slaStatusService = slaStatusService;
         this.clock = clock;
         this.developerTeamRepository = developerTeamRepository;
+        this.subtypeRepository=subtypeRepository;this.routingRuleRepository=routingRuleRepository;this.fieldDefinitionRepository=fieldDefinitionRepository;
+        this.fieldOptionRepository=fieldOptionRepository;this.fieldValueRepository=fieldValueRepository;this.dynamicFieldValidator=dynamicFieldValidator;
     }
 
     /**
@@ -111,6 +126,15 @@ public class TicketService {
                 .orElseThrow(() -> ApiException.validation(
                         "Ticket type '%s' is not configured for organization %d."
                                 .formatted(request.type(), organization.getId())));
+        TicketSubtype subtype = null;
+        if (request.subtypeId() != null) {
+            subtype = subtypeRepository.findById(request.subtypeId())
+                    .filter(s -> s.isActive() && s.getTicketType().getId().equals(ticketType.getId()))
+                    .orElseThrow(() -> ApiException.validation("subtypeId is not active for this ticket type."));
+            validateDynamicValues(subtype, request.dynamicValues());
+        } else if (request.dynamicValues() != null && !request.dynamicValues().isEmpty()) {
+            throw ApiException.validation("dynamicValues requires subtypeId.");
+        }
         WorkflowState initialState = workflowStateRepository
                 .findByWorkflowIdAndInitialTrue(ticketType.getWorkflow().getId())
                 .orElseThrow(() -> ApiException.validation(
@@ -129,6 +153,13 @@ public class TicketService {
                 organization,
                 actor,
                 Responsibility.TICKETFLOW1);
+        ticket.setSubtype(subtype);
+        if (request.parentTicketKey() != null && !request.parentTicketKey().isBlank()) {
+            Ticket parent = ticketRepository.findByTicketKeyAndOrganizationId(request.parentTicketKey().trim(), organization.getId())
+                    .orElseThrow(() -> ApiException.notFound("Parent ticket not found: " + request.parentTicketKey()));
+            ticket.setParentTicket(parent);
+        }
+        applyRouting(ticket, subtype, organization);
 
         if (request.ticketLeadId() != null || request.developerIds() != null) {
             requireAssignmentPermission(principal);
@@ -147,6 +178,8 @@ public class TicketService {
         }
 
         Ticket saved = ticketRepository.saveAndFlush(ticket);
+        if (saved.getTeams() != null && !saved.getTeams().isEmpty()) developerTeamRepository.saveAll(saved.getTeams());
+        persistDynamicValues(saved, subtype, request.dynamicValues());
         if (request.teamIds() != null) {
             requireAssignmentPermission(principal);
             syncTeams(saved, request.teamIds());
@@ -308,6 +341,47 @@ public class TicketService {
         if (!principal.hasPermission("TICKET_ASSIGN")) {
             throw ApiException.forbidden("TICKET_ASSIGN permission is required.");
         }
+    }
+
+    private void validateDynamicValues(TicketSubtype subtype, Map<String,Object> values) {
+        Map<String,Object> supplied = values == null ? Map.of() : values;
+        for (String key : supplied.keySet()) {
+            if (fieldDefinitionRepository.findBySubtypeIdAndKey(subtype.getId(), key).filter(SubtypeFieldDefinition::isActive).isEmpty()) {
+                throw ApiException.validation("Unknown dynamic field: " + key);
+            }
+        }
+        for (SubtypeFieldDefinition field : fieldDefinitionRepository.findBySubtypeIdAndActiveTrueOrderBySortOrderAscIdAsc(subtype.getId())) {
+            dynamicFieldValidator.validate(field, supplied.get(field.getKey()),
+                    fieldOptionRepository.findByFieldDefinitionIdAndActiveTrueOrderBySortOrderAscIdAsc(field.getId()));
+        }
+    }
+
+    private void persistDynamicValues(Ticket ticket, TicketSubtype subtype, Map<String,Object> values) {
+        if (subtype == null || values == null) return;
+        for (SubtypeFieldDefinition field : fieldDefinitionRepository.findBySubtypeIdAndActiveTrueOrderBySortOrderAscIdAsc(subtype.getId())) {
+            Object value = values.get(field.getKey()); if (value == null) continue;
+            TicketFieldValue stored = new TicketFieldValue(ticket, field);
+            switch (field.getFieldKind()) {
+                case SHORT_TEXT, LONG_TEXT -> stored.setText((String) value);
+                case INTEGER, DECIMAL -> stored.setNumber(new java.math.BigDecimal(value.toString()));
+                case DATE -> stored.setDate(LocalDate.parse(value.toString()));
+                case BOOLEAN -> stored.setBoolean((Boolean) value);
+                case SINGLE_SELECT -> stored.setOption(fieldOptionRepository.findByFieldDefinitionIdAndKeyAndActiveTrue(field.getId(), (String) value).orElseThrow());
+                case MULTI_SELECT -> { Set<SubtypeFieldOption> selected = new LinkedHashSet<>(); for (Object item : (Collection<?>) value) selected.add(fieldOptionRepository.findByFieldDefinitionIdAndKeyAndActiveTrue(field.getId(), String.valueOf(item)).orElseThrow()); stored.setOptions(selected); }
+                case USER_REFERENCE -> { AppUser user = internalUser(((Number) value).longValue(), field.getKey()); stored.setUser(user, user.getDisplayName()); }
+                case TEAM_REFERENCE -> { DeveloperTeam team = developerTeamRepository.findById(((Number) value).longValue()).orElseThrow(() -> ApiException.validation(field.getKey() + " team not found.")); stored.setTeam(team, team.getName()); }
+            }
+            fieldValueRepository.save(stored);
+        }
+    }
+
+    private void applyRouting(Ticket ticket, TicketSubtype subtype, Organization organization) {
+        if (subtype == null) return;
+        SubtypeRoutingRule rule = routingRuleRepository.findBySubtypeIdAndOrganizationIdAndActiveTrue(subtype.getId(), organization.getId())
+                .orElseGet(() -> routingRuleRepository.findBySubtypeIdAndOrganizationIsNullAndActiveTrue(subtype.getId()).orElse(null));
+        if (rule == null) return;
+        ticket.setRoutingRule(rule); ticket.setResolvedApprover(rule.getApprover()); ticket.setTicketLead(rule.getPrimaryDeveloper());
+        ticket.setAssignedTeam(rule.getTeam().getName()); ticket.replaceTeams(Set.of(rule.getTeam()));
     }
 
     private void syncTeams(Ticket ticket, Set<Long> teamIds) {
