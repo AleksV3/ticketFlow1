@@ -33,9 +33,9 @@ dependency; all tasks remain unchecked until implemented and verified.
 ## Phase 2: Configuration schema and domain
 
 - [x] T015 Add an additive Flyway migration for ticket subtype definitions, active/order metadata, field definitions, options, typed values, and required constraints/indexes.
-- [ ] T016 Add routing-rule and explicit approval/decision tables with tenant-safe foreign keys and audit metadata.
-- [ ] T017 Add nullable `parent_ticket_id` and subtype reference to ticket with safe indexes; leave existing tickets valid.
-- [ ] T018 Add active/capability metadata needed for organization type availability and DFCT SLA behavior without runtime DDL.
+- [x] T016 Add routing-rule and explicit approval/decision tables with tenant-safe foreign keys and audit metadata.
+- [x] T017 Add nullable `parent_ticket_id` and subtype reference to ticket with safe indexes; leave existing tickets valid.
+- [x] T018 Add active/capability metadata needed for organization type availability and DFCT SLA behavior without runtime DDL.
 - [ ] T019 [P] Implement subtype/field/option entities and repositories.
 - [ ] T020 [P] Implement typed field-value entities/repositories and fixed field-kind enum.
 - [ ] T021 [P] Implement routing and approval entities/repositories.
