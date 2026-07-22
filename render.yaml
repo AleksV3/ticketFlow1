@@ -5,7 +5,7 @@ services:
     plan: free
     rootDir: backend
     dockerfilePath: ./Dockerfile
-    healthCheckPath: /swagger-ui.html
+    healthCheckPath: /api/health
     envVars:
       - key: SERVER_PORT
         value: 10000

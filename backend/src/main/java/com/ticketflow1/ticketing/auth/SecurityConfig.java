@@ -26,6 +26,7 @@ import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 class SecurityConfig {
 
     private static final String[] PUBLIC_PATHS = {
+        "/api/health",
         "/api/auth/login",
         "/api/auth/logout",
         "/swagger-ui.html",
