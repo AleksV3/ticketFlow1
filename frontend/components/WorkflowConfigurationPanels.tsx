@@ -196,7 +196,8 @@ function SubtypeAdministration({ organizationId, type, reloadTypes, report }: {
 
   async function createSubtype(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    const form = new FormData(event.currentTarget);
+    const target = event.currentTarget;
+    const form = new FormData(target);
     try {
       await post(`/admin/ticket-types/${type.id}/subtypes`, {
         key: form.get("key"),
@@ -204,7 +205,7 @@ function SubtypeAdministration({ organizationId, type, reloadTypes, report }: {
         description: form.get("description"),
         sortOrder: subtypes.length * 10,
       });
-      event.currentTarget.reset();
+      target.reset();
       report("Subtype created.");
       await loadSubtypes();
     } catch (error) {
@@ -331,7 +332,8 @@ function FieldAdministration({ subtype, report }: { subtype: Subtype; report: (m
 
   async function createField(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    const form = new FormData(event.currentTarget);
+    const target = event.currentTarget;
+    const form = new FormData(target);
     const fieldKind = form.get("fieldKind") as FieldKind;
     try {
       await post(`/admin/subtypes/${subtype.id}/fields`, {
@@ -347,7 +349,7 @@ function FieldAdministration({ subtype, report }: { subtype: Subtype; report: (m
         minNumber: numberKind(fieldKind) ? numberOrNull(form.get("minNumber")) : null,
         maxNumber: numberKind(fieldKind) ? numberOrNull(form.get("maxNumber")) : null,
       });
-      event.currentTarget.reset();
+      target.reset();
       report("Field created.");
       await loadFields();
     } catch (error) {
@@ -467,10 +469,11 @@ function OptionAdministration({ field, report }: { field: Field; report: (messag
   useEffect(() => { void loadOptions(); }, [loadOptions]);
   async function createOption(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    const form = new FormData(event.currentTarget);
+    const target = event.currentTarget;
+    const form = new FormData(target);
     try {
       await post(`/admin/fields/${field.id}/options`, { key: form.get("key"), label: form.get("label"), sortOrder: options.length * 10 });
-      event.currentTarget.reset();
+      target.reset();
       report("Option created.");
       await loadOptions();
     } catch (error) {

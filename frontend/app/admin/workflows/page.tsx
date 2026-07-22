@@ -84,17 +84,17 @@ function Editor({ user }: { user: CurrentUser }) {
   }
 
   async function addType(event: FormEvent) {
-    event.preventDefault(); if (!selected || organizationId === "internal") return;
+    event.preventDefault(); if (!selected) return;
     try {
       await post("/admin/ticket-types", { key: normalize(typeKey), name: typeName, workflowId: selected.id,
-        organizationId: Number(organizationId), requiresProposal: false });
+        organizationId: organizationId === "internal" ? null : Number(organizationId), requiresProposal: false });
       setTypeKey(""); setTypeName(""); setMessage("Custom ticket type created."); await load();
     } catch (error) { setMessage(error instanceof Error ? error.message : "Could not create ticket type."); }
   }
 
   async function applyWorkflowToType(type: TicketType, workflowId: number) {
     if (type.workflowId === workflowId) return;
-    try { await patch(`/admin/ticket-types/${type.id}`, { workflowId }); setMessage("Ticket type workflow updated."); await load(); }
+    try { await patch(`/admin/ticket-types/${type.id}`, { version: type.version, workflowId }); setMessage("Ticket type workflow updated."); await load(); }
     catch (error) { setMessage(error instanceof Error ? error.message : "Could not update ticket type workflow."); }
   }
 
@@ -143,7 +143,7 @@ function Editor({ user }: { user: CurrentUser }) {
       <section className="space-y-6">
         {selected ? <WorkflowMap workflow={selected} types={types.filter(type => type.workflowId === selected.id)} addState={addGraphState} addTransition={addGraphTransition} removeTransition={removeTransition} removeState={removeState} /> : <div className="card">Select a workflow to view its branching map.</div>}
         <WorkflowConfigurationPanels organizationId={organizationId} workflows={workflows} types={types} reload={load} report={setMessage} />
-        {organizationId!=="internal"?<form className="card space-y-3" onSubmit={addType}><h2 className="font-bold">Create ticket type for selected workflow</h2><label className="block">Key<input required disabled={!selected} className="field mt-1" value={typeKey} onChange={event => setTypeKey(event.target.value)} /></label><label className="block">Display name<input required disabled={!selected} className="field mt-1" value={typeName} onChange={event => setTypeName(event.target.value)} /></label><button disabled={!selected} className="btn-primary">Create ticket type</button></form>:null}
+        <form className="card space-y-3" onSubmit={addType}><h2 className="font-bold">Create ticket type for selected workflow</h2><p className="text-sm text-slate-500">{organizationId === "internal" ? "Creates an internal TicketFlow1 template type." : "Creates a client-organization ticket type."}</p><label className="block">Key<input required disabled={!selected} className="field mt-1" value={typeKey} onChange={event => setTypeKey(event.target.value)} /></label><label className="block">Display name<input required disabled={!selected} className="field mt-1" value={typeName} onChange={event => setTypeName(event.target.value)} /></label><button disabled={!selected} className="btn-primary">Create ticket type</button></form>
         <form className="card grid gap-3 sm:grid-cols-2" onSubmit={createWorkflow}><div className="sm:col-span-2"><p className="eyebrow">New map</p><h2 className="font-bold">Create custom workflow</h2><p className="text-sm text-slate-500">Start with two states, then arrange and connect everything directly in the canvas.</p></div><label className="sm:col-span-2">Workflow name<input className="field mt-1" required value={workflowName} onChange={event => setWorkflowName(event.target.value)} /></label><label>Starting state<input className="field mt-1" required value={initialKey} onChange={event => setInitialKey(event.target.value)} /></label><label>Ending state<input className="field mt-1" required value={terminalKey} onChange={event => setTerminalKey(event.target.value)} /></label><button className="btn-primary sm:col-span-2">Create workflow</button></form>
       </section>
     </div>

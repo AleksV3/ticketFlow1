@@ -88,8 +88,7 @@ class TicketServiceTest {
 
     @ParameterizedTest
     @CsvSource({
-        "CHANGE_REQUEST,SUBMITTED,false",
-        "TASK,SUBMITTED,false",
+        "REQ,SUBMITTED,false",
         "DEFECT,REPORTED,true"
     })
     void createTicket_setsInitialStateOrgAuditAndHistory(String typeKey, String initialStateKey,
@@ -143,16 +142,16 @@ class TicketServiceTest {
     void createTicket_rejectsSeverityForNonDefect() {
         Organization organization = organization(7L, "Client A");
         AppUser actor = appUser(11L, "client-a@demo.test", "Client A User", Responsibility.CLIENT, organization);
-        Workflow workflow = workflow(21L, "Task workflow");
-        TicketType ticketType = ticketType(31L, "TASK", workflow, organization, false);
+        Workflow workflow = workflow(21L, "Request workflow");
+        TicketType ticketType = ticketType(31L, "REQ", workflow, organization, false);
         WorkflowState initialState = workflowState(41L, workflow, "SUBMITTED", true);
         AuthPrincipal principal = new AuthPrincipal(actor.getId(), actor.getParty(), organization.getId(),
                 Set.of("TICKET_CREATE"));
-        CreateTicketRequest request = new CreateTicketRequest("TASK", "Task", "Desc", Priority.MEDIUM,
+        CreateTicketRequest request = new CreateTicketRequest("REQ", "Request", "Desc", Priority.MEDIUM,
                 Severity.SEV_1, null, null, null, null, null, null, null, null);
 
         when(appUserRepository.findById(actor.getId())).thenReturn(java.util.Optional.of(actor));
-        when(ticketTypeRepository.findByOrganizationIdAndKey(organization.getId(), "TASK"))
+        when(ticketTypeRepository.findByOrganizationIdAndKey(organization.getId(), "REQ"))
                 .thenReturn(java.util.Optional.of(ticketType));
         when(workflowStateRepository.findByWorkflowIdAndInitialTrue(workflow.getId()))
                 .thenReturn(java.util.Optional.of(initialState));

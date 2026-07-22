@@ -54,8 +54,11 @@ import org.springframework.transaction.annotation.Transactional;
 public class TicketService {
 
     private static final String DEFECT_TYPE_KEY = "DEFECT";
+    private static final String INTERNAL_ORGANIZATION_NAME = "TicketFlow1 Internal";
     private static final int DEFAULT_PAGE_SIZE = 20;
     private static final int MAX_PAGE_SIZE = 100;
+    private static final Set<String> CLIENT_CREATABLE_TYPES = Set.of("DFCT", "REQ", "DEFECT", "REQUEST");
+    private static final Set<String> INTERNAL_WORKFLOW_TYPES = Set.of("TASI", "USR");
 
     private final TicketRepository ticketRepository;
     private final TicketTypeRepository ticketTypeRepository;
@@ -121,7 +124,7 @@ public class TicketService {
         AppUser actor = appUserRepository.findById(principal.userId())
                 .orElseThrow(() -> ApiException.notFound("Current user no longer exists."));
 
-        Organization organization = resolveOrganization(actor, principal, request.organizationId());
+        Organization organization = resolveOrganization(actor, principal, request.organizationId(), request.type(), request.parentTicketKey());
         TicketType ticketType = ticketTypeRepository.findByOrganizationIdAndKey(organization.getId(), request.type())
                 .orElseThrow(() -> ApiException.validation(
                         "Ticket type '%s' is not configured for organization %d."
@@ -157,8 +160,7 @@ public class TicketService {
         ticket.setSubtype(subtype);
         if (targetUser != null) { ticket.setTargetUser(targetUser); ticket.setTargetUserDisplaySnapshot(targetUser.getDisplayName()); }
         if (request.parentTicketKey() != null && !request.parentTicketKey().isBlank()) {
-            Ticket parent = ticketRepository.findByTicketKeyAndOrganizationId(request.parentTicketKey().trim(), organization.getId())
-                    .orElseThrow(() -> ApiException.notFound("Parent ticket not found: " + request.parentTicketKey()));
+            Ticket parent = findVisibleParentTicket(request.parentTicketKey().trim(), organization, principal);
             if (principal.party() == Responsibility.CLIENT && !Set.of("DFCT", "REQ", "DEFECT", "REQUEST").contains(parent.getTicketType().getKey()))
                 throw ApiException.notFound("Parent ticket not found: " + request.parentTicketKey());
             for (Ticket ancestor = parent; ancestor != null; ancestor = ancestor.getParentTicket()) {
@@ -185,7 +187,6 @@ public class TicketService {
         }
 
         Ticket saved = ticketRepository.saveAndFlush(ticket);
-        if (saved.getTeams() != null && !saved.getTeams().isEmpty()) developerTeamRepository.saveAll(saved.getTeams());
         persistDynamicValues(saved, subtype, request.dynamicValues());
         if (request.teamIds() != null) {
             requireAssignmentPermission(principal);
@@ -412,7 +413,8 @@ public class TicketService {
         if (supplied == null) return null;
         final Long targetId = supplied;
         AppUser target = appUserRepository.findById(targetId).filter(AppUser::isActive)
-                .filter(user -> user.getOrganization() != null && user.getOrganization().getId().equals(organization.getId()))
+                .filter(user -> principal.party() == Responsibility.TICKETFLOW1
+                        || user.getOrganization() != null && user.getOrganization().getId().equals(organization.getId()))
                 .orElseThrow(() -> ApiException.notFound("Target user not found: " + targetId));
         if (principal.party() != Responsibility.TICKETFLOW1) throw ApiException.forbidden("Only TICKETFLOW1 users may create USR tickets.");
         return target;
@@ -572,19 +574,42 @@ public class TicketService {
         }
     }
 
-    private Organization resolveOrganization(AppUser actor, AuthPrincipal principal, Long organizationId) {
+    private Ticket findVisibleParentTicket(String parentTicketKey, Organization organization, AuthPrincipal principal) {
+        if (principal.party() == Responsibility.TICKETFLOW1) {
+            return ticketRepository.findByTicketKey(parentTicketKey)
+                    .orElseThrow(() -> ApiException.notFound("Parent ticket not found: " + parentTicketKey));
+        }
+        return ticketRepository.findByTicketKeyAndOrganizationId(parentTicketKey, organization.getId())
+                .orElseThrow(() -> ApiException.notFound("Parent ticket not found: " + parentTicketKey));
+    }
+
+    private Organization resolveOrganization(AppUser actor, AuthPrincipal principal, Long organizationId,
+            String requestedType, String parentTicketKey) {
+        String typeKey = requestedType == null ? "" : requestedType.trim().toUpperCase(java.util.Locale.ROOT);
         if (principal.party() == Responsibility.CLIENT) {
+            if (!CLIENT_CREATABLE_TYPES.contains(typeKey)) {
+                throw ApiException.forbidden("Client users may create only request or defect tickets.");
+            }
             Organization actorOrganization = actor.getOrganization();
             if (actorOrganization == null) {
                 throw ApiException.validation("CLIENT users must belong to an organization.");
             }
             return actorOrganization;
         }
+        if (INTERNAL_WORKFLOW_TYPES.contains(typeKey)
+                || parentTicketKey != null && !parentTicketKey.isBlank()) {
+            return internalOrganization();
+        }
         if (organizationId == null) {
             throw ApiException.validation("organizationId is required for TICKETFLOW1-party ticket creation.");
         }
         return organizationRepository.findById(organizationId)
                 .orElseThrow(() -> ApiException.validation("Organization not found: " + organizationId));
+    }
+
+    private Organization internalOrganization() {
+        return organizationRepository.findByNameIgnoreCase(INTERNAL_ORGANIZATION_NAME)
+                .orElseThrow(() -> ApiException.validation("Internal organization is not configured."));
     }
 
     private void validateSeverityRules(TicketType ticketType, CreateTicketRequest request) {

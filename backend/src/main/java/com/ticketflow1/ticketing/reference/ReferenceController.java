@@ -16,6 +16,8 @@ import org.springframework.web.bind.annotation.*;
 
 @RestController @RequestMapping("/api/reference")
 public class ReferenceController {
+    private static final java.util.Set<String> CLIENT_CREATABLE_TYPES = java.util.Set.of("DFCT", "REQ", "DEFECT", "REQUEST");
+    private static final String INTERNAL_ORGANIZATION_NAME = "TicketFlow1 Internal";
     private final TicketTypeRepository types; private final OrganizationRepository organizations;
     private final AppUserRepository users; private final RoleRepository roles;
     private final TicketSubtypeRepository subtypes; private final SubtypeFieldDefinitionRepository fields;
@@ -24,7 +26,7 @@ public class ReferenceController {
             AppUserRepository users,RoleRepository roles,TicketSubtypeRepository subtypes,
             SubtypeFieldDefinitionRepository fields,SubtypeFieldOptionRepository options){this.types=types;this.organizations=organizations;this.users=users;this.roles=roles;this.subtypes=subtypes;this.fields=fields;this.options=options;}
     @GetMapping("/ticket-types") @PreAuthorize("hasAuthority('TICKET_CREATE')")
-    public List<TypeRef> types(@AuthenticationPrincipal AuthPrincipal p,@RequestParam(required=false)Long organizationId){Long id=p.party()==Responsibility.CLIENT?p.organizationId():organizationId;if(id==null)throw ApiException.validation("organizationId is required.");return types.findByOrganizationId(id).stream().map(t->new TypeRef(t.getId(),t.getKey(),t.getName())).toList();}
+    public List<TypeRef> types(@AuthenticationPrincipal AuthPrincipal p,@RequestParam(required=false)Long organizationId){Long id=p.party()==Responsibility.CLIENT?p.organizationId():organizationId;if(id==null){id=organizations.findByNameIgnoreCase(INTERNAL_ORGANIZATION_NAME).map(o->o.getId()).orElseThrow(()->ApiException.validation("organizationId is required."));}return types.findByOrganizationId(id).stream().filter(t->p.party()==Responsibility.TICKETFLOW1||CLIENT_CREATABLE_TYPES.contains(t.getKey())).map(t->new TypeRef(t.getId(),t.getKey(),t.getName())).toList();}
     @GetMapping("/ticket-types/{typeId}/creation-form") @PreAuthorize("hasAuthority('TICKET_CREATE')")
     public CreationForm creationForm(@AuthenticationPrincipal AuthPrincipal p,@PathVariable Long typeId){
         var type=types.findById(typeId).filter(t->t.isActive()&&authorized(p,t.getOrganization()==null?null:t.getOrganization().getId()))
@@ -50,8 +52,11 @@ public class ReferenceController {
         Long scope=p.party()==Responsibility.CLIENT?p.organizationId():organizationId;
         if(scope==null)throw ApiException.validation("organizationId is required.");
         if(p.party()==Responsibility.CLIENT&&organizationId!=null&&!scope.equals(organizationId))throw ApiException.notFound("Organization not found: "+organizationId);
-        if(!organizations.findById(scope).filter(o->o.isActive()).isPresent())throw ApiException.notFound("Organization not found: "+scope);
-        return users.searchActiveDirectory(scope,query,PageRequest.of(0,20)).stream().map(u->new UserRef(u.getId(),u.getDisplayName(),u.getEmail())).toList();
+        var organization=organizations.findById(scope).filter(o->o.isActive()).orElseThrow(()->ApiException.notFound("Organization not found: "+scope));
+        var results=p.party()==Responsibility.TICKETFLOW1&&INTERNAL_ORGANIZATION_NAME.equalsIgnoreCase(organization.getName())
+                ? users.searchActiveDirectory(query,PageRequest.of(0,20))
+                : users.searchActiveDirectory(scope,query,PageRequest.of(0,20));
+        return results.stream().map(u->new UserRef(u.getId(),u.getDisplayName(),u.getEmail())).toList();
     }
     @GetMapping("/assignable-roles") @PreAuthorize("hasAuthority('USER_MANAGE')")
     public List<RoleRef> roles(@AuthenticationPrincipal AuthPrincipal p,@RequestParam(required=false)Long organizationId){Long id=p.party()==Responsibility.CLIENT?p.organizationId():organizationId;return (id==null?roles.findByOrganizationIsNull():roles.findByOrganizationId(id)).stream().map(r->new RoleRef(r.getId(),r.getName(),r.getParty().name())).toList();}

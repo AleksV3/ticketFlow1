@@ -21,4 +21,9 @@ public interface AppUserRepository extends JpaRepository<AppUser, Long>, JpaSpec
             "(lower(u.displayName) like lower(concat('%',:query,'%')) or lower(u.email) like lower(concat('%',:query,'%'))) " +
             "order by u.displayName asc,u.id asc")
     List<AppUser> searchActiveDirectory(@Param("organizationId") Long organizationId,@Param("query") String query,Pageable pageable);
+
+    @Query("select u from AppUser u where u.active=true and " +
+            "(lower(u.displayName) like lower(concat('%',:query,'%')) or lower(u.email) like lower(concat('%',:query,'%'))) " +
+            "order by u.displayName asc,u.id asc")
+    List<AppUser> searchActiveDirectory(@Param("query") String query,Pageable pageable);
 }

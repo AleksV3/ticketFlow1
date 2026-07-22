@@ -63,14 +63,28 @@ function TicketForm({ user }: { user: CurrentUser }) {
   const selectedType = useMemo(() => types.find(item => item.key === type || item.name.toLowerCase() === type.toLowerCase()) ?? null, [type, types]);
   const selectedSubtype = useMemo(() => creationForm?.subtypes.find(item => String(item.id) === subtypeId) ?? null, [creationForm, subtypeId]);
   const needsUsrTarget = selectedType?.key === "USR" && ["MODIFY", "DELETE"].includes(selectedSubtype?.key ?? "");
+  const isSubticket = parentTicketKey.trim().length > 0;
+  const internalOrganization = useMemo(() => orgs.find(item => item.name.toLowerCase() === "ticketflow1 internal"), [orgs]);
 
-  useEffect(() => { if (user.party === "TICKETFLOW1") void get<Ref[]>("/reference/organizations").then(setOrgs); }, [user.party]);
+  useEffect(() => {
+    if (user.party !== "TICKETFLOW1") return;
+    void get<Ref[]>("/reference/organizations").then(values => {
+      setOrgs(values);
+      const internal = values.find(item => item.name.toLowerCase() === "ticketflow1 internal");
+      setOrg(current => current || (internal ? String(internal.id) : values[0]?.id ? String(values[0].id) : ""));
+    });
+  }, [user.party]);
   useEffect(() => { if (canAssign) void get<Ref[]>("/reference/ticket-leads").then(setPeople); }, [canAssign]);
   useEffect(() => { if (canAssign) void get<Team[]>("/teams").then(setTeams); }, [canAssign]);
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     setParentTicketKey(params.get("parent") ?? "");
   }, []);
+  useEffect(() => {
+    if (user.party === "TICKETFLOW1" && isSubticket && internalOrganization) {
+      setOrg(String(internalOrganization.id));
+    }
+  }, [internalOrganization, isSubticket, user.party]);
   useEffect(() => {
     if (!org) return;
     void get<Ref[]>(`/reference/ticket-types?organizationId=${org}`).then(values => {
@@ -147,7 +161,7 @@ function TicketForm({ user }: { user: CurrentUser }) {
   return <div className="max-w-4xl">
     <h1 className="text-3xl font-bold">Create ticket</h1>
     <form className="card mt-6 space-y-5" onSubmit={submit}>
-      {user.party === "TICKETFLOW1" ? <Select label="Organization" value={org} set={setOrg} options={orgs.map(item => [String(item.id), item.name])}/> : null}
+      {user.party === "TICKETFLOW1" ? <Select label="Organization" value={org} set={setOrg} disabled={isSubticket} options={orgs.map(item => [String(item.id), item.name])} help={isSubticket ? "Subtickets created by TicketFlow1 are internal work items. The parent can still be a client ticket." : "TASI and USR are saved under TicketFlow1 Internal automatically."}/> : null}
       <label className="block"><span>Ticket type</span><input className="field mt-1" required list="ticket-type-options" value={type} onChange={event => setType(event.target.value)} placeholder="Search standard or custom ticket types..."/><datalist id="ticket-type-options">{types.map(item => <option key={item.id} value={item.key}>{item.name}</option>)}</datalist><small className="text-slate-500">Start typing to search all ticket types configured for this organization.</small></label>
       {creationForm?.subtypes.length ? <SubtypeAndFields subtypeId={subtypeId} setSubtypeId={setSubtypeId} selectedSubtype={selectedSubtype} form={creationForm} values={dynamicValues} setValue={setDynamic} people={people} teams={teams}/> : null}
       {needsUsrTarget ? <TargetUserSearch query={targetQuery} setQuery={setTargetQuery} results={targetResults} selected={targetUser} setSelected={setTargetUser}/> : null}
@@ -216,8 +230,8 @@ function TargetUserSearch({ query, setQuery, results, selected, setSelected }: {
   </fieldset>;
 }
 
-function Select({label,value,set,options}:{label:string;value:string;set:(value:string)=>void;options:string[][]}) {
-  return <label className="block"><span>{label}</span><select className="field mt-1" required value={value} onChange={event => set(event.target.value)}><option value="">Select...</option>{options.map(([optionValue,label]) => <option value={optionValue} key={optionValue}>{label}</option>)}</select></label>;
+function Select({label,value,set,options,disabled=false,help}:{label:string;value:string;set:(value:string)=>void;options:string[][];disabled?:boolean;help?:string}) {
+  return <label className="block"><span>{label}</span><select className="field mt-1 disabled:opacity-70" required disabled={disabled} value={value} onChange={event => set(event.target.value)}><option value="">Select...</option>{options.map(([optionValue,label]) => <option value={optionValue} key={optionValue}>{label}</option>)}</select>{help ? <small className="text-slate-500">{help}</small> : null}</label>;
 }
 
 export function compactValues(values: Record<string, unknown>, fields: Pick<FieldDef, "key">[]) {

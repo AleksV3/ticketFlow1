@@ -38,12 +38,12 @@ public class DeveloperTeamService {
     @Transactional public TeamDtos.TeamResponse reorder(Long id,TeamDtos.ReorderTicketsRequest r,AuthPrincipal p){
         DeveloperTeam team=teams.findById(id).orElseThrow(()->ApiException.notFound("Team not found."));
         if(!canView(team,p))throw ApiException.notFound("Team not found.");
-        List<Ticket> visible=team.getTickets().stream().filter(ticket->ticketVisible(ticket,p)).toList();
+        List<Ticket> visible=team.getTickets().stream().filter(Objects::nonNull).filter(ticket->ticketVisible(ticket,p)).toList();
         List<String> keys=r.ticketKeys()==null?List.of():r.ticketKeys();
         if(keys.size()!=visible.size()||new HashSet<>(keys).size()!=keys.size()||!new HashSet<>(keys).equals(visible.stream().map(Ticket::getTicketKey).collect(java.util.stream.Collectors.toSet())))throw ApiException.validation("ticketKeys must contain every visible team ticket exactly once.");
         Map<String,Ticket> byKey=visible.stream().collect(java.util.stream.Collectors.toMap(Ticket::getTicketKey,java.util.function.Function.identity()));
         Iterator<Ticket> reorderedVisible=keys.stream().map(byKey::get).iterator();List<Ticket> merged=new ArrayList<>();
-        for(Ticket ticket:team.getTickets())merged.add(ticketVisible(ticket,p)?reorderedVisible.next():ticket);
+        for(Ticket ticket:team.getTickets())if(ticket!=null)merged.add(ticketVisible(ticket,p)?reorderedVisible.next():ticket);
         teams.parkTicketPositions(team.getId());
         for(int position=0;position<merged.size();position++)teams.updateTicketPosition(team.getId(),merged.get(position).getId(),position);
         entityManager.clear();DeveloperTeam reordered=teams.findById(id).orElseThrow(()->ApiException.notFound("Team not found."));return response(reordered,p);
