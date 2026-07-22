@@ -13,14 +13,16 @@ It does not reinterpret old decisions as new workflow decisions.
 | `DEFECT` | `DFCT` | Remains readable with its original state/history and keeps defect SLA capability |
 
 New TASI, USR, DFCT, and REQ types/workflows are seeded alongside legacy rows.
-After verification, legacy types are marked inactive, which blocks only new
-creation. Existing ticket detail, lists, comments, attachments, history, and
-transitions continue to use their original type/workflow until they naturally
-finish. No bulk state compression or ticket-type FK rewrite is performed.
+Existing ticket detail, lists, comments, attachments, history, and transitions
+continue to use their original type/workflow until they naturally finish. No
+bulk state compression or ticket-type FK rewrite is performed. Legacy creation
+can be disabled later with the type activation controls after the rollout owner
+confirms no users still need the old entry points.
 
-The UI labels inactive legacy types as “Legacy” and does not offer them in new
-ticket forms. Reporting may group legacy and successor keys using the fixed
-mapping above without changing stored ticket identity.
+The UI should label inactive legacy types as “Legacy” and not offer them in new
+ticket forms once the rollout owner deactivates them. Reporting may group legacy
+and successor keys using the fixed mapping above without changing stored ticket
+identity.
 
 ## Backfill rules
 
@@ -29,8 +31,9 @@ mapping above without changing stored ticket identity.
 - Existing `DEFECT` types receive `DEFECT_SLA`; new `DFCT` types are seeded with
   the same capability. Severity remains fixed and existing SLA timestamps are
   untouched.
-- Existing types start `active=true`; the workflow-seeding migration explicitly
-  deactivates legacy types only after successor types exist for the same scope.
+- Existing types start `active=true`; the workflow-seeding migration preserves
+  that flag so deploys do not unexpectedly remove old creation paths. Operators
+  can deactivate legacy types per organization after acceptance.
 - Organization-owned successor configuration is cloned from templates with the
   existing `clone_org_templates` mechanism extended additively.
 - Existing assignments are not re-routed. Routing applies only on creation or
@@ -65,3 +68,34 @@ history, or drop the additive tables as part of an application rollback.
   v19; all migrations and Hibernate validation passed.
 - Detached pre-feature commit `4a45bf5` started successfully against the v19
   database with the explicit rollback setting above; no schema change ran.
+
+## T064 rehearsal record (2026-07-22)
+
+- Created disposable local database `tf1_t064_base_20260722` and migrated it
+  with an isolated copy of production migrations V1 through V15. Current-code
+  Hibernate validation was disabled only for this baseline step because the
+  current entity model expects the later additive tables.
+- Inserted a sanitized legacy sample ticket `TF-9001` as `CHANGE_REQUEST` /
+  `SUBMITTED` for `Sanitized Client A`, with one public comment, one attachment
+  metadata row, one status-history row, and one audit row. No real customer data
+  or Render data was used.
+- Created a custom-format backup with `pg_dump -Fc` and restored it into
+  `tf1_t064_restore_20260722`. The restored database was confirmed at Flyway
+  version 15 with the sanitized sample ticket present.
+- Ran the current backend against the restored database. Flyway validated 22
+  migrations, applied V16 through V21, and ended at version 21
+  (`backfill service request subtypes`). The Spring context then started
+  successfully with Hibernate schema validation.
+- Post-migration checks confirmed `TF-9001` still existed with original type,
+  original state, one comment, one attachment, one status-history row, and one
+  audit row. New nullable workflow-context columns (`subtype_id`,
+  `parent_ticket_id`, `routing_rule_id`, `resolved_approver_id`,
+  `target_user_id`) remained null for the legacy ticket, as designed.
+- Successor type rows for `TASI`, `USR`, `DFCT`, and `REQ` were present for
+  templates and cloned organizations. `DEFECT` and `DFCT` retained
+  `DEFECT_SLA`; other types retained `STANDARD`.
+- Rollback/recovery decision: do not run destructive Flyway undo. For an
+  application-only rollback, redeploy the older artifact with
+  `--spring.flyway.validate-on-migrate=false` as described above. For database
+  recovery, restore the pre-migration backup and replay any accepted business
+  events created after the backup point.
