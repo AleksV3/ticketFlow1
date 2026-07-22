@@ -97,19 +97,19 @@ public record TicketDetailResponse(
         return from(ticket, allowedTransitions, proposal, slaStatus, Map.of());
     }
 
-    public record ProcessMap(String name, List<ProcessState> states, List<ProcessTransition> transitions) {
+    public record ProcessMap(String name, String canvasLayout, List<ProcessState> states, List<ProcessTransition> transitions) {
         static ProcessMap from(Ticket ticket) {
             var workflow = ticket.getTicketType().getWorkflow();
-            return new ProcessMap(workflow.getName(),
+            return new ProcessMap(workflow.getName(), workflow.getCanvasLayout(),
                     workflow.getStates().stream().sorted(java.util.Comparator.comparingInt(WorkflowState::getSortOrder))
                             .map(state -> new ProcessState(state.getId(), state.getKey(), state.isInitial(), state.isTerminal(), state.getSortOrder())).toList(),
                     workflow.getTransitions().stream().sorted(java.util.Comparator.comparing(WorkflowTransition::getId))
-                            .map(edge -> new ProcessTransition(edge.getFromState().getId(), edge.getToState().getId())).toList());
+                            .map(edge -> new ProcessTransition(edge.getId(), edge.getFromState().getId(), edge.getToState().getId())).toList());
         }
     }
 
     public record ProcessState(Long id, String key, boolean isInitial, boolean isTerminal, int sortOrder) {}
-    public record ProcessTransition(Long fromStateId, Long toStateId) {}
+    public record ProcessTransition(Long id, Long fromStateId, Long toStateId) {}
 
     public record OrganizationRef(Long id, String name) {
         public static OrganizationRef from(Organization organization) {

@@ -31,6 +31,9 @@ public class Workflow extends Auditable {
     @Column(nullable = false, length = 100)
     private String name;
 
+    @Column(name = "canvas_layout", columnDefinition = "text")
+    private String canvasLayout;
+
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "organization_id")
     private Organization organization;
@@ -62,6 +65,14 @@ public class Workflow extends Auditable {
 
     public Organization getOrganization() {
         return organization;
+    }
+
+    public String getCanvasLayout() {
+        return canvasLayout;
+    }
+
+    public void setCanvasLayout(String canvasLayout) {
+        this.canvasLayout = canvasLayout;
     }
 
     public Set<WorkflowState> getStates() {

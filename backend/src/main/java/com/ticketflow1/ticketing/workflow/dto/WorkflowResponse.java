@@ -4,12 +4,13 @@ import com.ticketflow1.ticketing.workflow.*;
 import java.util.Comparator;
 import java.util.List;
 
-public record WorkflowResponse(Long id, String name, Long organizationId, long version,
+public record WorkflowResponse(Long id, String name, Long organizationId, long version, String canvasLayout,
         List<State> states, List<Transition> transitions) {
     public static WorkflowResponse from(Workflow workflow, List<WorkflowState> states,
             List<WorkflowTransition> transitions) {
         return new WorkflowResponse(workflow.getId(), workflow.getName(),
                 workflow.getOrganization() == null ? null : workflow.getOrganization().getId(), workflow.getVersion(),
+                workflow.getCanvasLayout(),
                 states.stream().map(State::from).toList(),
                 transitions.stream().sorted(Comparator.comparing(WorkflowTransition::getId)).map(Transition::from).toList());
     }

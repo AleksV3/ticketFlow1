@@ -136,14 +136,26 @@ tbody tr:hover { background: rgb(0 84 166 / 10%); }
 .react-flow-shell { width: 100%; height: min(86vh, 980px); min-height: 780px; overflow: hidden; border: 1px solid var(--line); border-radius: .75rem; background: rgb(7 13 27 / 80%); }
 @media (max-width: 640px) { .react-flow-shell { height: 78vh; min-height: 600px; } }
 .react-flow-shell .react-flow__node { width: 190px; border: 1px solid rgb(72 105 148); border-left: 4px solid var(--signature-blue); border-radius: .6rem; padding: .8rem; color: var(--off-white); background: rgb(26 35 50); font-size: .75rem; font-weight: 700; box-shadow: 0 10px 28px rgb(0 0 0 / 35%); }
+.react-flow-shell .workflow-state-node { min-height: 3rem; display: grid; place-items: center; text-align: center; }
+.react-flow-shell .react-flow__node-routeHandle { width: 34px; height: 34px; padding: 0; border: 2px solid rgb(250 204 21); border-radius: 999px; background: rgb(120 53 15 / 92%); box-shadow: 0 0 18px rgb(250 204 21 / 42%); cursor: grab; transition: transform .14s ease, box-shadow .14s ease, border-color .14s ease; }
+.react-flow-shell .react-flow__node-routeHandle:hover, .react-flow-shell .react-flow__node-routeHandle.selected { transform: scale(1.12); border-color: rgb(254 240 138); box-shadow: 0 0 24px rgb(250 204 21 / 62%); }
+.react-flow-shell .react-flow__node-routeHandle:active { cursor: grabbing; }
+.react-flow-shell .route-handle-protected { border-color: rgb(196 181 253); background: rgb(76 29 149 / 92%); box-shadow: 0 0 18px rgb(167 139 250 / 42%); }
+.react-flow-shell .route-handle-protected:hover, .react-flow-shell .route-handle-protected.selected { border-color: rgb(221 214 254); box-shadow: 0 0 24px rgb(167 139 250 / 60%); }
+.workflow-route-handle { display: grid; width: 100%; height: 100%; place-items: center; color: rgb(254 240 138); font-size: 1rem; font-weight: 900; }
+.route-handle-protected .workflow-route-handle { color: rgb(237 233 254); }
 .react-flow-shell .flow-state-start { border-color: var(--accent-blue); }
 .react-flow-shell .flow-state-end { border-color: rgb(52 211 153); }
 .react-flow-shell .react-flow__handle { width: 20px; height: 20px; border: 3px solid rgb(11 19 37); background: var(--accent-blue); box-shadow: 0 0 0 3px rgb(0 130 255 / 18%), 0 0 16px rgb(0 130 255 / 55%); }
-.react-flow-shell .react-flow__handle-left { background: rgb(52 211 153); }
-.react-flow-shell .react-flow__handle-right { background: var(--accent-blue); }
+.react-flow-shell .workflow-handle-target { background: rgb(52 211 153); }
+.react-flow-shell .workflow-handle-source { background: var(--accent-blue); }
 .react-flow-shell .react-flow__handle:hover, .react-flow-shell .react-flow__handle.connecting { transform: scale(1.2); background: rgb(250 204 21); }
-.react-flow-shell .flow-edge-protected path { stroke: rgb(167 139 250); stroke-dasharray: 7 5; }
-.react-flow-shell .react-flow__edge-text { fill: rgb(210 226 248); font-size: 10px; }
+.react-flow-shell .flow-edge path { stroke: rgb(91 179 255); stroke-width: 3.5; transition: stroke .14s ease, stroke-width .14s ease, filter .14s ease; }
+.react-flow-shell .selected-manual-edge { stroke: rgb(250 204 21); stroke-width: 5; filter: drop-shadow(0 0 8px rgb(250 204 21 / 55%)); }
+.react-flow-shell .react-flow__edge.selected path { stroke: rgb(250 204 21); stroke-width: 5; filter: drop-shadow(0 0 8px rgb(250 204 21 / 55%)); }
+.react-flow-shell .react-flow__edge .react-flow__edge-interaction { stroke-width: 28; }
+.react-flow-shell .flow-edge-protected path { stroke: rgb(167 139 250); stroke-width: 3.25; stroke-dasharray: 7 5; transition: stroke .14s ease, stroke-width .14s ease, filter .14s ease; }
+.react-flow-shell .react-flow__edge-text { fill: rgb(210 226 248); font-size: 11px; font-weight: 800; }
 .react-flow-shell .react-flow__edge-textbg { fill: rgb(11 19 37); }
 .graph-add-state { display: flex; flex-wrap: wrap; align-items: center; gap: .75rem; border: 1px solid rgb(0 130 255 / 45%); border-radius: .7rem; padding: .8rem; background: rgb(0 84 166 / 12%); }
 .graph-add-state input[type="checkbox"] { width: 1rem; height: 1rem; accent-color: var(--accent-blue); }
@@ -179,4 +191,4 @@ tbody tr:hover { background: rgb(0 84 166 / 10%); }
 .permission-option input { margin-top: .2rem; width: 1rem; height: 1rem; flex: none; accent-color: var(--accent-blue); }
 .permission-option strong { display: block; font-size: .82rem; }
 .permission-option small { display: block; margin-top: .2rem; color: var(--muted); font-size: .68rem; line-height: 1.35; }
-.react-flow-shell .flow-edge-draft path { stroke: rgb(250 204 21); stroke-width: 3; stroke-dasharray: 6 4; }
+.react-flow-shell .flow-edge-draft path { stroke: rgb(250 204 21); stroke-width: 4; stroke-dasharray: 6 4; }

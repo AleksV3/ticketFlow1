@@ -82,6 +82,10 @@ public class WorkflowAdminService {
             transitions.flush();
             saveTransitions(w,map,r.transitions());
         }
+        if(r.canvasLayout()!=null) {
+            if(r.canvasLayout().length()>20000) throw ApiException.validation("Workflow canvas layout is too large.");
+            w.setCanvasLayout(r.canvasLayout());
+        }
         w.touchForAudit(); workflows.flush(); audit.record(w.getOrganization(),p.userId(),"WORKFLOW",id,"UPDATED",null,"{\"version\":"+w.getVersion()+"}"); return response(w);
     }
     /**

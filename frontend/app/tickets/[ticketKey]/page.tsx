@@ -2,7 +2,7 @@
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { Background, Controls, MarkerType, MiniMap, Position, ReactFlow, type Edge, type Node } from "@xyflow/react";
+import { Background, BaseEdge, Controls, Handle, MarkerType, Position, ReactFlow, type Edge, type EdgeProps, type Node } from "@xyflow/react";
 import { AppShell } from "@/components/AppShell";
 import { ProposalActions, TicketCommunication, TicketHistory } from "@/components/TicketExtras";
 import { SlaBadge, StatusBadge, TransitionButtons } from "@/components/TicketUi";
@@ -47,12 +47,19 @@ function Detail({ canEdit, canAssign, internal }: { canEdit: boolean; canAssign:
 function ProcessMap({ ticket, history }: { ticket: TicketDetail; history: History[] }) {
   const elements = useMemo(() => {
     const visited = new Set(history.map(item => item.toStatus));
-    const states = ticket.processMap.states, positions = processLayout(ticket);
-    const nodes: Node[] = states.map(state => ({ id: String(state.id), position: positions.get(state.id)!, sourcePosition: Position.Right, targetPosition: Position.Left, data: { label: `${state.isInitial ? "▶ " : state.isTerminal ? "■ " : ""}${state.key.replaceAll("_", " ")}` }, className: `flow-state ${state.isInitial ? "flow-state-start" : ""} ${state.isTerminal ? "flow-state-end" : ""} ${state.key === ticket.status ? "process-current" : ticket.allowedTransitions.includes(state.key) ? "process-next" : visited.has(state.key) ? "process-visited" : ""}` }));
-    const edges: Edge[] = ticket.processMap.transitions.map((edge, index) => ({ id: `process-${index}`, source: String(edge.fromStateId), target: String(edge.toStateId), type: "smoothstep", markerEnd: { type: MarkerType.ArrowClosed }, animated: edge.toStateId === states.find(state => state.key === ticket.status)?.id }));
+    const states = ticket.processMap.states, positions = processLayout(ticket), layout = parseProcessCanvasLayout(ticket.processMap.canvasLayout);
+    const nodes: Node[] = states.map(state => ({ id: String(state.id), type: "workflowState", position: layout.nodes[String(state.id)] ?? positions.get(state.id)!, data: { label: `${state.isInitial ? "▶ " : state.isTerminal ? "■ " : ""}${state.key.replaceAll("_", " ")}` }, className: `flow-state ${state.isInitial ? "flow-state-start" : ""} ${state.isTerminal ? "flow-state-end" : ""} ${state.key === ticket.status ? "process-current" : ticket.allowedTransitions.includes(state.key) ? "process-next" : visited.has(state.key) ? "process-visited" : ""}` }));
+    const statePositions = new Map(nodes.map(node => [Number(node.id), node.position]));
+    const currentStateId = states.find(state => state.key === ticket.status)?.id;
+    const edges: Edge[] = ticket.processMap.transitions.map(edge => {
+      const id = String(edge.id);
+      const route = layout.edgeRoutes[id] ?? defaultRoute;
+      const point = layout.edgePoints[id] ?? defaultRoutePoint(statePositions.get(edge.fromStateId)!, statePositions.get(edge.toStateId)!);
+      return { id, source: String(edge.fromStateId), target: String(edge.toStateId), sourceHandle: `source-${route.source}`, targetHandle: `target-${route.target}`, type: "manualStep", data: { routeX: point.x, routeY: point.y }, markerEnd: { type: MarkerType.ArrowClosed, width: 26, height: 26, color: "rgb(91 179 255)" }, animated: edge.toStateId === currentStateId, className: "flow-edge" };
+    });
     return { nodes, edges };
   }, [history, ticket]);
-  return <section className="card py-4"><div className="mb-2 flex flex-wrap items-center justify-between gap-2"><div><p className="eyebrow">Process overview</p><h2 className="text-sm font-bold">{ticket.processMap.name}</h2></div><div className="flex gap-2 text-[10px] text-slate-500"><span className="text-emerald-400">● Done</span><span className="text-yellow-300">● Current</span><span className="text-blue-400">● Next</span></div></div><div className="react-flow-shell ticket-view-map"><ReactFlow nodes={elements.nodes} edges={elements.edges} nodesDraggable={false} nodesConnectable={false} edgesFocusable={false} elementsSelectable={false} fitView fitViewOptions={{ padding: .12 }} minZoom={.2} maxZoom={2} colorMode="dark"><Controls showInteractive={false}/><Background gap={20} size={1}/></ReactFlow></div></section>;
+  return <section className="card py-4"><div className="mb-2 flex flex-wrap items-center justify-between gap-2"><div><p className="eyebrow">Process overview</p><h2 className="text-sm font-bold">{ticket.processMap.name}</h2></div><div className="flex gap-2 text-[10px] text-slate-500"><span className="text-emerald-400">● Done</span><span className="text-yellow-300">● Current</span><span className="text-blue-400">● Next</span></div></div><div className="react-flow-shell ticket-view-map"><ReactFlow nodes={elements.nodes} edges={elements.edges} nodeTypes={workflowNodeTypes} edgeTypes={workflowEdgeTypes} nodesDraggable={false} nodesConnectable={false} edgesFocusable={false} elementsSelectable={false} fitView fitViewOptions={{ padding: .12 }} minZoom={.2} maxZoom={2} colorMode="dark"><Controls showInteractive={false}/><Background gap={20} size={1}/></ReactFlow></div></section>;
 }
 
 function processLayout(ticket: TicketDetail) {
@@ -65,6 +72,70 @@ function processLayout(ticket: TicketDetail) {
   const positions = new Map<number, { x: number; y: number }>(); columns.forEach((column, level) => column.sort((a, b) => a.sortOrder - b.sortOrder).forEach((state, row) => positions.set(state.id, { x: 40 + level * 270, y: 40 + row * 130 })));
   return positions;
 }
+
+type Side = "top" | "right" | "bottom" | "left";
+type RoutePoint = { x: number; y: number };
+type EdgeRoute = { source: Side; target: Side };
+type CanvasLayout = { nodes: Record<string, RoutePoint>; edgeRoutes: Record<string, EdgeRoute>; edgePoints: Record<string, RoutePoint> };
+const SIDES: Side[] = ["right", "bottom", "left", "top"];
+const defaultRoute: EdgeRoute = { source: "right", target: "left" };
+const STATE_NODE_WIDTH = 190;
+const STATE_NODE_HEIGHT = 64;
+const sidePositions: Record<Side, Position> = { top: Position.Top, right: Position.Right, bottom: Position.Bottom, left: Position.Left };
+function WorkflowStateNode({ data }: { data: { label?: string } }) {
+  return <div className="workflow-state-node">
+    {SIDES.map(side => <Handle className="workflow-handle-source" id={`source-${side}`} key={`source-${side}`} type="source" position={sidePositions[side]} />)}
+    {SIDES.map(side => <Handle className="workflow-handle-target" id={`target-${side}`} key={`target-${side}`} type="target" position={sidePositions[side]} />)}
+    <span>{data.label}</span>
+  </div>;
+}
+function ManualStepEdge({ id, sourceX, sourceY, targetX, targetY, sourcePosition, targetPosition, markerEnd, label, selected, data }: EdgeProps) {
+  const route = data as { routeX?: number; routeY?: number } | undefined;
+  const routeX = route?.routeX ?? (sourceX + targetX) / 2;
+  const routeY = route?.routeY ?? (sourceY + targetY) / 2;
+  const sourceStub = offsetPoint(sourceX, sourceY, sourcePosition, 28);
+  const targetStub = offsetPoint(targetX, targetY, targetPosition, 28);
+  const path = [`M ${sourceX} ${sourceY}`, `L ${sourceStub.x} ${sourceStub.y}`, `L ${routeX} ${sourceStub.y}`, `L ${routeX} ${routeY}`, `L ${targetStub.x} ${routeY}`, `L ${targetStub.x} ${targetStub.y}`, `L ${targetX} ${targetY}`].join(" ");
+  return <BaseEdge id={id} path={path} markerEnd={markerEnd} label={label} labelX={routeX} labelY={routeY} className={selected ? "selected-manual-edge" : undefined} interactionWidth={30} />;
+}
+function offsetPoint(x: number, y: number, position: Position, distance: number) {
+  if (position === Position.Left) return { x: x - distance, y };
+  if (position === Position.Right) return { x: x + distance, y };
+  if (position === Position.Top) return { x, y: y - distance };
+  return { x, y: y + distance };
+}
+function defaultRoutePoint(from: { x: number; y: number }, to: { x: number; y: number }) {
+  return { x: (from.x + STATE_NODE_WIDTH / 2 + to.x + STATE_NODE_WIDTH / 2) / 2, y: (from.y + STATE_NODE_HEIGHT / 2 + to.y + STATE_NODE_HEIGHT / 2) / 2 };
+}
+function parseProcessCanvasLayout(value?: string | null): CanvasLayout {
+  if (!value) return { nodes: {}, edgeRoutes: {}, edgePoints: {} };
+  try {
+    const parsed = JSON.parse(value) as Partial<CanvasLayout>;
+    return {
+      nodes: validPoints(parsed.nodes),
+      edgeRoutes: validRoutes(parsed.edgeRoutes),
+      edgePoints: validPoints(parsed.edgePoints),
+    };
+  } catch {
+    return { nodes: {}, edgeRoutes: {}, edgePoints: {} };
+  }
+}
+function validPoints(value: unknown): Record<string, RoutePoint> {
+  if (!value || typeof value !== "object") return {};
+  return Object.fromEntries(Object.entries(value as Record<string, unknown>).filter(([, point]) => isPoint(point))) as Record<string, RoutePoint>;
+}
+function validRoutes(value: unknown): Record<string, EdgeRoute> {
+  if (!value || typeof value !== "object") return {};
+  return Object.fromEntries(Object.entries(value as Record<string, unknown>).filter(([, route]) => isRoute(route))) as Record<string, EdgeRoute>;
+}
+function isPoint(value: unknown): value is RoutePoint {
+  return !!value && typeof value === "object" && Number.isFinite((value as RoutePoint).x) && Number.isFinite((value as RoutePoint).y);
+}
+function isRoute(value: unknown): value is EdgeRoute {
+  return !!value && typeof value === "object" && SIDES.includes((value as EdgeRoute).source) && SIDES.includes((value as EdgeRoute).target);
+}
+const workflowNodeTypes = { workflowState: WorkflowStateNode };
+const workflowEdgeTypes = { manualStep: ManualStepEdge };
 
 function Row({ k, v }: { k: string; v: string }) { return <div><dt className="text-[10px] uppercase tracking-wider text-slate-500">{k}</dt><dd className="truncate text-sm font-medium" title={v}>{v}</dd></div>; }
 function TeamPanel({ ticket }: { ticket: TicketDetail }) { return <section className="card py-4"><div className="flex flex-wrap items-start justify-between gap-4"><div><p className="eyebrow">Assigned team</p><h2 className="mt-1 text-sm font-bold">Teams, lead and developers</h2></div><span className="badge bg-blue-900 text-blue-100">{ticket.developers?.length ?? 0} developer{ticket.developers?.length === 1 ? "" : "s"}</span></div><div className="mt-4 grid gap-4 md:grid-cols-3"><div><p className="text-[10px] uppercase tracking-wider text-slate-500">Developer teams</p><div className="mt-2 flex min-h-11 flex-wrap gap-2">{ticket.teams?.length?ticket.teams.map(team=><span className="badge bg-indigo-100 text-indigo-800" key={team.id}>{team.name}</span>):<span className="rounded-lg border border-dashed px-3 py-2 text-xs text-slate-500">No team assigned</span>}</div></div><div><p className="text-[10px] uppercase tracking-wider text-slate-500">Team lead</p><div className="mt-2 rounded-lg border border-blue-500/30 bg-blue-950/20 p-3 text-sm font-semibold">{ticket.ticketLead?.displayName ?? "Not assigned"}</div></div><div><p className="text-[10px] uppercase tracking-wider text-slate-500">Developers</p><div className="mt-2 flex min-h-11 flex-wrap gap-2">{ticket.developers?.length ? ticket.developers.map(person => <span className="badge bg-slate-100 text-slate-700" key={person.id}>{person.displayName}</span>) : <span className="rounded-lg border border-dashed px-3 py-2 text-xs text-slate-500">No developers assigned</span>}</div></div></div></section>; }
