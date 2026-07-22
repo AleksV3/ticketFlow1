@@ -29,6 +29,9 @@ function Editor({ user }: { user: CurrentUser }) {
   const [typeKey, setTypeKey] = useState("");
   const [typeName, setTypeName] = useState("");
   const [message, setMessage] = useState("");
+  const internalOrganization = useMemo(() => organizations.find(org => org.name.toLowerCase() === "ticketflow1 internal"), [organizations]);
+  const selectedOrganizationId = organizationId === "internal" ? internalOrganization?.id ?? null : Number(organizationId);
+  const selectedScopeReady = user.party !== "TICKETFLOW1" || organizationId !== "internal" || !!selectedOrganizationId;
 
   useEffect(() => {
     if (user.party === "TICKETFLOW1") {
@@ -38,8 +41,9 @@ function Editor({ user }: { user: CurrentUser }) {
   }, [user.party]);
 
   const load = useCallback(async () => {
+    if (!selectedScopeReady) return;
     try {
-      const query = organizationId === "internal" ? "" : `?organizationId=${organizationId}`;
+      const query = selectedOrganizationId ? `?organizationId=${selectedOrganizationId}` : "";
       const [workflowRows, typeRows] = await Promise.all([
         get<Workflow[]>(`/admin/workflows${query}`),
         get<TicketType[]>(`/admin/ticket-types${query}`),
@@ -50,7 +54,7 @@ function Editor({ user }: { user: CurrentUser }) {
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Could not load workflow configuration.");
     }
-  }, [organizationId]);
+  }, [selectedOrganizationId, selectedScopeReady]);
   useEffect(() => { void load(); }, [load]);
 
   async function createWorkflow(event: FormEvent) {
@@ -59,7 +63,7 @@ function Editor({ user }: { user: CurrentUser }) {
     if (first === terminal) { setMessage("Use two different state keys."); return; }
     try {
       await post("/admin/workflows", {
-        name: workflowName, organizationId: organizationId === "internal" ? null : Number(organizationId),
+        name: workflowName, organizationId: selectedOrganizationId,
         states: [
           { key: first, isInitial: true, isTerminal: false, sortOrder: 0 },
           { key: terminal, isInitial: false, isTerminal: true, sortOrder: 1 },
@@ -87,7 +91,7 @@ function Editor({ user }: { user: CurrentUser }) {
     event.preventDefault(); if (!selected) return;
     try {
       await post("/admin/ticket-types", { key: normalize(typeKey), name: typeName, workflowId: selected.id,
-        organizationId: organizationId === "internal" ? null : Number(organizationId), requiresProposal: false });
+        organizationId: selectedOrganizationId, requiresProposal: false });
       setTypeKey(""); setTypeName(""); setMessage("Custom ticket type created."); await load();
     } catch (error) { setMessage(error instanceof Error ? error.message : "Could not create ticket type."); }
   }
@@ -138,12 +142,13 @@ function Editor({ user }: { user: CurrentUser }) {
   return <div className="space-y-6">
     <div><p className="eyebrow">Ticket configuration</p><h1 className="mt-1 text-3xl font-bold">Ticket types apply workflows</h1><p className="mt-2 max-w-3xl text-slate-600">A <strong>ticket type</strong> defines what kind of ticket is created. Each ticket type applies exactly one <strong>workflow</strong>: a branching map of states and allowed choices. Admins can add states and connect one state to multiple next states.</p></div>
     {user.party === "TICKETFLOW1" ? <label className="card block">Workflow owner<select className="field mt-1" value={organizationId} onChange={event => setOrganizationId(event.target.value)}><option value="internal">TicketFlow1 · Internal workflows</option>{organizations.map(org => <option key={org.id} value={org.id}>{org.name} · Client workflows</option>)}</select></label> : null}
+    {!selectedScopeReady ? <div className="card">Loading TicketFlow1 Internal workflow scope…</div> : null}
     <div className="space-y-6">
       <section className="card space-y-5"><div><h2 className="font-bold">1. Choose a workflow map</h2><div className="mt-2 grid gap-2 sm:grid-cols-3">{workflows.map(workflow => <button className="block w-full rounded border p-3 text-left hover:bg-slate-50" key={workflow.id} onClick={() => setSelected(workflow)}><strong>{workflow.name}</strong><span className="mt-1 block text-xs text-slate-500">{organizationId==="internal"?"Internal TicketFlow1 workflow":`Applied by: ${types.filter(type => type.workflowId === workflow.id).map(type => type.name).join(", ") || "No ticket type"}`}</span><span className="mt-1 block text-xs text-blue-400">{workflow.states.length} states · {workflow.transitions.length} choices</span></button>)}</div></div>{organizationId!=="internal"?<div><h2 className="font-bold">2. Select workflow for each ticket type</h2><div className="mt-2 grid gap-2">{types.map(type => <label className="block rounded-xl border p-3" key={type.id}><span className="flex flex-wrap items-center justify-between gap-3"><span><strong>{type.name}</strong><span className="block text-xs text-slate-500">{type.key}</span></span><select aria-label={`Workflow for ${type.name}`} className="field min-w-64" value={type.workflowId} onChange={event => void applyWorkflowToType(type, Number(event.target.value))}>{workflows.map(workflow => <option value={workflow.id} key={workflow.id}>{workflow.name}</option>)}</select></span></label>)}</div><p className="mt-2 text-xs text-slate-500">For safety, a ticket type can only switch workflows before its first ticket is created.</p></div>:null}</section>
       <section className="space-y-6">
         {selected ? <WorkflowMap workflow={selected} types={types.filter(type => type.workflowId === selected.id)} addState={addGraphState} addTransition={addGraphTransition} removeTransition={removeTransition} removeState={removeState} /> : <div className="card">Select a workflow to view its branching map.</div>}
-        <WorkflowConfigurationPanels organizationId={organizationId} workflows={workflows} types={types} reload={load} report={setMessage} />
-        <form className="card space-y-3" onSubmit={addType}><h2 className="font-bold">Create ticket type for selected workflow</h2><p className="text-sm text-slate-500">{organizationId === "internal" ? "Creates an internal TicketFlow1 template type." : "Creates a client-organization ticket type."}</p><label className="block">Key<input required disabled={!selected} className="field mt-1" value={typeKey} onChange={event => setTypeKey(event.target.value)} /></label><label className="block">Display name<input required disabled={!selected} className="field mt-1" value={typeName} onChange={event => setTypeName(event.target.value)} /></label><button disabled={!selected} className="btn-primary">Create ticket type</button></form>
+        {selectedScopeReady ? <WorkflowConfigurationPanels organizationId={selectedOrganizationId ? String(selectedOrganizationId) : "internal"} workflows={workflows} types={types} reload={load} report={setMessage} /> : null}
+        <form className="card space-y-3" onSubmit={addType}><h2 className="font-bold">Create ticket type for selected workflow</h2><p className="text-sm text-slate-500">{organizationId === "internal" ? "Creates a TicketFlow1 Internal ticket type used by internal ticket creation." : "Creates a client-organization ticket type."}</p><label className="block">Key<input required disabled={!selected} className="field mt-1" value={typeKey} onChange={event => setTypeKey(event.target.value)} /></label><label className="block">Display name<input required disabled={!selected} className="field mt-1" value={typeName} onChange={event => setTypeName(event.target.value)} /></label><button disabled={!selected} className="btn-primary">Create ticket type</button></form>
         <form className="card grid gap-3 sm:grid-cols-2" onSubmit={createWorkflow}><div className="sm:col-span-2"><p className="eyebrow">New map</p><h2 className="font-bold">Create custom workflow</h2><p className="text-sm text-slate-500">Start with two states, then arrange and connect everything directly in the canvas.</p></div><label className="sm:col-span-2">Workflow name<input className="field mt-1" required value={workflowName} onChange={event => setWorkflowName(event.target.value)} /></label><label>Starting state<input className="field mt-1" required value={initialKey} onChange={event => setInitialKey(event.target.value)} /></label><label>Ending state<input className="field mt-1" required value={terminalKey} onChange={event => setTerminalKey(event.target.value)} /></label><button className="btn-primary sm:col-span-2">Create workflow</button></form>
       </section>
     </div>
