@@ -65,7 +65,7 @@ dependency; all tasks remain unchecked until implemented and verified.
 - [x] T039 Extend detail/list/board responses and filters with subtype, dynamic values as authorized, routing, parent, and child progress.
 - [x] T040 Audit creation values without leaking internal/sensitive values to client-visible feeds.
 - [x] T041 [P] Test routing, dynamic validation, USR search/reference rules, inheritance, cycles, tenant isolation, and transactional rollback.
-- [ ] T042 **Verify**: create TASI/FIREWALL, USR/NEW, USR/MODIFY, and a child ticket through API and inspect assignments/audit.
+- [x] T042 **Verify**: create TASI/FIREWALL, USR/NEW, USR/MODIFY, and a child ticket through API and inspect assignments/audit.
 
 ## Phase 5: Workflow migration and relationship-aware approvals
 
@@ -77,7 +77,7 @@ dependency; all tasks remain unchecked until implemented and verified.
 - [x] T048 Implement REQ client acceptance/rejection command; require same-org business owner or approved permission rule.
 - [x] T049 Ensure protected transitions never appear in or execute through the generic transition endpoint.
 - [x] T050 [P] Matrix-test every legal/illegal transition, repeated loop, permission, party, relationship, stale decision, and rollback case.
-- [ ] T051 **Verify**: execute complete TASI, USR, DFCT, and REQ happy paths plus correction/rejection loops using multiple actors.
+- [x] T051 **Verify**: execute complete TASI, USR, DFCT, and REQ happy paths plus correction/rejection loops using multiple actors.
 
 ## Phase 6: Administration and ticket UI
 
@@ -90,8 +90,8 @@ dependency; all tasks remain unchecked until implemented and verified.
 - [x] T058 Add approval panels driven by server-provided commands and resolved approver information.
 - [x] T059 Add subtype and parent/child filters/metadata to ticket list and team boards.
 - [x] T060 [P] Add frontend unit tests for dynamic rendering, subtype changes, stale-value clearing, user search, approval visibility, and hierarchy.
-- [ ] T061 Add end-to-end flows for TASI routing/approval, USR MODIFY search, DFCT loop, REQ client acceptance, and subticket creation.
-- [ ] T062 **Verify**: keyboard, responsive, permission-role, and no-console-error review passes.
+- [x] T061 Add end-to-end flows for TASI routing/approval, USR MODIFY search, DFCT loop, REQ client acceptance, and subticket creation.
+- [x] T062 **Verify**: keyboard, responsive, permission-role, and no-console-error review passes.
 
 ## Phase 7: Release and documentation
 
