@@ -1,9 +1,9 @@
 # TicketFlow1 Service Workflow Demo Script
 
 This script is for a mentor/demo walkthrough of the configurable
-service-request workflow slice. The demo profile still provides the base demo
-users; T066 will add a shorter seed that preloads a complete runtime-field and
-routing scenario.
+service-request workflow slice. The demo profile provides the base demo users
+and a concise service-workflow seed with dynamic fields, routing, approvals,
+client acceptance, and subtickets.
 
 ## Demo accounts
 

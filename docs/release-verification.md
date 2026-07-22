@@ -177,6 +177,54 @@ Follow-up:
 
 ## T068 remaining release gate
 
+### 2026-07-22 partial deploy verification
+
+Status: blocked on Render redeploy/current-branch confirmation.
+
+Local checks completed:
+
+- Clean default-profile backend startup passed against
+  `tf1_t068_clean_20260722`.
+  - Flyway validated 22 production migrations.
+  - Empty schema migrated to version `21`.
+  - Hibernate validation succeeded.
+- Clean demo-profile backend startup passed against
+  `tf1_t068_demo_20260722`.
+  - Flyway validated 24 migrations.
+  - Empty schema migrated to demo version `22`.
+  - Hibernate validation succeeded.
+  - Demo tickets `TF-2100`, `TF-2101`, `TF-2102`, and `TF-2103` were present.
+- Migrated backend startup passed against the restored rehearsal database
+  `tf1_t064_restore_20260722`.
+  - Flyway validated 22 migrations.
+  - Schema was already at version `21`.
+  - Hibernate validation succeeded.
+- Frontend production build passed with Render-like variables:
+
+  ```bash
+  NEXT_PUBLIC_API_BASE_URL=/api \
+    BACKEND_HOST=ticketflow1-api.onrender.com \
+    npm run build
+  ```
+
+Live Render checks completed:
+
+- `https://ticketflow1-web.onrender.com/login` returned HTTP `200`.
+- `https://ticketflow1-api.onrender.com/swagger-ui.html` returned HTTP `200`
+  after following the Swagger redirect.
+- Demo login through the frontend proxy succeeded for
+  `admin@ticketflow1.demo`.
+- Fetching `TF-2100` through the frontend proxy returned HTTP `404`.
+- The live ticket list still shows older `TF-100x` records, so the public
+  Render environment is not yet on the new T066 demo seed.
+
+Branch/deploy note:
+
+- Local branch `dev2` is ahead of `origin/main`.
+- Render cannot deploy local-only commits. Push/deploy the intended `dev2`
+  commit, or repoint Render to the branch/commit that contains
+  `0a07782 Seed service workflow demo data` and later release commits.
+
 Before marking the feature complete:
 
 1. Run a clean local deploy/build from a fresh database.
