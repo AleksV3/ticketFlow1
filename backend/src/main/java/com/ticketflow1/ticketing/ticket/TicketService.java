@@ -533,7 +533,8 @@ public class TicketService {
 
     private TicketDetailResponse detail(Ticket ticket, AuthPrincipal principal) {
         return TicketDetailResponse.from(ticket, ticketTransitionService.allowedTransitions(ticket, principal),
-                proposalDetailService.detail(ticket, principal), slaStatusService.status(ticket), dynamicValues(ticket, principal));
+                proposalDetailService.detail(ticket, principal), slaStatusService.status(ticket), dynamicValues(ticket, principal),
+                ticketRepository.findByParentTicketIdOrderByCreatedAtAsc(ticket.getId()));
     }
 
     private Map<String,Object> dynamicValues(Ticket ticket, AuthPrincipal principal) {

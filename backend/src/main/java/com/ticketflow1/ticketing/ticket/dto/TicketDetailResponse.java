@@ -42,6 +42,7 @@ public record TicketDetailResponse(
         String subtype,
         Long subtypeId,
         String parentTicketKey,
+        List<ChildTicketRef> childTickets,
         UserRef targetUser,
         String targetUserDisplaySnapshot,
         Long routingRuleId,
@@ -49,7 +50,7 @@ public record TicketDetailResponse(
         Map<String,Object> dynamicValues) {
 
     public static TicketDetailResponse from(Ticket ticket, List<String> allowedTransitions, ProposalDetail proposal,
-            SlaStatus slaStatus, Map<String,Object> dynamicValues) {
+            SlaStatus slaStatus, Map<String,Object> dynamicValues, List<Ticket> childTickets) {
         return new TicketDetailResponse(
                 ticket.getId(),
                 ticket.getTicketKey(),
@@ -79,9 +80,14 @@ public record TicketDetailResponse(
                 ticket.getSubtype() == null ? null : ticket.getSubtype().getKey(),
                 ticket.getSubtype() == null ? null : ticket.getSubtype().getId(),
                 ticket.getParentTicket() == null ? null : ticket.getParentTicket().getTicketKey(),
+                childTickets.stream().map(ChildTicketRef::from).toList(),
                 UserRef.from(ticket.getTargetUser()), ticket.getTargetUserDisplaySnapshot(),
                 ticket.getRoutingRule() == null ? null : ticket.getRoutingRule().getId(),
                 ticket.getResolvedApprover() == null ? null : ticket.getResolvedApprover().getId(), dynamicValues);
+    }
+    public static TicketDetailResponse from(Ticket ticket, List<String> allowedTransitions, ProposalDetail proposal,
+            SlaStatus slaStatus, Map<String,Object> dynamicValues) {
+        return from(ticket, allowedTransitions, proposal, slaStatus, dynamicValues, List.of());
     }
     public static TicketDetailResponse from(Ticket ticket, List<String> allowedTransitions, ProposalDetail proposal,
             SlaStatus slaStatus) {
@@ -118,6 +124,12 @@ public record TicketDetailResponse(
     }
     public record TeamRef(Long id, String name) {
         public static TeamRef from(DeveloperTeam team) { return new TeamRef(team.getId(), team.getName()); }
+    }
+    public record ChildTicketRef(String ticketKey, String title, String type, String status, String currentResponsibility) {
+        public static ChildTicketRef from(Ticket ticket) {
+            return new ChildTicketRef(ticket.getTicketKey(), ticket.getTitle(), ticket.getTicketType().getKey(),
+                    ticket.getCurrentState().getKey(), ticket.getCurrentResponsibility().name());
+        }
     }
 
     public record SlaRef(

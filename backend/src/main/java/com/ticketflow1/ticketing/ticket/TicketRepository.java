@@ -13,6 +13,8 @@ public interface TicketRepository extends JpaRepository<Ticket, Long>, JpaSpecif
 
     Optional<Ticket> findByTicketKeyAndOrganizationId(String ticketKey, Long organizationId);
 
+    List<Ticket> findByParentTicketIdOrderByCreatedAtAsc(Long parentTicketId);
+
     boolean existsByTicketTypeId(Long ticketTypeId);
     boolean existsByCurrentStateId(Long stateId);
 }
