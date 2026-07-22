@@ -134,7 +134,7 @@ public class TicketService {
             subtype = subtypeRepository.findById(request.subtypeId())
                     .filter(s -> s.isActive() && s.getTicketType().getId().equals(ticketType.getId()))
                     .orElseThrow(() -> ApiException.validation("subtypeId is not active for this ticket type."));
-            validateDynamicValues(subtype, request.dynamicValues());
+            validateDynamicValues(subtype, request.dynamicValues(), principal);
         } else if (request.dynamicValues() != null && !request.dynamicValues().isEmpty()) {
             throw ApiException.validation("dynamicValues requires subtypeId.");
         }
@@ -357,14 +357,17 @@ public class TicketService {
         }
     }
 
-    private void validateDynamicValues(TicketSubtype subtype, Map<String,Object> values) {
+    private void validateDynamicValues(TicketSubtype subtype, Map<String,Object> values, AuthPrincipal principal) {
         Map<String,Object> supplied = values == null ? Map.of() : values;
+        List<SubtypeFieldDefinition> activeFields = fieldDefinitionRepository.findBySubtypeIdAndActiveTrueOrderBySortOrderAscIdAsc(subtype.getId());
         for (String key : supplied.keySet()) {
-            if (fieldDefinitionRepository.findBySubtypeIdAndKey(subtype.getId(), key).filter(SubtypeFieldDefinition::isActive).isEmpty()) {
+            Optional<SubtypeFieldDefinition> field = activeFields.stream().filter(item -> item.getKey().equals(key)).findFirst();
+            if (field.isEmpty() || principal.party() != Responsibility.TICKETFLOW1 && field.get().getVisibility() == FieldVisibility.INTERNAL) {
                 throw ApiException.validation("Unknown dynamic field: " + key);
             }
         }
-        for (SubtypeFieldDefinition field : fieldDefinitionRepository.findBySubtypeIdAndActiveTrueOrderBySortOrderAscIdAsc(subtype.getId())) {
+        for (SubtypeFieldDefinition field : activeFields) {
+            if (principal.party() != Responsibility.TICKETFLOW1 && field.getVisibility() == FieldVisibility.INTERNAL) continue;
             dynamicFieldValidator.validate(field, supplied.get(field.getKey()),
                     fieldOptionRepository.findByFieldDefinitionIdAndActiveTrueOrderBySortOrderAscIdAsc(field.getId()));
         }

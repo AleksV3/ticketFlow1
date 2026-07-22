@@ -193,8 +193,10 @@ function SubtypeAndFields({ subtypeId, setSubtypeId, selectedSubtype, form, valu
       {form.subtypes.map(subtype => <option value={subtype.id} key={subtype.id}>{subtype.name}</option>)}
     </select></label>
     {selectedSubtype?.description ? <p className="mt-2 text-sm text-slate-500">{selectedSubtype.description}</p> : null}
+    {selectedSubtype ? <p className="mt-2 text-xs text-slate-500">{selectedSubtype.fields.length} dynamic field{selectedSubtype.fields.length === 1 ? "" : "s"} configured for this subtype.</p> : null}
     <div className="mt-4 grid gap-4 sm:grid-cols-2">
       {selectedSubtype?.fields.map(field => <DynamicField field={field} value={values[field.key]} setValue={value => setValue(field.key, value)} people={people} teams={teams} key={field.id}/>)}
+      {selectedSubtype && selectedSubtype.fields.length === 0 ? <p className="rounded-lg border border-dashed p-4 text-sm text-slate-500 sm:col-span-2">This subtype has no active fields yet.</p> : null}
     </div>
   </fieldset>;
 }

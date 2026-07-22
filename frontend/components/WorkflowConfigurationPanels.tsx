@@ -61,7 +61,7 @@ export function WorkflowConfigurationPanels({
   }, [types]);
   const selectedType = types.find(type => type.id === selectedTypeId) ?? null;
 
-  return <section className="grid gap-6 xl:grid-cols-[minmax(0,420px)_minmax(0,1fr)]">
+  return <section className="space-y-6">
     <TypeAdministration
       organizationId={organizationId}
       workflows={workflows}
@@ -127,7 +127,7 @@ function TypeAdministration({ organizationId, workflows, types, selectedTypeId, 
     await updateType(type, { sortOrder: Math.max(0, (type.sortOrder ?? 0) + direction * 10) });
   }
 
-  return <section className="card self-start">
+  return <section className="card">
     <div className="mb-4 flex items-start justify-between gap-3">
       <div>
         <p className="eyebrow">Type administration</p>
@@ -136,34 +136,46 @@ function TypeAdministration({ organizationId, workflows, types, selectedTypeId, 
       </div>
       <span className="badge bg-slate-100 text-slate-700">{types.length}</span>
     </div>
-    <div className="space-y-3">
-      {types.map(type => <article className={`rounded-lg border p-3 ${selectedTypeId === type.id ? "border-blue-500 bg-blue-950/30" : ""}`} key={type.id}>
+    <div className="grid gap-3">
+      {types.map(type => {
+        const selected = selectedTypeId === type.id;
+        const workflow = workflows.find(item => item.id === type.workflowId);
+        return <article className={`rounded-2xl border p-4 transition ${selected ? "border-blue-500 bg-blue-950/30 shadow-sm" : "bg-white hover:border-blue-300 hover:shadow-sm"}`} key={type.id}>
         <button type="button" className="w-full text-left" onClick={() => selectType(type.id)}>
-          <span className="flex items-center justify-between gap-2">
-            <strong>{type.name}</strong>
-            <span className={`badge ${type.active === false ? "bg-red-100 text-red-700" : "bg-emerald-100 text-emerald-700"}`}>{type.active === false ? "Inactive" : "Active"}</span>
+          <span className="flex flex-wrap items-start justify-between gap-3">
+            <span>
+              <strong className="text-lg">{type.name}</strong>
+              <span className="mt-1 block text-xs text-slate-500">{type.key} · {workflow?.name ?? "No workflow"} · order {type.sortOrder ?? 0}</span>
+            </span>
+            <span className="flex flex-wrap gap-2">
+              <span className="badge bg-slate-100 text-slate-700">{pretty(type.capability ?? "STANDARD")}</span>
+              <span className={`badge ${type.active === false ? "bg-red-100 text-red-700" : "bg-emerald-100 text-emerald-700"}`}>{type.active === false ? "Inactive" : "Active"}</span>
+              <span className="badge bg-blue-100 text-blue-700">{selected ? "Editing" : "Click to edit"}</span>
+            </span>
           </span>
-          <span className="mt-1 block text-xs text-slate-500">{type.key} · order {type.sortOrder ?? 0}</span>
         </button>
-        <div className="mt-3 grid gap-2">
-          <label>Name<input className="field mt-1" defaultValue={type.name} onBlur={event => {
-            const next = event.currentTarget.value.trim();
-            if (next && next !== type.name) void updateType(type, { name: next });
-          }} /></label>
-          <label>Workflow<select className="field mt-1" value={type.workflowId} onChange={event => void updateType(type, { workflowId: Number(event.target.value) })}>
-            {workflows.map(workflow => <option value={workflow.id} key={workflow.id}>{workflow.name}</option>)}
-          </select></label>
-          <label>Capability<select className="field mt-1" value={type.capability ?? "STANDARD"} onChange={event => void updateType(type, { capability: event.target.value })}>
-            {CAPABILITIES.map(value => <option key={value} value={value}>{pretty(value)}</option>)}
-          </select></label>
-        </div>
-        <div className="mt-3 flex flex-wrap gap-2">
-          <button type="button" className="btn-secondary px-2 py-1 text-xs" onClick={() => void reorder(type, -1)}>Move up</button>
-          <button type="button" className="btn-secondary px-2 py-1 text-xs" onClick={() => void reorder(type, 1)}>Move down</button>
-          <button type="button" className="btn-secondary px-2 py-1 text-xs" onClick={() => void setActive(type, type.active === false)}>{type.active === false ? "Activate" : "Deactivate"}</button>
-          <button type="button" className="btn-secondary px-2 py-1 text-xs text-red-300" onClick={() => void deleteType(type)}>Delete</button>
-        </div>
-      </article>)}
+        {selected ? <>
+          <div className="mt-4 grid gap-3 md:grid-cols-3">
+            <label>Name<input className="field mt-1" defaultValue={type.name} onBlur={event => {
+              const next = event.currentTarget.value.trim();
+              if (next && next !== type.name) void updateType(type, { name: next });
+            }} /></label>
+            <label>Workflow<select className="field mt-1" value={type.workflowId} onChange={event => void updateType(type, { workflowId: Number(event.target.value) })}>
+              {workflows.map(workflow => <option value={workflow.id} key={workflow.id}>{workflow.name}</option>)}
+            </select></label>
+            <label>Capability<select className="field mt-1" value={type.capability ?? "STANDARD"} onChange={event => void updateType(type, { capability: event.target.value })}>
+              {CAPABILITIES.map(value => <option key={value} value={value}>{pretty(value)}</option>)}
+            </select></label>
+          </div>
+          <div className="mt-3 flex flex-wrap gap-2">
+            <button type="button" className="btn-secondary px-2 py-1 text-xs" onClick={() => void reorder(type, -1)}>Move up</button>
+            <button type="button" className="btn-secondary px-2 py-1 text-xs" onClick={() => void reorder(type, 1)}>Move down</button>
+            <button type="button" className="btn-secondary px-2 py-1 text-xs" onClick={() => void setActive(type, type.active === false)}>{type.active === false ? "Activate" : "Deactivate"}</button>
+            <button type="button" className="btn-secondary px-2 py-1 text-xs text-red-300" onClick={() => void deleteType(type)}>Delete</button>
+          </div>
+        </> : null}
+      </article>;
+      })}
       {!types.length ? <p className="text-sm text-slate-500">No ticket types in this scope.</p> : null}
     </div>
     {organizationId === "internal" ? <p className="mt-4 text-xs text-slate-500">Internal template types are cloned to organizations when they are created.</p> : null}
@@ -180,12 +192,15 @@ function SubtypeAdministration({ organizationId, type, reloadTypes, report }: {
   const [selectedSubtypeId, setSelectedSubtypeId] = useState<number | null>(null);
   const [loading, setLoading] = useState(false);
   const selectedSubtype = subtypes.find(subtype => subtype.id === selectedSubtypeId) ?? null;
-  const loadSubtypes = useCallback(async () => {
+  const loadSubtypes = useCallback(async (preferredId?: number) => {
     setLoading(true);
     try {
       const rows = await get<Subtype[]>(`/admin/ticket-types/${type.id}/subtypes`);
       setSubtypes(rows);
-      setSelectedSubtypeId(current => current && rows.some(row => row.id === current) ? current : rows[0]?.id ?? null);
+      setSelectedSubtypeId(current => {
+        const desired = preferredId ?? current;
+        return desired && rows.some(row => row.id === desired) ? desired : rows[0]?.id ?? null;
+      });
     } catch (error) {
       report(error instanceof Error ? error.message : "Could not load subtypes.");
     } finally {
@@ -199,7 +214,7 @@ function SubtypeAdministration({ organizationId, type, reloadTypes, report }: {
     const target = event.currentTarget;
     const form = new FormData(target);
     try {
-      await post(`/admin/ticket-types/${type.id}/subtypes`, {
+      const created = await post<Subtype>(`/admin/ticket-types/${type.id}/subtypes`, {
         key: form.get("key"),
         name: form.get("name"),
         description: form.get("description"),
@@ -207,7 +222,7 @@ function SubtypeAdministration({ organizationId, type, reloadTypes, report }: {
       });
       target.reset();
       report("Subtype created.");
-      await loadSubtypes();
+      await loadSubtypes(created.id);
     } catch (error) {
       report(error instanceof Error ? error.message : "Could not create subtype.");
     }
@@ -270,7 +285,7 @@ function SubtypeAdministration({ organizationId, type, reloadTypes, report }: {
         </div>
         {loading ? <span className="text-xs text-slate-500">Loading…</span> : null}
       </div>
-      <div className="mt-4 grid gap-4 lg:grid-cols-[minmax(0,1fr)_320px]">
+      <div className="mt-4 space-y-4">
         <div className="space-y-2">
           {subtypes.map((subtype, index) => <article className={`rounded-lg border p-3 ${selectedSubtypeId === subtype.id ? "border-blue-500 bg-blue-950/30" : ""}`} key={subtype.id}>
             <button type="button" className="w-full text-left" onClick={() => setSelectedSubtypeId(subtype.id)}>
@@ -299,12 +314,12 @@ function SubtypeAdministration({ organizationId, type, reloadTypes, report }: {
           </article>)}
           {!subtypes.length ? <p className="rounded-lg border border-dashed p-5 text-center text-sm text-slate-500">No subtypes yet.</p> : null}
         </div>
-        <form className="rounded-lg border p-3" onSubmit={event => void createSubtype(event)}>
-          <h3 className="font-bold">Add subtype</h3>
-          <label className="mt-3 block">Key<input name="key" className="field mt-1" required placeholder="FIREWALL" /></label>
-          <label className="mt-3 block">Name<input name="name" className="field mt-1" required placeholder="Firewall" /></label>
-          <label className="mt-3 block">Description<textarea name="description" className="field mt-1 min-h-20" /></label>
-          <button className="btn-primary mt-3 w-full">Create subtype</button>
+        <form className="grid gap-3 rounded-lg border p-3 md:grid-cols-3" onSubmit={event => void createSubtype(event)}>
+          <h3 className="font-bold md:col-span-3">Add subtype</h3>
+          <label>Key<input name="key" className="field mt-1" required placeholder="FIREWALL" /></label>
+          <label>Name<input name="name" className="field mt-1" required placeholder="Firewall" /></label>
+          <label className="md:col-span-3">Description<textarea name="description" className="field mt-1 min-h-20" /></label>
+          <button className="btn-primary md:col-span-3">Create subtype</button>
         </form>
       </div>
     </div>
@@ -319,11 +334,14 @@ function FieldAdministration({ subtype, report }: { subtype: Subtype; report: (m
   const [fields, setFields] = useState<Field[]>([]);
   const [selectedFieldId, setSelectedFieldId] = useState<number | null>(null);
   const selectedField = fields.find(field => field.id === selectedFieldId) ?? null;
-  const loadFields = useCallback(async () => {
+  const loadFields = useCallback(async (preferredId?: number) => {
     try {
       const rows = await get<Field[]>(`/admin/subtypes/${subtype.id}/fields`);
       setFields(rows);
-      setSelectedFieldId(current => current && rows.some(row => row.id === current) ? current : rows[0]?.id ?? null);
+      setSelectedFieldId(current => {
+        const desired = preferredId ?? current;
+        return desired && rows.some(row => row.id === desired) ? desired : rows[0]?.id ?? null;
+      });
     } catch (error) {
       report(error instanceof Error ? error.message : "Could not load fields.");
     }
@@ -336,7 +354,7 @@ function FieldAdministration({ subtype, report }: { subtype: Subtype; report: (m
     const form = new FormData(target);
     const fieldKind = form.get("fieldKind") as FieldKind;
     try {
-      await post(`/admin/subtypes/${subtype.id}/fields`, {
+      const created = await post<Field>(`/admin/subtypes/${subtype.id}/fields`, {
         key: form.get("key"),
         label: form.get("label"),
         helpText: form.get("helpText"),
@@ -351,7 +369,7 @@ function FieldAdministration({ subtype, report }: { subtype: Subtype; report: (m
       });
       target.reset();
       report("Field created.");
-      await loadFields();
+      await loadFields(created.id);
     } catch (error) {
       report(error instanceof Error ? error.message : "Could not create field.");
     }
@@ -414,6 +432,7 @@ function FieldAdministration({ subtype, report }: { subtype: Subtype; report: (m
     <div className="mb-4">
       <p className="eyebrow">Dynamic fields</p>
       <h2 className="mt-1 text-xl font-bold">{subtype.name} form</h2>
+      <p className="mt-1 text-sm text-slate-500">Active fields show on ticket creation for this subtype. PUBLIC fields show to clients; INTERNAL fields only show to TicketFlow1 users.</p>
     </div>
     <div className="space-y-2">
       {fields.map((field, index) => <article className={`rounded-lg border p-3 ${selectedFieldId === field.id ? "border-blue-500 bg-blue-950/30" : ""}`} key={field.id}>
