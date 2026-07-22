@@ -95,7 +95,7 @@ dependency; all tasks remain unchecked until implemented and verified.
 
 ## Phase 7: Release and documentation
 
-- [ ] T063 Run full backend/frontend suites and two-organization isolation suite.
+- [x] T063 Run full backend/frontend suites and two-organization isolation suite.
 - [ ] T064 Rehearse migration against a sanitized current-schema backup and document rollback/recovery.
 - [ ] T065 Update README, presentation guide, technical deep dive, OpenAPI contracts, and demo script with the new model and workflows.
 - [ ] T066 Seed a concise demo showing runtime field creation, automatic routing, relationship approval, client acceptance, and a subticket.

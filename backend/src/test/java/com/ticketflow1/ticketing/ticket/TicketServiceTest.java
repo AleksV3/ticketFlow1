@@ -20,6 +20,7 @@ import com.ticketflow1.ticketing.ticket.dto.TicketDetailResponse;
 import com.ticketflow1.ticketing.user.AppUser;
 import com.ticketflow1.ticketing.user.AppUserRepository;
 import com.ticketflow1.ticketing.workflow.TicketType;
+import com.ticketflow1.ticketing.workflow.TicketTypeCapability;
 import com.ticketflow1.ticketing.workflow.TicketTypeRepository;
 import com.ticketflow1.ticketing.workflow.TicketTransitionService;
 import com.ticketflow1.ticketing.workflow.Workflow;
@@ -61,6 +62,12 @@ class TicketServiceTest {
     private TicketTransitionService ticketTransitionService;
     @Mock private ProposalDetailService proposalDetailService;
     @Mock private com.ticketflow1.ticketing.team.DeveloperTeamRepository developerTeamRepository;
+    @Mock private com.ticketflow1.ticketing.ticketconfig.TicketSubtypeRepository subtypeRepository;
+    @Mock private com.ticketflow1.ticketing.ticketconfig.SubtypeRoutingRuleRepository routingRuleRepository;
+    @Mock private com.ticketflow1.ticketing.ticketconfig.SubtypeFieldDefinitionRepository fieldDefinitionRepository;
+    @Mock private com.ticketflow1.ticketing.ticketconfig.SubtypeFieldOptionRepository fieldOptionRepository;
+    @Mock private com.ticketflow1.ticketing.ticketconfig.TicketFieldValueRepository fieldValueRepository;
+    @Mock private com.ticketflow1.ticketing.ticketconfig.DynamicFieldValidator dynamicFieldValidator;
     private com.ticketflow1.ticketing.sla.SlaCalculator slaCalculator;
     private com.ticketflow1.ticketing.sla.SlaStatusService slaStatusService;
 
@@ -74,7 +81,9 @@ class TicketServiceTest {
         ticketService = new TicketService(ticketRepository, ticketTypeRepository, workflowStateRepository,
                 appUserRepository, organizationRepository, ticketKeyGenerator, auditService,
                 statusHistoryService, ticketTransitionService, proposalDetailService,
-                slaCalculator, slaStatusService, java.time.Clock.systemUTC(), developerTeamRepository);
+                slaCalculator, slaStatusService, java.time.Clock.systemUTC(), developerTeamRepository,
+                subtypeRepository, routingRuleRepository, fieldDefinitionRepository, fieldOptionRepository,
+                fieldValueRepository, dynamicFieldValidator);
     }
 
     @ParameterizedTest
@@ -93,7 +102,8 @@ class TicketServiceTest {
         AuthPrincipal principal = new AuthPrincipal(actor.getId(), actor.getParty(), organization.getId(),
                 Set.of("TICKET_CREATE", "TICKET_READ"));
         CreateTicketRequest request = new CreateTicketRequest(typeKey, "Test title", "Test description",
-                Priority.HIGH, defectType ? Severity.SEV_2 : null, null, null, null, null);
+                Priority.HIGH, defectType ? Severity.SEV_2 : null, null, null, null, null,
+                null, null, null, null);
 
         when(appUserRepository.findById(actor.getId())).thenReturn(java.util.Optional.of(actor));
         when(ticketTypeRepository.findByOrganizationIdAndKey(organization.getId(), typeKey))
@@ -139,7 +149,7 @@ class TicketServiceTest {
         AuthPrincipal principal = new AuthPrincipal(actor.getId(), actor.getParty(), organization.getId(),
                 Set.of("TICKET_CREATE"));
         CreateTicketRequest request = new CreateTicketRequest("TASK", "Task", "Desc", Priority.MEDIUM,
-                Severity.SEV_1, null, null, null, null);
+                Severity.SEV_1, null, null, null, null, null, null, null, null);
 
         when(appUserRepository.findById(actor.getId())).thenReturn(java.util.Optional.of(actor));
         when(ticketTypeRepository.findByOrganizationIdAndKey(organization.getId(), "TASK"))
@@ -156,7 +166,7 @@ class TicketServiceTest {
         Organization organization = organization(7L, "Client A");
         AppUser actor = appUser(11L, "admin@ticketflow1.demo", "Admin", Responsibility.TICKETFLOW1, null);
         Workflow workflow = workflow(21L, "Defect workflow");
-        TicketType type = ticketType(31L, "DEFECT", workflow, organization, false);
+        TicketType type = ticketType(31L, "DEFECT", workflow, organization, true);
         WorkflowState analysis = workflowState(41L, workflow, "ANALYSIS", false);
         Ticket ticket = new Ticket("TF-1002", type, analysis, Priority.HIGH, Severity.SEV_1,
                 "Defect", "Description", organization, actor, Responsibility.TICKETFLOW1);
@@ -197,8 +207,10 @@ class TicketServiceTest {
     }
 
     private static TicketType ticketType(Long id, String key, Workflow workflow,
-            Organization organization, boolean requiresProposal) {
-        TicketType ticketType = new TicketType(key, key, workflow, organization, false, requiresProposal);
+            Organization organization, boolean defectType) {
+        TicketType ticketType = new TicketType(key, key, workflow, organization, false, false);
+        ticketType.configure(key, workflow, true, 0,
+                defectType ? TicketTypeCapability.DEFECT_SLA : TicketTypeCapability.STANDARD);
         ReflectionTestUtils.setField(ticketType, "id", id);
         return ticketType;
     }

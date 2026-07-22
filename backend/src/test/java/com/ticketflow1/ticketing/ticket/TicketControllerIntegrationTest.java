@@ -195,7 +195,7 @@ class TicketControllerIntegrationTest {
                 }
                 """, "SUBMITTED");
 
-        mockMvc.perform(post("/api/tickets/{ticketKey}/transition", allowedTicketKey)
+        mockMvc.perform(post("/api/tickets/{ticketKey}/transition", allowedTicketKey).with(csrf())
                         .cookie(internalCookie)
                         .contentType("application/json")
                         .content("""
@@ -206,7 +206,7 @@ class TicketControllerIntegrationTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.status").value("ANALYSIS"));
 
-        mockMvc.perform(post("/api/tickets/{ticketKey}/transition", forbiddenTicketKey)
+        mockMvc.perform(post("/api/tickets/{ticketKey}/transition", forbiddenTicketKey).with(csrf())
                         .cookie(clientCookie)
                         .contentType("application/json")
                         .content("""
@@ -247,7 +247,7 @@ class TicketControllerIntegrationTest {
                 }
                 """, "SUBMITTED");
 
-        mockMvc.perform(post("/api/tickets/{ticketKey}/comments", ticketKey)
+        mockMvc.perform(post("/api/tickets/{ticketKey}/comments", ticketKey).with(csrf())
                         .cookie(clientACookie)
                         .contentType("application/json")
                         .content("""
@@ -256,7 +256,7 @@ class TicketControllerIntegrationTest {
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.visibility").value("PUBLIC"));
 
-        mockMvc.perform(post("/api/tickets/{ticketKey}/comments", ticketKey)
+        mockMvc.perform(post("/api/tickets/{ticketKey}/comments", ticketKey).with(csrf())
                         .cookie(internalCookie)
                         .contentType("application/json")
                         .content("""
@@ -279,7 +279,7 @@ class TicketControllerIntegrationTest {
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.error").value("NOT_FOUND"));
 
-        mockMvc.perform(post("/api/tickets/{ticketKey}/comments", ticketKey)
+        mockMvc.perform(post("/api/tickets/{ticketKey}/comments", ticketKey).with(csrf())
                         .cookie(clientACookie)
                         .contentType("application/json")
                         .content("""
@@ -288,7 +288,7 @@ class TicketControllerIntegrationTest {
                 .andExpect(status().isForbidden())
                 .andExpect(jsonPath("$.error").value("FORBIDDEN"));
 
-        mockMvc.perform(post("/api/tickets/{ticketKey}/comments", ticketKey)
+        mockMvc.perform(post("/api/tickets/{ticketKey}/comments", ticketKey).with(csrf())
                         .cookie(clientACookie)
                         .contentType("application/json")
                         .content("""
@@ -297,7 +297,7 @@ class TicketControllerIntegrationTest {
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.error").value("VALIDATION_FAILED"));
 
-        mockMvc.perform(post("/api/tickets/{ticketKey}/attachments", ticketKey)
+        mockMvc.perform(post("/api/tickets/{ticketKey}/attachments", ticketKey).with(csrf())
                         .cookie(clientACookie)
                         .contentType("application/json")
                         .content("""
@@ -310,7 +310,7 @@ class TicketControllerIntegrationTest {
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.error").value("NOT_FOUND"));
 
-        mockMvc.perform(post("/api/tickets/{ticketKey}/attachments", ticketKey)
+        mockMvc.perform(post("/api/tickets/{ticketKey}/attachments", ticketKey).with(csrf())
                         .cookie(clientACookie)
                         .contentType("application/json")
                         .content("""
@@ -319,7 +319,7 @@ class TicketControllerIntegrationTest {
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.error").value("VALIDATION_FAILED"));
 
-        mockMvc.perform(post("/api/tickets/{ticketKey}/attachments", ticketKey)
+        mockMvc.perform(post("/api/tickets/{ticketKey}/attachments", ticketKey).with(csrf())
                         .cookie(clientACookie)
                         .contentType("application/json")
                         .content("""
@@ -342,14 +342,14 @@ class TicketControllerIntegrationTest {
                 }
                 """, "SUBMITTED");
 
-        mockMvc.perform(post("/api/tickets/{ticketKey}/comments", ticketKey)
+        mockMvc.perform(post("/api/tickets/{ticketKey}/comments", ticketKey).with(csrf())
                         .cookie(clientCookie)
                         .contentType("application/json")
                         .content("""
                                 {"body":"Public audit comment","visibility":"PUBLIC"}
                                 """))
                 .andExpect(status().isCreated());
-        mockMvc.perform(post("/api/tickets/{ticketKey}/comments", ticketKey)
+        mockMvc.perform(post("/api/tickets/{ticketKey}/comments", ticketKey).with(csrf())
                         .cookie(internalCookie)
                         .contentType("application/json")
                         .content("""
@@ -382,7 +382,7 @@ class TicketControllerIntegrationTest {
                 CHECK (action <> 'COMMENT_ADDED') NOT VALID
                 """);
         try {
-            mockMvc.perform(post("/api/tickets/{ticketKey}/comments", ticketKey)
+            mockMvc.perform(post("/api/tickets/{ticketKey}/comments", ticketKey).with(csrf())
                             .cookie(clientCookie)
                             .contentType("application/json")
                             .content("""
@@ -443,14 +443,14 @@ class TicketControllerIntegrationTest {
         String ticketKey = createTicket(client, """
                 {"type":"CHANGE_REQUEST","title":"Protected proposal","description":"Command test","priority":"MEDIUM"}
                 """, "SUBMITTED");
-        mockMvc.perform(post("/api/tickets/{ticketKey}/transition", ticketKey).cookie(internal)
+        mockMvc.perform(post("/api/tickets/{ticketKey}/transition", ticketKey).with(csrf()).cookie(internal)
                         .contentType("application/json").content("{\"toStatus\":\"ANALYSIS\"}"))
                 .andExpect(status().isOk());
-        mockMvc.perform(post("/api/tickets/{ticketKey}/transition", ticketKey).cookie(internal)
+        mockMvc.perform(post("/api/tickets/{ticketKey}/transition", ticketKey).with(csrf()).cookie(internal)
                         .contentType("application/json").content("{\"toStatus\":\"PROPOSAL\"}"))
                 .andExpect(status().isConflict()).andExpect(jsonPath("$.error").value("ILLEGAL_TRANSITION"));
 
-        MvcResult created = mockMvc.perform(post("/api/tickets/{ticketKey}/proposals", ticketKey).cookie(internal)
+        MvcResult created = mockMvc.perform(post("/api/tickets/{ticketKey}/proposals", ticketKey).with(csrf()).cookie(internal)
                         .contentType("application/json").content("""
                                 {"description":"Deliver protected change","effortEstimate":"5 person-days"}
                                 """))
@@ -459,7 +459,7 @@ class TicketControllerIntegrationTest {
         mockMvc.perform(get("/api/tickets/{ticketKey}", ticketKey).cookie(client))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.status").value("PROPOSAL"));
 
-        mockMvc.perform(post("/api/proposals/{id}/approve", proposalId).cookie(approver)
+        mockMvc.perform(post("/api/proposals/{id}/approve", proposalId).with(csrf()).cookie(approver)
                         .contentType("application/json").content("{\"comment\":\"Approved\"}"))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.status").value("APPROVED"));
         mockMvc.perform(get("/api/tickets/{ticketKey}", ticketKey).cookie(client))
@@ -487,20 +487,20 @@ class TicketControllerIntegrationTest {
                 .andExpect(jsonPath("$.proposalCommands[0]").value("APPROVE"))
                 .andExpect(jsonPath("$.proposalCommands[1]").value("REJECT"))
                 .andExpect(jsonPath("$.latestProposal.id").value(proposalId));
-        mockMvc.perform(post("/api/proposals/{id}/approve", proposalId).cookie(approverB)
+        mockMvc.perform(post("/api/proposals/{id}/approve", proposalId).with(csrf()).cookie(approverB)
                         .contentType("application/json").content("{}"))
                 .andExpect(status().isNotFound());
-        mockMvc.perform(post("/api/proposals/{id}/reject", proposalId).cookie(approverA)
+        mockMvc.perform(post("/api/proposals/{id}/reject", proposalId).with(csrf()).cookie(approverA)
                         .contentType("application/json").content("{}"))
                 .andExpect(status().isBadRequest());
-        mockMvc.perform(post("/api/tickets/{ticketKey}/transition", ticketKey).cookie(approverA)
+        mockMvc.perform(post("/api/tickets/{ticketKey}/transition", ticketKey).with(csrf()).cookie(approverA)
                         .contentType("application/json").content("{\"toStatus\":\"PROPOSAL_APPROVED\"}"))
                 .andExpect(status().isConflict());
 
         Integer commentsBefore = jdbcTemplate.queryForObject("SELECT count(*) FROM comment c JOIN ticket t ON t.id=c.ticket_id WHERE t.ticket_key=?", Integer.class, ticketKey);
         jdbcTemplate.execute("ALTER TABLE audit_log ADD CONSTRAINT test_reject_decision_audit CHECK (action <> 'PROPOSAL_REJECTED') NOT VALID");
         try {
-            mockMvc.perform(post("/api/proposals/{id}/reject", proposalId).cookie(approverA)
+            mockMvc.perform(post("/api/proposals/{id}/reject", proposalId).with(csrf()).cookie(approverA)
                             .contentType("application/json").content("{\"comment\":\"Must also roll back\"}"))
                     .andExpect(status().isInternalServerError());
         } finally { jdbcTemplate.execute("ALTER TABLE audit_log DROP CONSTRAINT test_reject_decision_audit"); }
@@ -548,7 +548,7 @@ class TicketControllerIntegrationTest {
         long rejectedId = objectMapper.readTree(createProposal(
                 ticketKey, internal, "First proposal", status().isCreated())
                 .getResponse().getContentAsString()).get("id").asLong();
-        mockMvc.perform(post("/api/proposals/{id}/reject", rejectedId).cookie(approver)
+        mockMvc.perform(post("/api/proposals/{id}/reject", rejectedId).with(csrf()).cookie(approver)
                         .contentType("application/json")
                         .content("{\"comment\":\"Please reduce the delivery risk\"}"))
                 .andExpect(status().isOk())
@@ -565,7 +565,7 @@ class TicketControllerIntegrationTest {
         long approvedId = objectMapper.readTree(createProposal(
                 ticketKey, internal, "Safer revised proposal", status().isCreated())
                 .getResponse().getContentAsString()).get("id").asLong();
-        mockMvc.perform(post("/api/proposals/{id}/approve", approvedId).cookie(approver)
+        mockMvc.perform(post("/api/proposals/{id}/approve", approvedId).with(csrf()).cookie(approver)
                         .contentType("application/json").content("{}"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.status").value("APPROVED"));
@@ -747,11 +747,11 @@ class TicketControllerIntegrationTest {
         Long orgA = jdbcTemplate.queryForObject("SELECT id FROM organization WHERE name='Client A'", Long.class);
         Long orgB = jdbcTemplate.queryForObject("SELECT id FROM organization WHERE name='Client B'", Long.class);
 
-        mockMvc.perform(post("/api/admin/workflows").cookie(internal).contentType("application/json").content("""
+        mockMvc.perform(post("/api/admin/workflows").with(csrf()).cookie(internal).contentType("application/json").content("""
                 {"name":"Invalid workflow","organizationId":%d,"states":[{"key":"OPEN","isInitial":false,"isTerminal":false,"sortOrder":1}],"transitions":[]}
                 """.formatted(orgA))).andExpect(status().isBadRequest());
 
-        MvcResult created = mockMvc.perform(post("/api/admin/workflows").cookie(internal)
+        MvcResult created = mockMvc.perform(post("/api/admin/workflows").with(csrf()).cookie(internal)
                         .contentType("application/json").content("""
                 {"name":"Access workflow","organizationId":%d,
                  "states":[{"key":"OPEN","isInitial":true,"isTerminal":false,"sortOrder":1},{"key":"CLOSED","isInitial":false,"isTerminal":true,"sortOrder":2}],
@@ -761,15 +761,15 @@ class TicketControllerIntegrationTest {
         long workflowId = workflow.path("id").asLong();
         long version = workflow.path("version").asLong();
 
-        mockMvc.perform(post("/api/admin/ticket-types").cookie(internal).contentType("application/json").content("""
+        mockMvc.perform(post("/api/admin/ticket-types").with(csrf()).cookie(internal).contentType("application/json").content("""
                 {"key":"ACCESS_REQUEST","name":"Access Request","workflowId":%d,"organizationId":%d,"requiresProposal":false}
                 """.formatted(workflowId, orgA))).andExpect(status().isCreated());
         mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch(
-                        "/api/admin/workflows/{id}", workflowId).cookie(internal).contentType("application/json")
+                        "/api/admin/workflows/{id}", workflowId).with(csrf()).cookie(internal).contentType("application/json")
                         .content("{\"version\":999,\"transitions\":[]}"))
                 .andExpect(status().isConflict());
         MvcResult updated = mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch(
-                        "/api/admin/workflows/{id}", workflowId).cookie(internal).contentType("application/json")
+                        "/api/admin/workflows/{id}", workflowId).with(csrf()).cookie(internal).contentType("application/json")
                         .content("""
                 {"version":%d,"states":[{"key":"REVIEW","isInitial":false,"isTerminal":false,"sortOrder":2}],
                  "transitions":[{"fromState":"OPEN","toState":"REVIEW","requiredPermission":"TICKET_TRANSITION","operationKind":"STANDARD"},{"fromState":"REVIEW","toState":"CLOSED","requiredPermission":"TICKET_TRANSITION","operationKind":"STANDARD"}]}
@@ -777,7 +777,7 @@ class TicketControllerIntegrationTest {
                 .andExpect(jsonPath("$.states.length()").value(3)).andReturn();
         long reorderedVersion = objectMapper.readTree(updated.getResponse().getContentAsString()).path("version").asLong();
         mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch(
-                        "/api/admin/workflows/{id}", workflowId).cookie(internal).contentType("application/json")
+                        "/api/admin/workflows/{id}", workflowId).with(csrf()).cookie(internal).contentType("application/json")
                         .content("""
                 {"version":%d,"states":[
                   {"key":"CLOSED","isInitial":false,"isTerminal":true,"sortOrder":0},
@@ -796,19 +796,19 @@ class TicketControllerIntegrationTest {
                 WHERE r.organization_id=? AND r.name='Client User' ON CONFLICT DO NOTHING
                 """, orgA);
         Cookie clientAdmin = login("client-a@demo.test", "client123");
-        mockMvc.perform(post("/api/admin/workflows").cookie(clientAdmin).contentType("application/json").content("""
+        mockMvc.perform(post("/api/admin/workflows").with(csrf()).cookie(clientAdmin).contentType("application/json").content("""
                 {"name":"Cross org","organizationId":%d,"states":[{"key":"OPEN","isInitial":true,"isTerminal":false,"sortOrder":1},{"key":"CLOSED","isInitial":false,"isTerminal":true,"sortOrder":2}],"transitions":[]}
                 """.formatted(orgB))).andExpect(status().isNotFound());
     }
 
     private void transition(String key, String to, Cookie cookie, org.springframework.test.web.servlet.ResultMatcher expected) throws Exception {
-        mockMvc.perform(post("/api/tickets/{ticketKey}/transition", key).cookie(cookie)
+        mockMvc.perform(post("/api/tickets/{ticketKey}/transition", key).with(csrf()).cookie(cookie)
                 .contentType("application/json").content("{\"toStatus\":\"" + to + "\"}")).andExpect(expected);
     }
 
     private MvcResult createProposal(String key, Cookie cookie, String description,
             org.springframework.test.web.servlet.ResultMatcher expected) throws Exception {
-        return mockMvc.perform(post("/api/tickets/{ticketKey}/proposals", key).cookie(cookie)
+        return mockMvc.perform(post("/api/tickets/{ticketKey}/proposals", key).with(csrf()).cookie(cookie)
                 .contentType("application/json").content("{\"description\":\"" + description + "\"}"))
                 .andExpect(expected).andReturn();
     }
@@ -1103,7 +1103,7 @@ class TicketControllerIntegrationTest {
     }
 
     private String createTicket(Cookie authCookie, String body, String expectedInitialState) throws Exception {
-        MvcResult createResult = mockMvc.perform(post("/api/tickets")
+        MvcResult createResult = mockMvc.perform(post("/api/tickets").with(csrf())
                         .cookie(authCookie)
                         .contentType("application/json")
                         .content(body))

@@ -66,11 +66,11 @@ class CommentServiceTest {
 
     @Test
     void listWithInternalReadReturnsAllComments() {
-        AuthPrincipal principal = principal(Set.of("TICKET_READ", CommentService.INTERNAL_READ));
+        AuthPrincipal principal = internalPrincipal(Set.of("TICKET_READ", CommentService.INTERNAL_READ));
         Comment publicComment = comment(1L, CommentVisibility.PUBLIC, "Public");
         Comment internalComment = comment(2L, CommentVisibility.INTERNAL, "Internal");
         when(ticket.getId()).thenReturn(42L);
-        when(ticketRepository.findByTicketKeyAndOrganizationId("TF-1000", 3L)).thenReturn(Optional.of(ticket));
+        when(ticketRepository.findByTicketKey("TF-1000")).thenReturn(Optional.of(ticket));
         when(commentRepository.findByTicketIdOrderByCreatedAtAsc(42L))
                 .thenReturn(List.of(publicComment, internalComment));
 
@@ -111,6 +111,10 @@ class CommentServiceTest {
 
     private AuthPrincipal principal(Set<String> permissions) {
         return new AuthPrincipal(7L, Responsibility.CLIENT, 3L, permissions);
+    }
+
+    private AuthPrincipal internalPrincipal(Set<String> permissions) {
+        return new AuthPrincipal(7L, Responsibility.TICKETFLOW1, null, permissions);
     }
 
     private Comment comment(Long id, CommentVisibility visibility, String body) {
