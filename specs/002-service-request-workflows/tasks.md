@@ -99,7 +99,7 @@ dependency; all tasks remain unchecked until implemented and verified.
 - [x] T064 Rehearse migration against a sanitized current-schema backup and document rollback/recovery.
 - [x] T065 Update README, presentation guide, technical deep dive, OpenAPI contracts, and demo script with the new model and workflows.
 - [x] T066 Seed a concise demo showing runtime field creation, automatic routing, relationship approval, client acceptance, and a subticket.
-- [ ] T067 Review logs/audit privacy, dependency/security checks, query indexes, pagination, and dynamic-field limits.
+- [x] T067 Review logs/audit privacy, dependency/security checks, query indexes, pagination, and dynamic-field limits.
 - [ ] T068 **Verify**: clean deploy, migrated deploy, and mentor acceptance walkthrough pass; mark the feature complete only after all required tasks are checked.
 
 ## Dependency order
