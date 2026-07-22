@@ -1,9 +1,11 @@
 # TicketFlow1
 
-TicketFlow1 is a multi-organization ticketing application for Change Requests,
-Tasks, and Defects. It includes configurable workflows and roles, comments,
-audit history, change-proposal approval, defect SLAs, dashboards, and a Next.js
-frontend.
+TicketFlow1 is a multi-organization ticketing application for service-request
+workflows. It supports legacy Change Requests, Tasks, and Defects, plus the
+new configurable workflow model for TASI, USR, DFCT, and REQ tickets. It
+includes runtime subtype forms, automatic routing to teams/developers,
+relationship-aware approvals, comments, attachments, audit history, defect
+SLAs, dashboards, and a Next.js frontend.
 
 ## Public demo on Render
 
@@ -60,6 +62,23 @@ The supported Spring profiles are:
 - `default`: production migrations only; no demo users or sample records.
 - `demo`: adds the isolated V8 demo migration with fixed local-only accounts.
 
+## Workflow model
+
+The current configurable workflow slice adds four service-request types:
+
+| Type | Who creates it | Main approval point |
+|---|---|---|
+| `TASI` | TicketFlow1/internal users | Team lead or configured approver approves implementation |
+| `USR` | TicketFlow1/internal users | Team lead or configured approver approves user changes |
+| `DFCT` | Client users | TicketFlow1 handles analysis/development/deployment and keeps defect SLA capability |
+| `REQ` | Client users | Client business owner or explicit delegate accepts before deployment |
+
+TASI and USR require a subtype such as `FIREWALL`, `NETWORK`, `APPLICATION`,
+`HARDWARE`, `NEW`, `MODIFY`, or `DELETE`. Admins can add/edit/deactivate
+subtypes, dynamic fields, options, routing rules, and type availability without
+adding physical ticket columns or editing source code. Existing legacy tickets
+remain readable on their original workflow after migration.
+
 ## Run with Docker and local frontend
 
 Start PostgreSQL and the backend:
@@ -115,6 +134,11 @@ The defaults use PostgreSQL port `5433`, API port `8081`, and frontend port
 Flyway owns the schema; Hibernate validates it and never creates tables.
 Production migrations are under `backend/src/main/resources/db/migration`.
 Demo V8 is under `db/demo-migration` and is added only by the `demo` profile.
+The service-request workflow migrations are additive: V16-V21 add subtype
+forms, routing, parent-ticket metadata, type activation/capability, and the
+TASI/USR/DFCT/REQ workflow seeds. The migration rehearsal and rollback plan are
+documented in
+[`specs/002-service-request-workflows/migration-strategy.md`](specs/002-service-request-workflows/migration-strategy.md).
 
 Do not edit an applied migration on a persistent environment. This project
 removed an early development-only credential from V1 during release hardening,
@@ -160,6 +184,10 @@ described in `docs/release-verification.md`.
 
 ## Additional documentation
 
+- [`docs/demo-script.md`](docs/demo-script.md) — presentation walkthrough for the service-request workflows
+- [`docs/presentation-guide.md`](docs/presentation-guide.md) — concise explanation for presenting the project
+- [`docs/technical-deep-dive.md`](docs/technical-deep-dive.md) — deeper architecture and code walkthrough
+- [`specs/002-service-request-workflows/contracts`](specs/002-service-request-workflows/contracts) — service workflow API contracts
 - [`specs/001-ticketing-mvp/tasks.md`](specs/001-ticketing-mvp/tasks.md) — task source of truth
 - [`specs/001-ticketing-mvp/quickstart.md`](specs/001-ticketing-mvp/quickstart.md) — validation flows
 - [`docs/database-er.md`](docs/database-er.md) — database model
