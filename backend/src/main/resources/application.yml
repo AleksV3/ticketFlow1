@@ -1,7 +1,7 @@
 server:
   # 8081, not the conventional 8080, to avoid clashing with another local
   # service already bound to 8080. Override with SERVER_PORT if needed.
-  port: ${SERVER_PORT:8081}
+  port: ${SERVER_PORT:${PORT:8081}}
 
 spring:
   application:
