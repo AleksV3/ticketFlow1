@@ -81,9 +81,9 @@ dependency; all tasks remain unchecked until implemented and verified.
 
 ## Phase 6: Administration and ticket UI
 
-- [ ] T052 Build subtype/field/option editor with ordering, activation, safe-delete feedback, and accessible controls.
-- [ ] T053 Build routing editor for team/developer/fallback/approver configuration and validation feedback.
-- [ ] T054 Extend organization workflow/type administration with internal types, active state, defaults, and unused-only deletion.
+- [x] T052 Build subtype/field/option editor with ordering, activation, safe-delete feedback, and accessible controls.
+- [x] T053 Build routing editor for team/developer/fallback/approver configuration and validation feedback.
+- [x] T054 Extend organization workflow/type administration with internal types, active state, defaults, and unused-only deletion.
 - [ ] T055 Build dynamic ticket creation form that reloads subtype definitions and clears stale hidden values safely.
 - [ ] T056 Build USR target-user autocomplete with loading, empty, selection, and authorization-safe error states.
 - [ ] T057 Add parent/subticket creation, hierarchy, progress, and navigation to ticket detail.
