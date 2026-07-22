@@ -87,9 +87,9 @@ dependency; all tasks remain unchecked until implemented and verified.
 - [x] T055 Build dynamic ticket creation form that reloads subtype definitions and clears stale hidden values safely.
 - [x] T056 Build USR target-user autocomplete with loading, empty, selection, and authorization-safe error states.
 - [x] T057 Add parent/subticket creation, hierarchy, progress, and navigation to ticket detail.
-- [ ] T058 Add approval panels driven by server-provided commands and resolved approver information.
-- [ ] T059 Add subtype and parent/child filters/metadata to ticket list and team boards.
-- [ ] T060 [P] Add frontend unit tests for dynamic rendering, subtype changes, stale-value clearing, user search, approval visibility, and hierarchy.
+- [x] T058 Add approval panels driven by server-provided commands and resolved approver information.
+- [x] T059 Add subtype and parent/child filters/metadata to ticket list and team boards.
+- [x] T060 [P] Add frontend unit tests for dynamic rendering, subtype changes, stale-value clearing, user search, approval visibility, and hierarchy.
 - [ ] T061 Add end-to-end flows for TASI routing/approval, USR MODIFY search, DFCT loop, REQ client acceptance, and subticket creation.
 - [ ] T062 **Verify**: keyboard, responsive, permission-role, and no-console-error review passes.
 

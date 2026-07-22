@@ -38,6 +38,7 @@ function Detail({ canEdit, canAssign, internal }: { canEdit: boolean; canAssign:
     {canAssign ? <details className="card"><summary className="cursor-pointer font-bold">Quickly assign ticket lead and developers</summary><div className="mt-4"><Edit ticket={ticket} canEdit={false} canAssign done={load}/></div></details> : null}
     <TicketCommunication ticketKey={ticketKey} internal={internal}/>
     <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_300px]"><ProcessMap ticket={ticket} history={history}/><section className="card py-4"><div className="mb-3"><p className="eyebrow">Next step</p><h2 className="text-sm font-bold">Available actions</h2></div><TransitionButtons allowedTransitions={ticket.allowedTransitions} onTransition={async status => { await post(`/tickets/${ticketKey}/transition`, { toStatus: status }); await load(); }}/></section></div>
+    <WorkflowDecisionPanel ticketKey={ticketKey} commands={ticket.workflowCommands ?? []} onDone={load}/>
     <ProposalActions ticketKey={ticketKey} proposal={ticket.latestProposal} commands={ticket.proposalCommands ?? []} onDone={load}/>
     <details className="card"><summary className="cursor-pointer font-bold">Status history and audit log</summary><div className="mt-5"><TicketHistory ticketKey={ticketKey}/></div></details>
   </div>;
@@ -67,7 +68,7 @@ function processLayout(ticket: TicketDetail) {
 
 function Row({ k, v }: { k: string; v: string }) { return <div><dt className="text-[10px] uppercase tracking-wider text-slate-500">{k}</dt><dd className="truncate text-sm font-medium" title={v}>{v}</dd></div>; }
 function TeamPanel({ ticket }: { ticket: TicketDetail }) { return <section className="card py-4"><div className="flex flex-wrap items-start justify-between gap-4"><div><p className="eyebrow">Assigned team</p><h2 className="mt-1 text-sm font-bold">Teams, lead and developers</h2></div><span className="badge bg-blue-900 text-blue-100">{ticket.developers?.length ?? 0} developer{ticket.developers?.length === 1 ? "" : "s"}</span></div><div className="mt-4 grid gap-4 md:grid-cols-3"><div><p className="text-[10px] uppercase tracking-wider text-slate-500">Developer teams</p><div className="mt-2 flex min-h-11 flex-wrap gap-2">{ticket.teams?.length?ticket.teams.map(team=><span className="badge bg-indigo-100 text-indigo-800" key={team.id}>{team.name}</span>):<span className="rounded-lg border border-dashed px-3 py-2 text-xs text-slate-500">No team assigned</span>}</div></div><div><p className="text-[10px] uppercase tracking-wider text-slate-500">Team lead</p><div className="mt-2 rounded-lg border border-blue-500/30 bg-blue-950/20 p-3 text-sm font-semibold">{ticket.ticketLead?.displayName ?? "Not assigned"}</div></div><div><p className="text-[10px] uppercase tracking-wider text-slate-500">Developers</p><div className="mt-2 flex min-h-11 flex-wrap gap-2">{ticket.developers?.length ? ticket.developers.map(person => <span className="badge bg-slate-100 text-slate-700" key={person.id}>{person.displayName}</span>) : <span className="rounded-lg border border-dashed px-3 py-2 text-xs text-slate-500">No developers assigned</span>}</div></div></div></section>; }
-function TicketContext({ ticket }: { ticket: TicketDetail }) {
+export function TicketContext({ ticket }: { ticket: TicketDetail }) {
   const dynamicEntries = Object.entries(ticket.dynamicValues ?? {});
   return <section className="card py-4">
     <div className="flex flex-wrap items-start justify-between gap-3">
@@ -88,6 +89,43 @@ function formatDynamic(value: unknown) {
   if (typeof value === "boolean") return value ? "Yes" : "No";
   if (value == null || value === "") return "Not supplied";
   return String(value);
+}
+export function WorkflowDecisionPanel({ ticketKey, commands, onDone }: { ticketKey: string; commands: string[]; onDone: () => Promise<void> }) {
+  const [reason, setReason] = useState("");
+  const [busy, setBusy] = useState("");
+  const [error, setError] = useState("");
+  if (!commands.length) return null;
+  async function run(command: string) {
+    const needsReason = command === "WORKFLOW_REJECT" || command === "CLIENT_REJECT" || command === "CORRECTION_RETURN";
+    if (needsReason && !reason.trim()) { setError("A reason is required for this decision."); return; }
+    setBusy(command); setError("");
+    const path = command === "WORKFLOW_APPROVE" ? "workflow-approve" : command === "WORKFLOW_REJECT" ? "workflow-reject" : command === "CLIENT_ACCEPT" ? "client-accept" : command === "CLIENT_REJECT" ? "client-reject" : "correction-return";
+    try {
+      await post(`/tickets/${ticketKey}/${path}`, reason.trim() ? { reason } : {});
+      setReason("");
+      await onDone();
+    } catch (error) {
+      setError(error instanceof Error ? error.message : "Could not apply workflow decision.");
+    } finally {
+      setBusy("");
+    }
+  }
+  return <section className="card py-4">
+    <div className="mb-3"><p className="eyebrow">Approval decision</p><h2 className="text-sm font-bold">Protected workflow actions</h2></div>
+    <label className="block">Reason or note<textarea className="field mt-1 min-h-24" value={reason} maxLength={10000} onChange={event => setReason(event.target.value)} /></label>
+    <div className="mt-3 flex flex-wrap gap-2">
+      {commands.map(command => <button type="button" className={command.includes("REJECT") || command === "CORRECTION_RETURN" ? "btn-secondary text-red-300" : "btn-primary"} disabled={!!busy} onClick={() => void run(command)} key={command}>{busy === command ? "Saving..." : decisionLabel(command)}</button>)}
+    </div>
+    {error ? <p className="mt-3 text-sm text-red-400" role="alert">{error}</p> : null}
+  </section>;
+}
+function decisionLabel(command: string) {
+  if (command === "WORKFLOW_APPROVE") return "Approve";
+  if (command === "WORKFLOW_REJECT") return "Reject";
+  if (command === "CLIENT_ACCEPT") return "Accept";
+  if (command === "CLIENT_REJECT") return "Reject to development";
+  if (command === "CORRECTION_RETURN") return "Return for correction";
+  return command.replaceAll("_", " ");
 }
 type Person={id:number;name:string};
 type TeamOption={id:number;name:string};

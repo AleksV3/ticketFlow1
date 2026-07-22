@@ -37,6 +37,7 @@ public record TicketDetailResponse(
         SlaRef sla,
         ProcessMap processMap,
         List<String> allowedTransitions,
+        List<String> workflowCommands,
         ChangeProposalResponse latestProposal,
         List<String> proposalCommands,
         String subtype,
@@ -50,7 +51,8 @@ public record TicketDetailResponse(
         Map<String,Object> dynamicValues) {
 
     public static TicketDetailResponse from(Ticket ticket, List<String> allowedTransitions, ProposalDetail proposal,
-            SlaStatus slaStatus, Map<String,Object> dynamicValues, List<Ticket> childTickets) {
+            SlaStatus slaStatus, Map<String,Object> dynamicValues, List<Ticket> childTickets,
+            List<String> workflowCommands) {
         return new TicketDetailResponse(
                 ticket.getId(),
                 ticket.getTicketKey(),
@@ -75,6 +77,7 @@ public record TicketDetailResponse(
                 ticket.getTicketType().getCapability() == com.ticketflow1.ticketing.workflow.TicketTypeCapability.DEFECT_SLA ? SlaRef.from(ticket, slaStatus) : null,
                 ProcessMap.from(ticket),
                 allowedTransitions,
+                workflowCommands,
                 proposal == null ? null : proposal.latestProposal(),
                 proposal == null ? List.of() : proposal.permittedCommands(),
                 ticket.getSubtype() == null ? null : ticket.getSubtype().getKey(),
@@ -87,7 +90,7 @@ public record TicketDetailResponse(
     }
     public static TicketDetailResponse from(Ticket ticket, List<String> allowedTransitions, ProposalDetail proposal,
             SlaStatus slaStatus, Map<String,Object> dynamicValues) {
-        return from(ticket, allowedTransitions, proposal, slaStatus, dynamicValues, List.of());
+        return from(ticket, allowedTransitions, proposal, slaStatus, dynamicValues, List.of(), List.of());
     }
     public static TicketDetailResponse from(Ticket ticket, List<String> allowedTransitions, ProposalDetail proposal,
             SlaStatus slaStatus) {

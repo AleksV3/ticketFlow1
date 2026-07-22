@@ -50,6 +50,7 @@ public class TicketController {
     @PreAuthorize("hasAuthority('TICKET_READ')")
     public PagedResponse<TicketSummaryResponse> list(
             @RequestParam(required = false) String type,
+            @RequestParam(required = false) String subtype,
             @RequestParam(required = false) String status,
             @RequestParam(required = false) String lifecycle,
             @RequestParam(required = false) Severity severity,
@@ -58,12 +59,13 @@ public class TicketController {
             @RequestParam(required = false) Responsibility responsibility,
             @RequestParam(required = false) String slaStatus,
             @RequestParam(required = false) Long organizationId,
+            @RequestParam(required = false) String parentTicketKey,
             @RequestParam(required = false) String q,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int pageSize,
             @AuthenticationPrincipal AuthPrincipal principal) {
-        return ticketService.listTickets(type, status, lifecycle, severity, priority, assignedTo, responsibility,
-                slaStatus, organizationId, q, page, pageSize, principal);
+        return ticketService.listTickets(type, subtype, status, lifecycle, severity, priority, assignedTo, responsibility,
+                slaStatus, organizationId, parentTicketKey, q, page, pageSize, principal);
     }
 
     /**

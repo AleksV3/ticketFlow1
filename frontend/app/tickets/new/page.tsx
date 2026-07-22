@@ -220,7 +220,7 @@ function Select({label,value,set,options}:{label:string;value:string;set:(value:
   return <label className="block"><span>{label}</span><select className="field mt-1" required value={value} onChange={event => set(event.target.value)}><option value="">Select...</option>{options.map(([optionValue,label]) => <option value={optionValue} key={optionValue}>{label}</option>)}</select></label>;
 }
 
-function compactValues(values: Record<string, unknown>, fields: FieldDef[]) {
+export function compactValues(values: Record<string, unknown>, fields: Pick<FieldDef, "key">[]) {
   const allowed = new Set(fields.map(field => field.key));
   return Object.fromEntries(Object.entries(values).filter(([key, value]) => allowed.has(key) && value !== "" && value !== null && value !== undefined && (!Array.isArray(value) || value.length)));
 }

@@ -445,9 +445,9 @@ public class TicketService {
      * Lists tickets using the active tenant scope and optional search filters.
      */
     @Transactional(readOnly = true)
-    public PagedResponse<TicketSummaryResponse> listTickets(String type, String status, String lifecycle, Severity severity,
+    public PagedResponse<TicketSummaryResponse> listTickets(String type, String subtype, String status, String lifecycle, Severity severity,
             Priority priority, String assignedTo, Responsibility responsibility, String slaStatus,
-            Long organizationId, String q, int page, int pageSize, AuthPrincipal principal) {
+            Long organizationId, String parentTicketKey, String q, int page, int pageSize, AuthPrincipal principal) {
         SlaStatus requestedSlaStatus = parseSlaStatus(slaStatus);
 
         int size = pageSize <= 0 ? DEFAULT_PAGE_SIZE : Math.min(pageSize, MAX_PAGE_SIZE);
@@ -464,6 +464,12 @@ public class TicketService {
         }
         if (type != null && !type.isBlank()) {
             spec = spec.and((root, query, cb) -> cb.equal(root.get("ticketType").get("key"), type));
+        }
+        if (subtype != null && !subtype.isBlank()) {
+            spec = spec.and((root, query, cb) -> cb.equal(root.get("subtype").get("key"), subtype));
+        }
+        if (parentTicketKey != null && !parentTicketKey.isBlank()) {
+            spec = spec.and((root, query, cb) -> cb.equal(root.get("parentTicket").get("ticketKey"), parentTicketKey.trim()));
         }
         if (status != null && !status.isBlank()) {
             spec = spec.and((root, query, cb) -> cb.equal(root.get("currentState").get("key"), status));
@@ -534,7 +540,8 @@ public class TicketService {
     private TicketDetailResponse detail(Ticket ticket, AuthPrincipal principal) {
         return TicketDetailResponse.from(ticket, ticketTransitionService.allowedTransitions(ticket, principal),
                 proposalDetailService.detail(ticket, principal), slaStatusService.status(ticket), dynamicValues(ticket, principal),
-                ticketRepository.findByParentTicketIdOrderByCreatedAtAsc(ticket.getId()));
+                ticketRepository.findByParentTicketIdOrderByCreatedAtAsc(ticket.getId()),
+                ticketTransitionService.workflowCommands(ticket, principal));
     }
 
     private Map<String,Object> dynamicValues(Ticket ticket, AuthPrincipal principal) {

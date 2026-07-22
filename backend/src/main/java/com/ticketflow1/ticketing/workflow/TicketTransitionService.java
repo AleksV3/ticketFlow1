@@ -191,6 +191,18 @@ public class TicketTransitionService {
                 .toList();
     }
 
+    @Transactional(readOnly = true)
+    public List<String> workflowCommands(Ticket ticket, AuthPrincipal principal) {
+        Long workflowId = ticket.getTicketType().getWorkflow().getId();
+        Long fromStateId = ticket.getCurrentState().getId();
+        return workflowTransitionRepository.findByWorkflowIdAndFromStateId(workflowId, fromStateId).stream()
+                .filter(transition -> transition.getOperationKind() != TransitionOperationKind.STANDARD)
+                .filter(transition -> isAllowed(ticket, transition, principal))
+                .map(transition -> transition.getOperationKind().name())
+                .distinct()
+                .toList();
+    }
+
     private boolean isAllowed(Ticket ticket, WorkflowTransition transition, AuthPrincipal principal) {
         if (!principal.hasPermission(transition.getRequiredPermission().getKey())) {
             return false;
