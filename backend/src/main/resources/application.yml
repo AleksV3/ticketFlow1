@@ -11,9 +11,9 @@ spring:
   # .env exported. Cloud Run can provide DATABASE_URL plus DATABASE_USERNAME /
   # DATABASE_PASSWORD; TicketingApplication converts those before Spring starts.
   datasource:
-    url: jdbc:postgresql://${POSTGRES_HOST:localhost}:${POSTGRES_PORT:5433}/${POSTGRES_DB:ticketflow1_ticketing}
-    username: ${POSTGRES_USER:ticketflow1}
-    password: ${POSTGRES_PASSWORD:ticketflow1}
+    url: ${DATABASE_URL:jdbc:postgresql://${POSTGRES_HOST:localhost}:${POSTGRES_PORT:5433}/${POSTGRES_DB:ticketflow1_ticketing}}
+    username: ${DATABASE_USERNAME:${POSTGRES_USER:ticketflow1}}
+    password: ${DATABASE_PASSWORD:${POSTGRES_PASSWORD:ticketflow1}}
 
   jpa:
     # Schema truth lives in Flyway. Hibernate only validates that entities match
