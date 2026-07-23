@@ -40,6 +40,15 @@ app:
   security:
     # HTTPS deployments keep this enabled. Plain-HTTP local development opts out.
     secure-cookies: ${COOKIE_SECURE:false}
+  dev-logging:
+    enabled: ${APP_DEV_LOGGING_ENABLED:true}
+    slow-request-ms: ${APP_DEV_LOGGING_SLOW_REQUEST_MS:1000}
+
+logging:
+  pattern:
+    console: "%d{yyyy-MM-dd'T'HH:mm:ss.SSSXXX} %-5level [%thread] [%X{requestId:-no-request}] %logger{36} - %msg%n"
+  level:
+    com.ticketflow1.ticketing: ${APP_LOG_LEVEL:INFO}
 
 springdoc:
   swagger-ui:

@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import type { ReactNode } from "react";
+import { DevLogPanel } from "@/components/DevLogPanel";
 import "@xyflow/react/dist/style.css";
 import "./globals.css";
 
@@ -15,7 +16,7 @@ type RootLayoutProps = Readonly<{
 export default function RootLayout({ children }: RootLayoutProps) {
   return (
     <html lang="en">
-      <body>{children}</body>
+      <body>{children}<DevLogPanel /></body>
     </html>
   );
 }

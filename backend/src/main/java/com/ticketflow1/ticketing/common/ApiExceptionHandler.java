@@ -33,6 +33,8 @@ public class ApiExceptionHandler {
 
     @ExceptionHandler(ApiException.class)
     public ResponseEntity<ApiError> handleApiException(ApiException ex, HttpServletRequest request) {
+        log.warn("api_exception method={} path={} status={} code={} message={}",
+                request.getMethod(), request.getRequestURI(), ex.getStatus().value(), ex.getErrorCode(), ex.getMessage());
         return ResponseEntity
                 .status(ex.getStatus())
                 .body(ApiError.of(ex.getStatus().value(), ex.getErrorCode(), ex.getMessage(),
@@ -45,6 +47,8 @@ public class ApiExceptionHandler {
         List<ApiError.FieldError> fieldErrors = ex.getBindingResult().getFieldErrors().stream()
                 .map(fe -> new ApiError.FieldError(fe.getField(), fe.getDefaultMessage()))
                 .toList();
+        log.warn("api_validation_failed method={} path={} fields={}",
+                request.getMethod(), request.getRequestURI(), fieldErrors);
         return ResponseEntity.badRequest().body(ApiError.of(
                 HttpStatus.BAD_REQUEST.value(), "VALIDATION_FAILED",
                 "Request body failed validation.", request.getRequestURI(), fieldErrors));
@@ -67,6 +71,8 @@ public class ApiExceptionHandler {
     @ExceptionHandler(AuthorizationDeniedException.class)
     public ResponseEntity<ApiError> handleAuthorizationDenied(AuthorizationDeniedException ex,
             HttpServletRequest request) {
+        log.warn("api_forbidden method={} path={} message={}",
+                request.getMethod(), request.getRequestURI(), ex.getMessage());
         return ResponseEntity.status(HttpStatus.FORBIDDEN).body(ApiError.of(
                 HttpStatus.FORBIDDEN.value(), "FORBIDDEN",
                 "You do not have permission to perform this action.", request.getRequestURI()));

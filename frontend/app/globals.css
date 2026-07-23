@@ -162,6 +162,23 @@ tbody tr:hover { background: rgb(0 84 166 / 10%); }
 .graph-connection-editor { display: flex; width: 100%; flex-wrap: wrap; align-items: end; gap: 1rem; border: 2px solid var(--accent-blue); border-radius: .85rem; padding: 1.25rem; background: rgb(0 84 166 / 20%); box-shadow: 0 0 24px rgb(0 130 255 / 16%); }
 .graph-connection-editor label { min-width: 220px; }
 .confirm-action { display: flex; margin-top: .75rem; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: .75rem; border: 1px solid rgb(250 204 21 / 45%); border-radius: .65rem; padding: .75rem; background: rgb(250 204 21 / 8%); }
+
+.dev-log-panel { position: fixed; right: 1rem; bottom: 1rem; z-index: 80; color: var(--off-white); }
+.dev-log-toggle { display: flex; align-items: center; gap: .4rem; border: 1px solid rgb(250 204 21 / 55%); border-radius: 999px; padding: .55rem .8rem; background: rgb(11 19 37 / 92%); color: rgb(254 240 138); font-size: .75rem; font-weight: 800; box-shadow: 0 12px 30px rgb(0 0 0 / 36%); }
+.dev-log-toggle span { display: grid; min-width: 1.25rem; height: 1.25rem; place-items: center; border-radius: 999px; background: rgb(220 38 38); color: white; font-size: .68rem; }
+.dev-log-drawer { position: absolute; right: 0; bottom: 3rem; width: min(92vw, 560px); max-height: min(78vh, 720px); overflow: hidden; border: 1px solid rgb(250 204 21 / 35%); border-radius: 1rem; background: rgb(7 13 27 / 96%); box-shadow: 0 20px 55px rgb(0 0 0 / 48%); }
+.dev-log-drawer header { display: flex; align-items: center; justify-content: space-between; gap: 1rem; border-bottom: 1px solid var(--line); padding: 1rem; }
+.dev-log-drawer h2 { font-size: .95rem; font-weight: 800; }
+.dev-log-list { max-height: calc(min(78vh, 720px) - 88px); overflow: auto; padding: .75rem; }
+.dev-log-entry { border: 1px solid var(--line); border-left-width: 4px; border-radius: .7rem; padding: .7rem; background: rgb(15 23 42 / 80%); font-size: .75rem; }
+.dev-log-entry + .dev-log-entry { margin-top: .6rem; }
+.dev-log-error { border-left-color: rgb(248 113 113); }
+.dev-log-warn { border-left-color: rgb(250 204 21); }
+.dev-log-info { border-left-color: rgb(91 179 255); }
+.dev-log-line { display: flex; flex-wrap: wrap; align-items: center; gap: .5rem; color: rgb(181 204 234); font-size: .68rem; text-transform: uppercase; letter-spacing: .04em; }
+.dev-log-line time { margin-left: auto; text-transform: none; letter-spacing: 0; }
+.dev-log-entry p { margin-top: .35rem; font-weight: 700; }
+.dev-log-entry pre { margin-top: .5rem; max-height: 220px; overflow: auto; white-space: pre-wrap; border-radius: .45rem; background: rgb(2 6 23 / 70%); padding: .6rem; color: rgb(203 213 225); font-size: .68rem; }
 .confirm-action p { margin-top: .15rem; color: var(--muted); font-size: .75rem; }
 .ticket-view-map { height: 300px; min-height: 300px; }
 .ticket-view-map .react-flow__node { width: 150px; padding: .55rem; font-size: .65rem; }
