@@ -66,7 +66,7 @@ public class JwtService {
         return ResponseCookie.from(AUTH_COOKIE_NAME, token)
                 .httpOnly(true)
                 .secure(secureCookies)
-                .sameSite("Lax")
+                .sameSite(sameSite())
                 .path("/")
                 .maxAge(expiration)
                 .build();
@@ -76,10 +76,18 @@ public class JwtService {
         return ResponseCookie.from(AUTH_COOKIE_NAME, "")
                 .httpOnly(true)
                 .secure(secureCookies)
-                .sameSite("Lax")
+                .sameSite(sameSite())
                 .path("/")
                 .maxAge(Duration.ZERO)
                 .build();
+    }
+
+    private String sameSite() {
+        // Local development uses same-site localhost requests and can stay Lax.
+        // Public deployments serve the frontend and backend from different
+        // HTTPS domains, so browsers require SameSite=None for the auth cookie
+        // to be stored and sent on cross-site fetch requests.
+        return secureCookies ? "None" : "Lax";
     }
 
     /** Parses and verifies the signature/expiry. Throws JwtException if invalid. */
