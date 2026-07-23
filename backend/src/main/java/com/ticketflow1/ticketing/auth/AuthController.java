@@ -1,6 +1,7 @@
 package com.ticketflow1.ticketing.auth;
 
 import com.ticketflow1.ticketing.auth.dto.CurrentUserResponse;
+import com.ticketflow1.ticketing.auth.dto.CsrfTokenResponse;
 import com.ticketflow1.ticketing.auth.dto.LoginRequest;
 import com.ticketflow1.ticketing.auth.dto.LoginResponse;
 import jakarta.validation.Valid;
@@ -37,6 +38,11 @@ public class AuthController {
         return ResponseEntity.noContent()
                 .header(HttpHeaders.SET_COOKIE, authService.clearLoginCookie().toString())
                 .build();
+    }
+
+    @GetMapping("/auth/csrf")
+    public CsrfTokenResponse csrf(CsrfToken csrfToken) {
+        return new CsrfTokenResponse(csrfToken.getHeaderName(), csrfToken.getToken());
     }
 
     @GetMapping("/users/me")

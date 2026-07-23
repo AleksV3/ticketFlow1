@@ -20,10 +20,14 @@ export class ApiError extends Error {
   }
 }
 
-function cookie(name: string): string | undefined {
-  if (typeof document === "undefined") return undefined;
-  return document.cookie.split(";").map(value => value.trim())
-    .find(value => value.startsWith(`${name}=`))?.slice(name.length + 1);
+async function getCsrfToken(): Promise<string | undefined> {
+  const response = await fetch(`${API_BASE}/auth/csrf`, {
+    credentials: "include",
+    cache: "no-store"
+  });
+  if (!response.ok) return undefined;
+  const body = await response.json() as { token?: string };
+  return body.token;
 }
 
 export async function api<T>(path: string, init: RequestInit = {}): Promise<T> {
@@ -35,7 +39,7 @@ export async function api<T>(path: string, init: RequestInit = {}): Promise<T> {
     const headers = new Headers(init.headers);
     if (init.body && !(init.body instanceof FormData) && !headers.has("Content-Type")) headers.set("Content-Type", "application/json");
     if (mutating) {
-      const token = cookie("XSRF-TOKEN");
+      const token = await getCsrfToken();
       if (token) headers.set("X-XSRF-TOKEN", decodeURIComponent(token));
     }
     let response: Response;
@@ -62,7 +66,6 @@ export async function api<T>(path: string, init: RequestInit = {}): Promise<T> {
       // A CSRF denial happens in Spring Security before the controller runs,
       // so retrying once cannot duplicate a completed business operation.
       if (mutating && !retriedAfterCsrfFailure && response.status === 403 && body.error === "CSRF_INVALID") {
-        await fetch(`${API_BASE}/users/me`, { credentials: "include", cache: "no-store" });
         recordDevLog("warn", "api", `${method} ${path} CSRF retry`, { status: response.status, requestId, durationMs: elapsed(started) });
         return send(true);
       }

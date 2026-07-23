@@ -27,6 +27,7 @@ class SecurityConfig {
 
     private static final String[] PUBLIC_PATHS = {
         "/api/health",
+        "/api/auth/csrf",
         "/api/auth/login",
         "/api/auth/logout",
         "/swagger-ui.html",
@@ -38,14 +39,17 @@ class SecurityConfig {
     private final RestAuthenticationEntryPoint authenticationEntryPoint;
     private final RestAccessDeniedHandler accessDeniedHandler;
     private final List<String> allowedOrigins;
+    private final boolean secureCookies;
 
     SecurityConfig(JwtAuthFilter jwtAuthFilter,
             RestAuthenticationEntryPoint authenticationEntryPoint,
             RestAccessDeniedHandler accessDeniedHandler,
-            @Value("${app.cors.allowed-origins}") String allowedOrigins) {
+            @Value("${app.cors.allowed-origins}") String allowedOrigins,
+            @Value("${app.security.secure-cookies}") boolean secureCookies) {
         this.jwtAuthFilter = jwtAuthFilter;
         this.authenticationEntryPoint = authenticationEntryPoint;
         this.accessDeniedHandler = accessDeniedHandler;
+        this.secureCookies = secureCookies;
         this.allowedOrigins = Arrays.stream(allowedOrigins.split(","))
                 .map(String::trim).filter(value -> !value.isBlank()).toList();
     }
@@ -54,7 +58,7 @@ class SecurityConfig {
     SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         http
             .csrf(csrf -> csrf
-                .csrfTokenRepository(CookieCsrfTokenRepository.withHttpOnlyFalse())
+                .csrfTokenRepository(csrfTokenRepository())
                 // The browser sends the raw XSRF-TOKEN cookie value in the
                 // X-XSRF-TOKEN header. Spring Security's default XOR handler
                 // expects a masked request value and rejects that standard SPA
@@ -78,6 +82,15 @@ class SecurityConfig {
             // SecurityContext is populated before authorization is checked.
             .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class);
         return http.build();
+    }
+
+    private CookieCsrfTokenRepository csrfTokenRepository() {
+        CookieCsrfTokenRepository repository = CookieCsrfTokenRepository.withHttpOnlyFalse();
+        repository.setCookieCustomizer(cookie -> cookie
+                .path("/")
+                .secure(secureCookies)
+                .sameSite(secureCookies ? "None" : "Lax"));
+        return repository;
     }
 
     @Bean
