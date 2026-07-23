@@ -11,5 +11,5 @@ RUN addgroup -S ticketflow && adduser -S ticketflow -G ticketflow
 WORKDIR /app
 COPY --from=build /workspace/target/ticketing-*.jar app.jar
 USER ticketflow
-EXPOSE 8081
+EXPOSE 8080
 ENTRYPOINT ["java", "-jar", "/app/app.jar"]

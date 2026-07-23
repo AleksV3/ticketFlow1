@@ -21,6 +21,11 @@ public class TicketingApplication {
 			return;
 		}
 		try {
+			applyExplicitDatabaseCredentials();
+			if (databaseUrl.startsWith("jdbc:postgresql://")) {
+				System.setProperty("spring.datasource.url", databaseUrl);
+				return;
+			}
 			URI uri = URI.create(databaseUrl);
 			String scheme = uri.getScheme();
 			if (!"postgres".equalsIgnoreCase(scheme) && !"postgresql".equalsIgnoreCase(scheme)) {
@@ -29,10 +34,10 @@ public class TicketingApplication {
 			String userInfo = uri.getRawUserInfo();
 			if (userInfo != null) {
 				String[] parts = userInfo.split(":", 2);
-				if (parts.length > 0 && !hasEnv("SPRING_DATASOURCE_USERNAME") && !hasEnv("POSTGRES_USER")) {
+				if (parts.length > 0 && !hasDatasourceUsername()) {
 					System.setProperty("spring.datasource.username", decode(parts[0]));
 				}
-				if (parts.length > 1 && !hasEnv("SPRING_DATASOURCE_PASSWORD") && !hasEnv("POSTGRES_PASSWORD")) {
+				if (parts.length > 1 && !hasDatasourcePassword()) {
 					System.setProperty("spring.datasource.password", decode(parts[1]));
 				}
 			}
@@ -62,6 +67,25 @@ public class TicketingApplication {
 	private static boolean hasEnv(String key) {
 		String value = System.getenv(key);
 		return value != null && !value.isBlank();
+	}
+
+	private static boolean hasDatasourceUsername() {
+		return hasEnv("SPRING_DATASOURCE_USERNAME") || hasEnv("POSTGRES_USER")
+				|| System.getProperty("spring.datasource.username") != null;
+	}
+
+	private static boolean hasDatasourcePassword() {
+		return hasEnv("SPRING_DATASOURCE_PASSWORD") || hasEnv("POSTGRES_PASSWORD")
+				|| System.getProperty("spring.datasource.password") != null;
+	}
+
+	private static void applyExplicitDatabaseCredentials() {
+		if (hasEnv("DATABASE_USERNAME") && !hasDatasourceUsername()) {
+			System.setProperty("spring.datasource.username", System.getenv("DATABASE_USERNAME"));
+		}
+		if (hasEnv("DATABASE_PASSWORD") && !hasDatasourcePassword()) {
+			System.setProperty("spring.datasource.password", System.getenv("DATABASE_PASSWORD"));
+		}
 	}
 
 	private static String decode(String value) {

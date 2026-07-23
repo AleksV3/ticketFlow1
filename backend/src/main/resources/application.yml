@@ -1,6 +1,6 @@
 server:
-  # 8081, not the conventional 8080, to avoid clashing with another local
-  # service already bound to 8080. Override with SERVER_PORT if needed.
+  # Cloud Run provides PORT=8080. Local development still defaults to 8081 to
+  # avoid clashing with another service already bound to 8080.
   port: ${SERVER_PORT:${PORT:8081}}
 
 spring:
@@ -8,7 +8,8 @@ spring:
     name: ticketing
 
   # Defaults match docker-compose.yml, so `./mvnw spring-boot:run` works with no
-  # .env exported. Override via env vars (POSTGRES_*, JWT_SECRET) in real setups.
+  # .env exported. Cloud Run can provide DATABASE_URL plus DATABASE_USERNAME /
+  # DATABASE_PASSWORD; TicketingApplication converts those before Spring starts.
   datasource:
     url: jdbc:postgresql://${POSTGRES_HOST:localhost}:${POSTGRES_PORT:5433}/${POSTGRES_DB:ticketflow1_ticketing}
     username: ${POSTGRES_USER:ticketflow1}
