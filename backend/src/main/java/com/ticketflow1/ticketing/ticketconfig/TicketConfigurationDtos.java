@@ -16,6 +16,7 @@ public final class TicketConfigurationDtos {
     public record PutRouting(Long organizationId,Long teamId,Long primaryDeveloperId,Long fallbackDeveloperId,
             Long approverId,boolean active,Long version) {}
     public record Reorder(List<Long> ids) {}
+    public record FieldGrants(List<Long> viewRoleIds,List<Long> editRoleIds,List<Long> createRoleIds) {}
     public record SubtypeResponse(Long id,Long ticketTypeId,String key,String name,String description,boolean active,int sortOrder,long version){
         public static SubtypeResponse from(TicketSubtype s){return new SubtypeResponse(s.getId(),s.getTicketType().getId(),s.getKey(),s.getName(),s.getDescription(),s.isActive(),s.getSortOrder(),s.getVersion());}}
     public record FieldResponse(Long id,Long subtypeId,String key,String label,String helpText,FieldKind fieldKind,

@@ -82,6 +82,7 @@ public class TicketService {
     private final SubtypeFieldOptionRepository fieldOptionRepository;
     private final TicketFieldValueRepository fieldValueRepository;
     private final DynamicFieldValidator dynamicFieldValidator;
+    private final com.ticketflow1.ticketing.ticketconfig.FieldAuthorizationService fieldAuthorization;
 
     public TicketService(TicketRepository ticketRepository,
             TicketTypeRepository ticketTypeRepository,
@@ -98,7 +99,8 @@ public class TicketService {
             Clock clock, DeveloperTeamRepository developerTeamRepository,
             TicketSubtypeRepository subtypeRepository, SubtypeRoutingRuleRepository routingRuleRepository,
             SubtypeFieldDefinitionRepository fieldDefinitionRepository, SubtypeFieldOptionRepository fieldOptionRepository,
-            TicketFieldValueRepository fieldValueRepository, DynamicFieldValidator dynamicFieldValidator) {
+            TicketFieldValueRepository fieldValueRepository, DynamicFieldValidator dynamicFieldValidator,
+            com.ticketflow1.ticketing.ticketconfig.FieldAuthorizationService fieldAuthorization) {
         this.ticketRepository = ticketRepository;
         this.ticketTypeRepository = ticketTypeRepository;
         this.workflowStateRepository = workflowStateRepository;
@@ -114,7 +116,16 @@ public class TicketService {
         this.clock = clock;
         this.developerTeamRepository = developerTeamRepository;
         this.subtypeRepository=subtypeRepository;this.routingRuleRepository=routingRuleRepository;this.fieldDefinitionRepository=fieldDefinitionRepository;
-        this.fieldOptionRepository=fieldOptionRepository;this.fieldValueRepository=fieldValueRepository;this.dynamicFieldValidator=dynamicFieldValidator;
+        this.fieldOptionRepository=fieldOptionRepository;this.fieldValueRepository=fieldValueRepository;this.dynamicFieldValidator=dynamicFieldValidator;this.fieldAuthorization=fieldAuthorization;
+    }
+
+    public TicketService(TicketRepository a, TicketTypeRepository b, WorkflowStateRepository c, AppUserRepository d,
+            OrganizationRepository e, TicketKeyGenerator f, AuditService g, StatusHistoryService h,
+            TicketTransitionService i, ProposalDetailService j, SlaCalculator k, SlaStatusService l, Clock m,
+            DeveloperTeamRepository n, TicketSubtypeRepository o, SubtypeRoutingRuleRepository p,
+            SubtypeFieldDefinitionRepository q, SubtypeFieldOptionRepository r, TicketFieldValueRepository s,
+            DynamicFieldValidator t) {
+        this(a,b,c,d,e,f,g,h,i,j,k,l,m,n,o,p,q,r,s,t,null);
     }
 
     /**
@@ -365,12 +376,12 @@ public class TicketService {
         List<SubtypeFieldDefinition> activeFields = fieldDefinitionRepository.findBySubtypeIdAndActiveTrueOrderBySortOrderAscIdAsc(subtype.getId());
         for (String key : supplied.keySet()) {
             Optional<SubtypeFieldDefinition> field = activeFields.stream().filter(item -> item.getKey().equals(key)).findFirst();
-            if (field.isEmpty() || principal.party() != Responsibility.TICKETFLOW1 && field.get().getVisibility() == FieldVisibility.INTERNAL) {
+            if (field.isEmpty() || !fieldAuthorization.allowed(field.get(), principal, com.ticketflow1.ticketing.ticketconfig.FieldGrantOperation.CREATE)) {
                 throw ApiException.validation("Unknown dynamic field: " + key);
             }
         }
         for (SubtypeFieldDefinition field : activeFields) {
-            if (principal.party() != Responsibility.TICKETFLOW1 && field.getVisibility() == FieldVisibility.INTERNAL) continue;
+            if (!fieldAuthorization.allowed(field, principal, com.ticketflow1.ticketing.ticketconfig.FieldGrantOperation.CREATE)) continue;
             dynamicFieldValidator.validate(field, supplied.get(field.getKey()),
                     fieldOptionRepository.findByFieldDefinitionIdAndActiveTrueOrderBySortOrderAscIdAsc(field.getId()));
         }
@@ -555,7 +566,7 @@ public class TicketService {
     private Map<String,Object> dynamicValues(Ticket ticket, AuthPrincipal principal) {
         Map<String,Object> values = new java.util.LinkedHashMap<>();
         for (TicketFieldValue value : fieldValueRepository.findByTicketId(ticket.getId())) {
-            if (principal.party() != Responsibility.TICKETFLOW1 && value.getFieldDefinition().getVisibility() != FieldVisibility.PUBLIC) continue;
+            if (!fieldAuthorization.allowed(value.getFieldDefinition(), principal, com.ticketflow1.ticketing.ticketconfig.FieldGrantOperation.VIEW)) continue;
             Object raw = value.getTextValue()!=null ? value.getTextValue() : value.getNumberValue()!=null ? value.getNumberValue() : value.getDateValue()!=null ? value.getDateValue().toString() : value.getBooleanValue()!=null ? value.getBooleanValue() : value.getSelectedOption()!=null ? value.getSelectedOption().getKey() : value.getUserValue()!=null ? value.getUserValue().getId() : value.getTeamValue()!=null ? value.getTeamValue().getId() : value.getSelectedOptions().stream().map(SubtypeFieldOption::getKey).toList();
             values.put(value.getFieldDefinition().getKey(), raw);
         }

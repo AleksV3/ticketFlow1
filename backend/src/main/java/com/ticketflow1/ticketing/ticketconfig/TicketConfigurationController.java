@@ -11,7 +11,10 @@ import org.springframework.web.bind.annotation.*;
 @RestController @RequestMapping("/api/admin") @PreAuthorize("hasAuthority('TYPE_MANAGE')")
 public class TicketConfigurationController {
     private final TicketConfigurationService service;
-    public TicketConfigurationController(TicketConfigurationService service){this.service=service;}
+    private final FieldGrantAdminService grantService;
+    public TicketConfigurationController(TicketConfigurationService service,FieldGrantAdminService grantService){this.service=service;this.grantService=grantService;}
+    @GetMapping("/fields/{id}/grants") public java.util.Map<String,java.util.List<Long>> grants(@PathVariable Long id){return grantService.get(id);}
+    @PutMapping("/fields/{id}/grants") public java.util.Map<String,java.util.List<Long>> replaceGrants(@AuthenticationPrincipal AuthPrincipal p,@PathVariable Long id,@RequestBody FieldGrants r){grantService.replace(p,id,r.viewRoleIds(),r.editRoleIds(),r.createRoleIds());return grantService.get(id);}
     @GetMapping("/ticket-types/{typeId}/subtypes") public List<SubtypeResponse> subtypes(@AuthenticationPrincipal AuthPrincipal p,@PathVariable Long typeId){return service.listSubtypes(p,typeId).stream().map(SubtypeResponse::from).toList();}
     @PostMapping("/ticket-types/{typeId}/subtypes") @ResponseStatus(HttpStatus.CREATED) public SubtypeResponse createSubtype(@AuthenticationPrincipal AuthPrincipal p,@PathVariable Long typeId,@RequestBody CreateSubtype r){return SubtypeResponse.from(service.createSubtype(p,typeId,r.key(),r.name(),r.description(),value(r.sortOrder())));}
     @PutMapping("/subtypes/{id}") public SubtypeResponse updateSubtype(@AuthenticationPrincipal AuthPrincipal p,@PathVariable Long id,@RequestBody UpdateSubtype r){return SubtypeResponse.from(service.updateSubtype(p,id,r.version(),r.name(),r.description(),value(r.sortOrder())));}

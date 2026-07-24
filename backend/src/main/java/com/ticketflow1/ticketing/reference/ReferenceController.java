@@ -22,9 +22,10 @@ public class ReferenceController {
     private final AppUserRepository users; private final RoleRepository roles;
     private final TicketSubtypeRepository subtypes; private final SubtypeFieldDefinitionRepository fields;
     private final SubtypeFieldOptionRepository options;
+    private final FieldAuthorizationService fieldAuthorization;
     public ReferenceController(TicketTypeRepository types,OrganizationRepository organizations,
             AppUserRepository users,RoleRepository roles,TicketSubtypeRepository subtypes,
-            SubtypeFieldDefinitionRepository fields,SubtypeFieldOptionRepository options){this.types=types;this.organizations=organizations;this.users=users;this.roles=roles;this.subtypes=subtypes;this.fields=fields;this.options=options;}
+            SubtypeFieldDefinitionRepository fields,SubtypeFieldOptionRepository options,FieldAuthorizationService fieldAuthorization){this.types=types;this.organizations=organizations;this.users=users;this.roles=roles;this.subtypes=subtypes;this.fields=fields;this.options=options;this.fieldAuthorization=fieldAuthorization;}
     @GetMapping("/ticket-types") @PreAuthorize("hasAuthority('TICKET_CREATE')")
     public List<TypeRef> types(@AuthenticationPrincipal AuthPrincipal p,@RequestParam(required=false)Long organizationId){Long id=p.party()==Responsibility.CLIENT?p.organizationId():organizationId;if(id==null){id=organizations.findByNameIgnoreCase(INTERNAL_ORGANIZATION_NAME).map(o->o.getId()).orElseThrow(()->ApiException.validation("organizationId is required."));}return types.findByOrganizationId(id).stream().filter(t->p.party()==Responsibility.TICKETFLOW1||CLIENT_CREATABLE_TYPES.contains(t.getKey())).map(t->new TypeRef(t.getId(),t.getKey(),t.getName())).toList();}
     @GetMapping("/ticket-types/{typeId}/creation-form") @PreAuthorize("hasAuthority('TICKET_CREATE')")
@@ -33,7 +34,7 @@ public class ReferenceController {
                 .orElseThrow(()->ApiException.notFound("Ticket type not found: "+typeId));
         List<SubtypeForm> subtypeForms=subtypes.findByTicketTypeIdAndActiveTrueOrderBySortOrderAscIdAsc(typeId).stream().map(s->{
             List<FieldForm> fieldForms=fields.findBySubtypeIdAndActiveTrueOrderBySortOrderAscIdAsc(s.getId()).stream()
-                    .filter(f->p.party()==Responsibility.TICKETFLOW1||f.getVisibility()==FieldVisibility.PUBLIC)
+                    .filter(f->fieldAuthorization.allowed(f,p,FieldGrantOperation.CREATE))
                     .map(f->new FieldForm(f.getId(),f.getKey(),f.getLabel(),f.getHelpText(),f.getFieldKind(),f.isRequired(),f.getVisibility(),f.getSortOrder(),f.getMinLength(),f.getMaxLength(),f.getMinNumber(),f.getMaxNumber(),f.getVersion(),
                             options.findByFieldDefinitionIdAndActiveTrueOrderBySortOrderAscIdAsc(f.getId()).stream().map(o->new OptionForm(o.getId(),o.getKey(),o.getLabel(),o.getSortOrder(),o.getVersion())).toList())).toList();
             return new SubtypeForm(s.getId(),s.getKey(),s.getName(),s.getDescription(),s.getSortOrder(),s.getVersion(),fieldForms);
