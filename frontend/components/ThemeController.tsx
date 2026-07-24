@@ -20,10 +20,14 @@ export function ThemeController() {
   const [resolved, setResolved] = useState<"light" | "dark">("dark");
   useEffect(() => {
     const stored = window.localStorage.getItem("ticketflow1-theme");
-    if (stored) applyTheme(stored), setResolved(stored === "LIGHT" ? "light" : stored === "DARK" ? "dark" : systemTheme());
+    if (stored) { applyTheme(stored); setResolved(stored === "LIGHT" ? "light" : stored === "DARK" ? "dark" : systemTheme()); }
     get<Preferences>("/preferences").then(value => {
-      setPreference(value); applyTheme(value.theme); setResolved(value.theme === "LIGHT" ? "light" : value.theme === "DARK" ? "dark" : systemTheme());
-      window.localStorage.setItem("ticketflow1-theme", value.theme);
+      setPreference(value);
+      // A local choice is applied immediately and must not be overwritten by
+      // a slower response from the previous page's preference request.
+      const selected = window.localStorage.getItem("ticketflow1-theme") ?? value.theme;
+      applyTheme(selected); setResolved(selected === "LIGHT" ? "light" : selected === "DARK" ? "dark" : systemTheme());
+      window.localStorage.setItem("ticketflow1-theme", selected);
     }).catch(() => applyTheme(stored ?? "SYSTEM"));
   }, []);
   useEffect(() => {
@@ -34,7 +38,10 @@ export function ThemeController() {
   async function toggle() {
     const next = resolved === "dark" ? "LIGHT" : "DARK";
     applyTheme(next); setResolved(next === "LIGHT" ? "light" : "dark"); window.localStorage.setItem("ticketflow1-theme", next);
-    if (preference) { try { setPreference(await put<Preferences>("/preferences", { ...preference, theme: next, version: preference.version })); } catch { /* local theme remains usable */ } }
+    try {
+      const latest = await get<Preferences>("/preferences");
+      setPreference(await put<Preferences>("/preferences", { ...latest, theme: next, version: latest.version }));
+    } catch { /* local theme remains usable and will retry on the next toggle */ }
   }
   return <button type="button" className="btn-secondary theme-toggle" aria-label={`Switch to ${resolved === "dark" ? "light" : "dark"} theme`} onClick={() => void toggle()}>{resolved === "dark" ? "☀ Light" : "◐ Dark"}</button>;
 }

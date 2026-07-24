@@ -27,7 +27,11 @@ async function getCsrfToken(): Promise<string | undefined> {
   });
   if (!response.ok) return undefined;
   const body = await response.json() as { token?: string };
-  return body.token;
+  // Prefer the browser cookie value. Through a Vercel rewrite the response
+  // token and cookie can be refreshed in separate layers; Spring validates
+  // the header against the cookie that the browser actually sends.
+  const cookie = typeof document === "undefined" ? "" : document.cookie.split(";").map(value => value.trim()).find(value => value.startsWith("XSRF-TOKEN="))?.slice("XSRF-TOKEN=".length);
+  return cookie ? decodeURIComponent(cookie) : body.token;
 }
 
 export async function api<T>(path: string, init: RequestInit = {}): Promise<T> {
