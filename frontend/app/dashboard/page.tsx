@@ -227,7 +227,7 @@ export function DashboardPreferencesEditor({
       </div>
     </div>
     <ul className="mt-5 grid gap-3 md:grid-cols-2">
-      {DASHBOARD_WIDGETS.map(key => {
+      {[...widgets, ...DASHBOARD_WIDGETS.filter(key => !widgets.includes(key))].map(key => {
         const enabled = widgets.includes(key);
         const position = widgets.indexOf(key);
         return <li key={key} draggable onDragStart={() => { (window as Window & { __dashboardDrag?: string }).__dashboardDrag = key; }} onDragOver={event => event.preventDefault()} onDrop={() => drop(key)} className="dashboard-widget-item rounded-xl border border-slate-200 p-3">
