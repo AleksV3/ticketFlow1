@@ -67,9 +67,9 @@ constitution, and the source todo list.
 - [x] T032 Enforce create/edit rules against direct and bulk API mutations.
 - [x] T033 Extend field administration UI for role grants.
 - [x] T034 Audit field-grant configuration changes.
-- [ ] T035 Test no-rule compatibility, multi-role union, view-only, create-only,
+- [x] T035 Test no-rule compatibility, multi-role union, view-only, create-only,
   role removal, direct mutation denial, response omission, and tenant isolation.
-- [ ] T036 **Verify**: restricted values are absent from every unauthorized API
+- [x] T036 **Verify**: restricted values are absent from every unauthorized API
   and UI surface.
 
 ## Phase 5: Ticket, team, and user UX P3
