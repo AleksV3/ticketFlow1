@@ -27,7 +27,7 @@ export type CurrentUser = {
 };
 
 export function getApiBaseUrl(): string {
-  return process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8081/api";
+  return process.env.NEXT_PUBLIC_API_BASE_URL ?? "https://ticketflow1-cm62j5alfq-og.a.run.app/api";
 }
 
 export async function fetchCurrentUser(): Promise<CurrentUser | null> {

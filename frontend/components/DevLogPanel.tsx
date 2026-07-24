@@ -12,7 +12,7 @@ export function DevLogPanel() {
     setEnabled(devLogsEnabled());
     if (!devLogsEnabled()) return;
     recordDevLog("info", "frontend", "Development log panel enabled", {
-      apiBase: process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8081/api",
+      apiBase: process.env.NEXT_PUBLIC_API_BASE_URL ?? "https://ticketflow1-cm62j5alfq-og.a.run.app/api",
       nodeEnv: process.env.NODE_ENV,
     });
     const unsubscribe = subscribeDevLogs(entry => setLogs(current => appendDevLog(current, entry)));
