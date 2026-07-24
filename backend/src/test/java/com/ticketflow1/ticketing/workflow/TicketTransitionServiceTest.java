@@ -13,6 +13,7 @@ import com.ticketflow1.ticketing.audit.AuditService;
 import com.ticketflow1.ticketing.auth.AuthPrincipal;
 import com.ticketflow1.ticketing.comment.CommentService;
 import com.ticketflow1.ticketing.comment.CommentVisibility;
+import com.ticketflow1.ticketing.common.ApiException;
 import com.ticketflow1.ticketing.common.IllegalTransitionException;
 import com.ticketflow1.ticketing.organization.Organization;
 import com.ticketflow1.ticketing.proposal.ProposalDetailService;
@@ -25,6 +26,9 @@ import com.ticketflow1.ticketing.ticket.Responsibility;
 import com.ticketflow1.ticketing.ticket.Ticket;
 import com.ticketflow1.ticketing.ticket.TicketRepository;
 import com.ticketflow1.ticketing.ticket.dto.TicketDetailResponse;
+import com.ticketflow1.ticketing.ticketconfig.TicketApproval;
+import com.ticketflow1.ticketing.ticketconfig.TicketApprovalRepository;
+import com.ticketflow1.ticketing.ticketconfig.TicketApprovalStatus;
 import com.ticketflow1.ticketing.user.AppUser;
 import com.ticketflow1.ticketing.user.AppUserRepository;
 import java.time.Instant;
@@ -59,6 +63,7 @@ class TicketTransitionServiceTest {
     @Mock
     private CommentService commentService;
     @Mock private ProposalDetailService proposalDetailService;
+    @Mock private TicketApprovalRepository ticketApprovalRepository;
     private com.ticketflow1.ticketing.sla.SlaStatusService slaStatusService;
 
     private TicketTransitionService ticketTransitionService;
@@ -70,7 +75,7 @@ class TicketTransitionServiceTest {
                 calculator, java.time.Clock.systemUTC());
         ticketTransitionService = new TicketTransitionService(ticketRepository, workflowStateRepository,
                 workflowTransitionRepository, appUserRepository, auditService, statusHistoryService, commentService,
-                proposalDetailService, slaStatusService, java.time.Clock.systemUTC());
+                proposalDetailService, slaStatusService, ticketApprovalRepository, java.time.Clock.systemUTC());
     }
 
     @ParameterizedTest
@@ -177,13 +182,14 @@ class TicketTransitionServiceTest {
                 TransitionOperationKind.WORKFLOW_APPROVE);
         when(workflowTransitionRepository.findByWorkflowIdAndFromStateId(fixture.workflow().getId(), fixture.fromState().getId()))
                 .thenReturn(List.of(protectedEdge));
-        when(appUserRepository.findById(fixture.actor().getId())).thenReturn(java.util.Optional.of(fixture.actor()));
         AuthPrincipal principal = new AuthPrincipal(fixture.actor().getId(), Responsibility.TICKETFLOW1,
                 fixture.organization().getId(), Set.of("TICKET_TRANSITION"));
 
         assertThatThrownBy(() -> ticketTransitionService.transitionOwned(fixture.ticket(),
                 TransitionOperationKind.WORKFLOW_APPROVE, principal))
-                .isInstanceOf(IllegalTransitionException.class);
+                .isInstanceOf(ApiException.class)
+                .extracting(error -> ((ApiException) error).getErrorCode())
+                .isEqualTo("FORBIDDEN");
     }
 
     @Test
@@ -206,11 +212,16 @@ class TicketTransitionServiceTest {
         Fixture fixture = fixture("TASI Workflow", "PENDING_APPROVAL", "IMPLEMENTATION",
                 "TICKET_TRANSITION", Responsibility.TICKETFLOW1, null);
         ReflectionTestUtils.setField(fixture.ticket(), "resolvedApprover", fixture.actor());
+        TicketApproval approval = new TicketApproval(
+                fixture.ticket(), fixture.fromState(), fixture.actor(), null);
         WorkflowTransition edge = new WorkflowTransition(fixture.workflow(), fixture.fromState(), fixture.toState(),
                 new Permission("TICKET_TRANSITION"), Responsibility.TICKETFLOW1, null,
                 TransitionOperationKind.WORKFLOW_APPROVE);
         when(workflowTransitionRepository.findByWorkflowIdAndFromStateId(fixture.workflow().getId(), fixture.fromState().getId()))
                 .thenReturn(List.of(edge));
+        when(ticketApprovalRepository.findByTicketIdAndStatus(
+                fixture.ticket().getId(), TicketApprovalStatus.PENDING))
+                .thenReturn(java.util.Optional.of(approval));
         when(appUserRepository.findById(fixture.actor().getId())).thenReturn(java.util.Optional.of(fixture.actor()));
         when(ticketRepository.save(any(Ticket.class))).thenAnswer(invocation -> invocation.getArgument(0));
         AuthPrincipal principal = new AuthPrincipal(fixture.actor().getId(), Responsibility.TICKETFLOW1,
@@ -237,11 +248,16 @@ class TicketTransitionServiceTest {
                 "TASI Delivery", "Approves TASI implementation", fixture.actor(), fixture.actor());
         ReflectionTestUtils.setField(assignedTeam, "id", 67L);
         fixture.ticket().replaceTeams(Set.of(assignedTeam));
+        TicketApproval approval = new TicketApproval(
+                fixture.ticket(), fixture.fromState(), null, assignedTeam);
         WorkflowTransition edge = new WorkflowTransition(fixture.workflow(), fixture.fromState(), fixture.toState(),
                 new Permission("TICKET_TRANSITION"), Responsibility.TICKETFLOW1, null,
                 TransitionOperationKind.WORKFLOW_APPROVE);
         when(workflowTransitionRepository.findByWorkflowIdAndFromStateId(
                 fixture.workflow().getId(), fixture.fromState().getId())).thenReturn(List.of(edge));
+        when(ticketApprovalRepository.findByTicketIdAndStatus(
+                fixture.ticket().getId(), TicketApprovalStatus.PENDING))
+                .thenReturn(java.util.Optional.of(approval));
         when(appUserRepository.findById(fixture.actor().getId()))
                 .thenReturn(java.util.Optional.of(fixture.actor()));
         when(ticketRepository.save(any(Ticket.class))).thenAnswer(invocation -> invocation.getArgument(0));

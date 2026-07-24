@@ -21,6 +21,7 @@ import jakarta.persistence.ManyToOne;
 import jakarta.persistence.ManyToMany;
 import jakarta.persistence.JoinTable;
 import jakarta.persistence.Table;
+import jakarta.persistence.Version;
 import java.time.Instant;
 import java.util.LinkedHashSet;
 import java.util.Set;
@@ -47,6 +48,10 @@ public class Ticket extends Auditable {
     @ManyToOne(fetch = FetchType.LAZY) @JoinColumn(name = "resolved_approver_id") private AppUser resolvedApprover;
     @ManyToOne(fetch = FetchType.LAZY) @JoinColumn(name = "target_user_id") private AppUser targetUser;
     @Column(name = "target_user_display_snapshot", length = 255) private String targetUserDisplaySnapshot;
+
+    @Version
+    @Column(nullable = false)
+    private long version;
 
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "current_state_id")
@@ -160,6 +165,7 @@ public class Ticket extends Auditable {
     public AppUser getResolvedApprover(){return resolvedApprover;} public void setResolvedApprover(AppUser value){resolvedApprover=value;}
     public AppUser getTargetUser(){return targetUser;} public void setTargetUser(AppUser value){targetUser=value;}
     public String getTargetUserDisplaySnapshot(){return targetUserDisplaySnapshot;} public void setTargetUserDisplaySnapshot(String value){targetUserDisplaySnapshot=value;}
+    public long getVersion(){return version;}
 
     public void setCurrentState(WorkflowState currentState) {
         this.currentState = currentState;

@@ -20,9 +20,9 @@ constitution, and the source todo list.
 
 ## Phase 1: TASI approval P0
 
-- [ ] T006 Trace and fix protected transition metadata and approval creation.
-- [ ] T007 Fix designated approver and required team-lead resolution.
-- [ ] T008 Fix backend decision authorization and clear forbidden/conflict
+- [x] T006 Trace and fix protected transition metadata and approval creation.
+- [x] T007 Fix designated approver and required team-lead resolution.
+- [x] T008 Fix backend decision authorization and clear forbidden/conflict
   responses.
 - [ ] T009 Ensure approve/reject atomically persists decision, correct next state,
   status history, and audit.

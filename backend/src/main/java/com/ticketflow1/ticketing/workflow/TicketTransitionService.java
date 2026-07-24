@@ -14,6 +14,9 @@ import com.ticketflow1.ticketing.ticket.Responsibility;
 import com.ticketflow1.ticketing.ticket.Ticket;
 import com.ticketflow1.ticketing.ticket.TicketRepository;
 import com.ticketflow1.ticketing.ticket.dto.TicketDetailResponse;
+import com.ticketflow1.ticketing.ticketconfig.TicketApproval;
+import com.ticketflow1.ticketing.ticketconfig.TicketApprovalRepository;
+import com.ticketflow1.ticketing.ticketconfig.TicketApprovalStatus;
 import com.ticketflow1.ticketing.user.AppUser;
 import com.ticketflow1.ticketing.user.AppUserRepository;
 import java.util.List;
@@ -41,6 +44,7 @@ public class TicketTransitionService {
     private final ProposalDetailService proposalDetailService;
     private final SlaStatusService slaStatusService;
     private final Clock clock;
+    private final TicketApprovalRepository ticketApprovalRepository;
 
     public TicketTransitionService(TicketRepository ticketRepository,
             WorkflowStateRepository workflowStateRepository,
@@ -51,6 +55,7 @@ public class TicketTransitionService {
             CommentService commentService,
             ProposalDetailService proposalDetailService,
             SlaStatusService slaStatusService,
+            TicketApprovalRepository ticketApprovalRepository,
             Clock clock) {
         this.ticketRepository = ticketRepository;
         this.workflowStateRepository = workflowStateRepository;
@@ -61,6 +66,7 @@ public class TicketTransitionService {
         this.commentService = commentService;
         this.proposalDetailService = proposalDetailService;
         this.slaStatusService = slaStatusService;
+        this.ticketApprovalRepository = ticketApprovalRepository;
         this.clock = clock;
     }
 
@@ -128,6 +134,9 @@ public class TicketTransitionService {
             throw new com.ticketflow1.ticketing.common.InvalidStateException(
                     "No " + operationKind + " operation is available from " + ticket.getCurrentState().getKey() + ".");
         }
+        if (!isAllowed(ticket, matches.getFirst(), principal)) {
+            throw ApiException.forbidden("You are not authorized to decide this ticket approval.");
+        }
         return apply(ticket, matches.getFirst(), principal);
     }
 
@@ -171,6 +180,8 @@ public class TicketTransitionService {
         }
         Ticket saved = ticketRepository.save(ticket);
 
+        createPendingApprovalIfRequired(saved, toState);
+
         statusHistoryService.record(saved, fromState, toState, actor.getId());
         auditService.record(saved, actor.getId(), AuditAction.STATUS_CHANGED,
                 "status", fromState.getKey(), toState.getKey());
@@ -212,9 +223,12 @@ public class TicketTransitionService {
         TransitionOperationKind operation = transition.getOperationKind();
         if (operation == TransitionOperationKind.WORKFLOW_APPROVE
                 || operation == TransitionOperationKind.WORKFLOW_REJECT) {
-            return principal.party() == Responsibility.TICKETFLOW1
-                    && ticket.getResolvedApprover() != null
-                    && ticket.getResolvedApprover().getId().equals(principal.userId());
+            if (principal.party() != Responsibility.TICKETFLOW1) {
+                return false;
+            }
+            return pendingApproval(ticket)
+                    .map(approval -> isNormalWorkflowApprover(approval, principal))
+                    .orElse(false);
         }
         if (operation == TransitionOperationKind.CLIENT_ACCEPT
                 || operation == TransitionOperationKind.CLIENT_REJECT) {
@@ -224,6 +238,43 @@ public class TicketTransitionService {
                     && ticket.getOrganization().getId().equals(principal.organizationId());
         }
         return true;
+    }
+
+    private void createPendingApprovalIfRequired(Ticket ticket, WorkflowState enteredState) {
+        List<WorkflowTransition> outgoing = workflowTransitionRepository.findByWorkflowIdAndFromStateId(
+                ticket.getTicketType().getWorkflow().getId(), enteredState.getId());
+        boolean approvalState = outgoing.stream().anyMatch(edge ->
+                edge.getOperationKind() == TransitionOperationKind.WORKFLOW_APPROVE
+                        || edge.getOperationKind() == TransitionOperationKind.WORKFLOW_REJECT);
+        if (!approvalState || pendingApproval(ticket).isPresent()) {
+            return;
+        }
+
+        var assignedTeam = ticket.getRoutingRule() == null
+                ? (ticket.getTeams().size() == 1 ? ticket.getTeams().iterator().next() : null)
+                : ticket.getRoutingRule().getTeam();
+        if (ticket.getResolvedApprover() == null && assignedTeam == null) {
+            throw ApiException.conflict("The approval state has no configured approver or assigned team.");
+        }
+        ticketApprovalRepository.save(new TicketApproval(
+                ticket, enteredState, ticket.getResolvedApprover(), assignedTeam));
+    }
+
+    private java.util.Optional<TicketApproval> pendingApproval(Ticket ticket) {
+        if (ticket.getId() == null) {
+            return java.util.Optional.empty();
+        }
+        return ticketApprovalRepository.findByTicketIdAndStatus(
+                ticket.getId(), TicketApprovalStatus.PENDING);
+    }
+
+    private boolean isNormalWorkflowApprover(TicketApproval approval, AuthPrincipal principal) {
+        if (approval.getAssignedApprover() != null) {
+            return approval.getAssignedApprover().getId().equals(principal.userId());
+        }
+        return approval.getAssignedTeam() != null
+                && approval.getAssignedTeam().getLeader() != null
+                && approval.getAssignedTeam().getLeader().getId().equals(principal.userId());
     }
 
     private Ticket findVisibleTicket(String ticketKey, AuthPrincipal principal) {
