@@ -59,14 +59,14 @@ constitution, and the source todo list.
   and two-user/two-organization isolation.
 - [x] T028 **Verify**: all initial widgets render and preferences remain isolated.
 
-## Phase 4: Field-level visibility P2
+## Phase 4: Field-level visibility P2 (implementation complete; verification pending)
 
-- [ ] T029 Add field-role-operation grant schema, entities, and repositories.
-- [ ] T030 Implement backward-compatible shared VIEW/EDIT/CREATE authorization.
-- [ ] T031 Filter creation references and ticket response values server-side.
-- [ ] T032 Enforce create/edit rules against direct and bulk API mutations.
-- [ ] T033 Extend field administration UI for role grants.
-- [ ] T034 Audit field-grant configuration changes.
+- [x] T029 Add field-role-operation grant schema, entities, and repositories.
+- [x] T030 Implement backward-compatible shared VIEW/EDIT/CREATE authorization.
+- [x] T031 Filter creation references and ticket response values server-side.
+- [x] T032 Enforce create/edit rules against direct and bulk API mutations.
+- [x] T033 Extend field administration UI for role grants.
+- [x] T034 Audit field-grant configuration changes.
 - [ ] T035 Test no-rule compatibility, multi-role union, view-only, create-only,
   role removal, direct mutation denial, response omission, and tenant isolation.
 - [ ] T036 **Verify**: restricted values are absent from every unauthorized API

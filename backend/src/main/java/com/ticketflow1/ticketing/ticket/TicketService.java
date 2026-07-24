@@ -244,7 +244,7 @@ public class TicketService {
         }
         boolean changesContent = request.title() != null || request.description() != null
                 || request.priority() != null || request.severity() != null || request.assignedTeam() != null
-                || request.teamIds() != null;
+                || request.teamIds() != null || request.dynamicValues() != null;
         if (changesContent && !principal.hasPermission("TICKET_UPDATE")) {
             throw ApiException.forbidden("TICKET_UPDATE permission is required.");
         }
@@ -302,6 +302,14 @@ public class TicketService {
                 applyDeadlines(ticket, request.severity(), clock.instant());
                 changed = true;
             }
+        }
+
+        if (request.dynamicValues() != null) {
+            TicketSubtype subtype = ticket.getSubtype();
+            if (subtype == null) throw ApiException.validation("dynamicValues requires a ticket subtype.");
+            validateDynamicValuesForEdit(subtype, request.dynamicValues(), principal);
+            persistDynamicValues(ticket, subtype, request.dynamicValues());
+            changed = true;
         }
 
         if (request.ticketLeadId() != null) {
@@ -387,11 +395,24 @@ public class TicketService {
         }
     }
 
+    private void validateDynamicValuesForEdit(TicketSubtype subtype, Map<String,Object> values, AuthPrincipal principal) {
+        Map<String,Object> supplied = values == null ? Map.of() : values;
+        List<SubtypeFieldDefinition> activeFields = fieldDefinitionRepository.findBySubtypeIdAndActiveTrueOrderBySortOrderAscIdAsc(subtype.getId());
+        for (String key : supplied.keySet()) {
+            SubtypeFieldDefinition field = activeFields.stream().filter(item -> item.getKey().equals(key)).findFirst()
+                    .orElseThrow(() -> ApiException.validation("Unknown dynamic field: " + key));
+            fieldAuthorization.require(field, principal, com.ticketflow1.ticketing.ticketconfig.FieldGrantOperation.EDIT);
+            dynamicFieldValidator.validate(field, supplied.get(key), fieldOptionRepository.findByFieldDefinitionIdAndActiveTrueOrderBySortOrderAscIdAsc(field.getId()));
+        }
+    }
+
     private void persistDynamicValues(Ticket ticket, TicketSubtype subtype, Map<String,Object> values) {
         if (subtype == null || values == null) return;
         for (SubtypeFieldDefinition field : fieldDefinitionRepository.findBySubtypeIdAndActiveTrueOrderBySortOrderAscIdAsc(subtype.getId())) {
             Object value = values.get(field.getKey()); if (value == null) continue;
-            TicketFieldValue stored = new TicketFieldValue(ticket, field);
+            TicketFieldValue stored = fieldValueRepository.findByTicketId(ticket.getId()).stream()
+                    .filter(existing -> existing.getFieldDefinition().getId().equals(field.getId())).findFirst()
+                    .orElseGet(() -> new TicketFieldValue(ticket, field));
             switch (field.getFieldKind()) {
                 case SHORT_TEXT, LONG_TEXT -> stored.setText((String) value);
                 case INTEGER, DECIMAL -> stored.setNumber(new java.math.BigDecimal(value.toString()));
