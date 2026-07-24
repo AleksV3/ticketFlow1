@@ -188,6 +188,29 @@ tbody tr:hover { background: rgb(0 84 166 / 10%); }
 .react-flow-shell .react-flow__handle:hover, .react-flow-shell .react-flow__handle.connecting { transform: scale(1.2); background: rgb(250 204 21); }
 .react-flow-shell .flow-edge path { stroke: rgb(91 179 255); stroke-width: 3.5; transition: stroke .14s ease, stroke-width .14s ease, filter .14s ease; }
 .react-flow-shell .selected-manual-edge { stroke: rgb(250 204 21); stroke-width: 5; filter: drop-shadow(0 0 8px rgb(250 204 21 / 55%)); }
+
+/* Theme contrast fixes for legacy utility classes. Keep the shared dark
+   presentation, but restore a clear light palette when the user selects it. */
+[data-theme="light"] .bg-white { background-color: rgb(255 255 255 / 96%) !important; }
+[data-theme="light"] .bg-slate-50, [data-theme="light"] .bg-slate-100 { background-color: rgb(241 245 249 / 96%) !important; }
+[data-theme="light"] .text-slate-900, [data-theme="light"] .text-slate-800, [data-theme="light"] .text-slate-700 { color: rgb(20 32 48) !important; }
+[data-theme="light"] .text-slate-600, [data-theme="light"] .text-slate-500, [data-theme="light"] .text-slate-400 { color: rgb(71 85 105) !important; }
+[data-theme="light"] .app-frame main h1, [data-theme="light"] .app-frame main h2 { color: rgb(20 32 48) !important; text-shadow: none; }
+[data-theme="light"] table, [data-theme="light"] thead, [data-theme="light"] tbody, [data-theme="light"] tbody td { color: rgb(51 65 85) !important; }
+[data-theme="light"] thead th { color: rgb(37 99 170) !important; }
+[data-theme="light"] tbody a { color: rgb(37 129 220) !important; }
+[data-theme="light"] .badge.bg-slate-100 { color: rgb(51 65 85) !important; background: rgb(226 232 240) !important; }
+
+/* The board uses pale status columns in light mode. In dark mode those same
+   utility classes need dark surfaces and light card text to remain readable. */
+[data-theme="dark"] .bg-emerald-50\/70 { background-color: rgb(6 78 59 / 34%) !important; }
+[data-theme="dark"] .bg-red-50\/70 { background-color: rgb(127 29 29 / 34%) !important; }
+[data-theme="dark"] .bg-blue-50\/70 { background-color: rgb(30 64 175 / 28%) !important; }
+[data-theme="dark"] .bg-slate-100\/80 { background-color: rgb(11 19 37 / 72%) !important; }
+[data-theme="dark"] .text-slate-800 { color: rgb(231 238 248) !important; }
+[data-theme="dark"] .text-slate-700 { color: rgb(219 229 243) !important; }
+[data-theme="dark"] .text-slate-600 { color: rgb(190 207 230) !important; }
+[data-theme="dark"] .team-board-card select { color: rgb(219 229 243) !important; background-color: rgb(11 19 37 / 86%) !important; }
 .react-flow-shell .react-flow__edge.selected path { stroke: rgb(250 204 21); stroke-width: 5; filter: drop-shadow(0 0 8px rgb(250 204 21 / 55%)); }
 .react-flow-shell .react-flow__edge .react-flow__edge-interaction { stroke-width: 28; }
 .react-flow-shell .flow-edge-protected path { stroke: rgb(167 139 250); stroke-width: 3.25; stroke-dasharray: 7 5; transition: stroke .14s ease, stroke-width .14s ease, filter .14s ease; }
