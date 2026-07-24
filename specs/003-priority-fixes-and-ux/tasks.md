@@ -24,10 +24,10 @@ constitution, and the source todo list.
 - [x] T007 Fix designated approver and required team-lead resolution.
 - [x] T008 Fix backend decision authorization and clear forbidden/conflict
   responses.
-- [ ] T009 Ensure approve/reject atomically persists decision, correct next state,
+- [x] T009 Ensure approve/reject atomically persists decision, correct next state,
   status history, and audit.
-- [ ] T010 Ensure ticket detail advertises available commands for the actor.
-- [ ] T011 Fix approval control visibility/enabled state and request handling.
+- [x] T010 Ensure ticket detail advertises available commands for the actor.
+- [x] T011 Fix approval control visibility/enabled state and request handling.
 - [ ] T012 Test assigned approver, team lead, unrelated user, inactive approver,
   stale decision, rollback, and cross-organization isolation.
 - [ ] T013 **Verify**: execute complete TASI approve and reject paths through API

@@ -29,6 +29,7 @@ import com.ticketflow1.ticketing.ticket.dto.TicketDetailResponse;
 import com.ticketflow1.ticketing.ticketconfig.TicketApproval;
 import com.ticketflow1.ticketing.ticketconfig.TicketApprovalRepository;
 import com.ticketflow1.ticketing.ticketconfig.TicketApprovalStatus;
+import com.ticketflow1.ticketing.ticketconfig.TicketDecisionRepository;
 import com.ticketflow1.ticketing.user.AppUser;
 import com.ticketflow1.ticketing.user.AppUserRepository;
 import java.time.Instant;
@@ -64,6 +65,7 @@ class TicketTransitionServiceTest {
     private CommentService commentService;
     @Mock private ProposalDetailService proposalDetailService;
     @Mock private TicketApprovalRepository ticketApprovalRepository;
+    @Mock private TicketDecisionRepository ticketDecisionRepository;
     private com.ticketflow1.ticketing.sla.SlaStatusService slaStatusService;
 
     private TicketTransitionService ticketTransitionService;
@@ -75,7 +77,8 @@ class TicketTransitionServiceTest {
                 calculator, java.time.Clock.systemUTC());
         ticketTransitionService = new TicketTransitionService(ticketRepository, workflowStateRepository,
                 workflowTransitionRepository, appUserRepository, auditService, statusHistoryService, commentService,
-                proposalDetailService, slaStatusService, ticketApprovalRepository, java.time.Clock.systemUTC());
+                proposalDetailService, slaStatusService, ticketApprovalRepository, ticketDecisionRepository,
+                java.time.Clock.systemUTC());
     }
 
     @ParameterizedTest
@@ -268,6 +271,48 @@ class TicketTransitionServiceTest {
                 fixture.ticket(), TransitionOperationKind.WORKFLOW_APPROVE, principal);
 
         assertThat(fixture.ticket().getCurrentState().getKey()).isEqualTo("IMPLEMENTATION");
+    }
+
+    @Test
+    void protectedApproval_persistsDecisionClosesApprovalAndAuditsAtomically() {
+        Fixture fixture = fixture("TASI Workflow", "PENDING_APPROVAL", "IMPLEMENTATION",
+                "TICKET_TRANSITION", Responsibility.TICKETFLOW1, null);
+        TicketApproval approval = new TicketApproval(
+                fixture.ticket(), fixture.fromState(), fixture.actor(), null);
+        WorkflowTransition edge = new WorkflowTransition(fixture.workflow(), fixture.fromState(), fixture.toState(),
+                new Permission("TICKET_TRANSITION"), Responsibility.TICKETFLOW1, null,
+                TransitionOperationKind.WORKFLOW_APPROVE);
+        AuthPrincipal principal = new AuthPrincipal(fixture.actor().getId(), Responsibility.TICKETFLOW1,
+                fixture.organization().getId(), Set.of("TICKET_TRANSITION"));
+        when(ticketRepository.findByTicketKey(fixture.ticket().getTicketKey()))
+                .thenReturn(java.util.Optional.of(fixture.ticket()));
+        when(ticketApprovalRepository.findForUpdate(
+                fixture.ticket().getId(), TicketApprovalStatus.PENDING))
+                .thenReturn(java.util.Optional.of(approval));
+        when(ticketApprovalRepository.findByTicketIdAndStatus(
+                fixture.ticket().getId(), TicketApprovalStatus.PENDING))
+                .thenReturn(java.util.Optional.of(approval));
+        when(workflowTransitionRepository.findByWorkflowIdAndFromStateId(
+                fixture.workflow().getId(), fixture.fromState().getId())).thenReturn(List.of(edge));
+        when(workflowTransitionRepository.findByWorkflowIdAndFromStateId(
+                fixture.workflow().getId(), fixture.toState().getId())).thenReturn(List.of());
+        when(appUserRepository.findById(fixture.actor().getId()))
+                .thenReturn(java.util.Optional.of(fixture.actor()));
+        when(ticketRepository.save(any(Ticket.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        TicketDetailResponse response = ticketTransitionService.protectedDecision(
+                fixture.ticket().getTicketKey(), TransitionOperationKind.WORKFLOW_APPROVE,
+                "Ready to implement", principal);
+
+        assertThat(response.status()).isEqualTo("IMPLEMENTATION");
+        assertThat(approval.getStatus()).isEqualTo(TicketApprovalStatus.APPROVED);
+        assertThat(approval.getDecidedBy()).isEqualTo(fixture.actor());
+        verify(ticketApprovalRepository).save(approval);
+        verify(ticketDecisionRepository).save(any(com.ticketflow1.ticketing.ticketconfig.TicketDecision.class));
+        verify(auditService).record(fixture.ticket(), fixture.actor().getId(),
+                AuditAction.WORKFLOW_APPROVED, "approvalDecision", "PENDING", "APPROVED");
+        verify(statusHistoryService).record(
+                fixture.ticket(), fixture.fromState(), fixture.toState(), fixture.actor().getId());
     }
 
     @Test
