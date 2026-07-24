@@ -34,6 +34,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Collection;
 import java.time.LocalDate;
+import java.time.ZoneOffset;
 import java.time.Clock;
 import jakarta.persistence.criteria.JoinType;
 import org.springframework.data.domain.PageRequest;
@@ -489,7 +490,13 @@ public class TicketService {
     @Transactional(readOnly = true)
     public PagedResponse<TicketSummaryResponse> listTickets(String type, String subtype, String status, String lifecycle, Severity severity,
             Priority priority, String assignedTo, Responsibility responsibility, String slaStatus,
-            Long organizationId, String parentTicketKey, String q, int page, int pageSize, AuthPrincipal principal) {
+            Long organizationId, String parentTicketKey, Long assigneeId, Long teamId, Long creatorId,
+            LocalDate createdFrom, LocalDate createdTo, Long workflowId, String approvalStatus,
+            String q, int page, int pageSize, AuthPrincipal principal) {
+        if (createdFrom != null && createdTo != null && createdFrom.isAfter(createdTo)) {
+            throw ApiException.validation("createdFrom must not be after createdTo.");
+        }
+        TicketApprovalStatus requestedApproval = parseApprovalStatus(approvalStatus);
         SlaStatus requestedSlaStatus = parseSlaStatus(slaStatus);
 
         int size = pageSize <= 0 ? DEFAULT_PAGE_SIZE : Math.min(pageSize, MAX_PAGE_SIZE);
@@ -513,6 +520,25 @@ public class TicketService {
         if (parentTicketKey != null && !parentTicketKey.isBlank()) {
             spec = spec.and((root, query, cb) -> cb.equal(root.get("parentTicket").get("ticketKey"), parentTicketKey.trim()));
         }
+        if (assigneeId != null) spec = spec.and((root, query, cb) -> cb.equal(root.get("ticketLead").get("id"), assigneeId));
+        if (teamId != null) spec = spec.and((root, query, cb) -> { query.distinct(true); return cb.equal(root.join("teams", JoinType.INNER).get("id"), teamId); });
+        if (creatorId != null) spec = spec.and((root, query, cb) -> cb.equal(root.get("businessOwner").get("id"), creatorId));
+        if (createdFrom != null) {
+            java.time.Instant from = createdFrom.atStartOfDay(ZoneOffset.UTC).toInstant();
+            spec = spec.and((root, query, cb) -> cb.greaterThanOrEqualTo(root.get("createdAt"), from));
+        }
+        if (createdTo != null) {
+            java.time.Instant until = createdTo.plusDays(1).atStartOfDay(ZoneOffset.UTC).toInstant();
+            spec = spec.and((root, query, cb) -> cb.lessThan(root.get("createdAt"), until));
+        }
+        if (workflowId != null) spec = spec.and((root, query, cb) -> cb.equal(root.get("ticketType").get("workflow").get("id"), workflowId));
+        if (requestedApproval != null) spec = spec.and((root, query, cb) -> {
+            var sub = query.subquery(Long.class);
+            var approval = sub.from(TicketApproval.class);
+            sub.select(approval.get("id"));
+            sub.where(cb.equal(approval.get("ticket").get("id"), root.get("id")), cb.equal(approval.get("status"), requestedApproval));
+            return cb.exists(sub);
+        });
         if (status != null && !status.isBlank()) {
             spec = spec.and((root, query, cb) -> cb.equal(root.get("currentState").get("key"), status));
         }
@@ -612,6 +638,12 @@ public class TicketService {
         } catch (IllegalArgumentException exception) {
             throw ApiException.validation("slaStatus must be OK, DUE_SOON, BREACHED, or NOT_APPLICABLE.");
         }
+    }
+
+    private TicketApprovalStatus parseApprovalStatus(String value) {
+        if (value == null || value.isBlank()) return null;
+        try { return TicketApprovalStatus.valueOf(value.trim().toUpperCase(java.util.Locale.ROOT)); }
+        catch (IllegalArgumentException exception) { throw ApiException.validation("approvalStatus must be PENDING, APPROVED, or REJECTED."); }
     }
 
     private Ticket findVisibleParentTicket(String parentTicketKey, Organization organization, AuthPrincipal principal) {

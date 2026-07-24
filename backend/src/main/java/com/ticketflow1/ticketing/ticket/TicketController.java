@@ -24,6 +24,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
+import java.time.LocalDate;
 
 @RestController
 @RequestMapping("/api/tickets")
@@ -60,12 +61,20 @@ public class TicketController {
             @RequestParam(required = false) String slaStatus,
             @RequestParam(required = false) Long organizationId,
             @RequestParam(required = false) String parentTicketKey,
+            @RequestParam(required = false) Long assigneeId,
+            @RequestParam(required = false) Long teamId,
+            @RequestParam(required = false) Long creatorId,
+            @RequestParam(required = false) LocalDate createdFrom,
+            @RequestParam(required = false) LocalDate createdTo,
+            @RequestParam(required = false) Long workflowId,
+            @RequestParam(required = false) String approvalStatus,
             @RequestParam(required = false) String q,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int pageSize,
             @AuthenticationPrincipal AuthPrincipal principal) {
         return ticketService.listTickets(type, subtype, status, lifecycle, severity, priority, assignedTo, responsibility,
-                slaStatus, organizationId, parentTicketKey, q, page, pageSize, principal);
+                slaStatus, organizationId, parentTicketKey, assigneeId, teamId, creatorId, createdFrom, createdTo,
+                workflowId, approvalStatus, q, page, pageSize, principal);
     }
 
     /**
