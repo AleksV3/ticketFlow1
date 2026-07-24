@@ -33,6 +33,8 @@ type Field = {
   maxNumber: number | null;
   version: number;
 };
+type GrantRoles = { VIEW: number[]; EDIT: number[]; CREATE: number[] };
+type RoleRef = { id: number; name: string; party: string };
 type Option = { id: number; fieldId: number; key: string; label: string; active: boolean; sortOrder: number; version: number };
 type Routing = { id: number; subtypeId: number; organizationId: number | null; teamId: number; primaryDeveloperId: number | null; fallbackDeveloperId: number | null; approverId: number | null; active: boolean; version: number };
 type Person = { id: number; name: string; party: string; organizationName: string | null };
@@ -334,6 +336,8 @@ function FieldAdministration({ subtype, report }: { subtype: Subtype; report: (m
   const [fields, setFields] = useState<Field[]>([]);
   const [selectedFieldId, setSelectedFieldId] = useState<number | null>(null);
   const selectedField = fields.find(field => field.id === selectedFieldId) ?? null;
+  const [roles, setRoles] = useState<RoleRef[]>([]);
+  const [grants, setGrants] = useState<GrantRoles>({ VIEW: [], EDIT: [], CREATE: [] });
   const loadFields = useCallback(async (preferredId?: number) => {
     try {
       const rows = await get<Field[]>(`/admin/subtypes/${subtype.id}/fields`);
@@ -347,6 +351,19 @@ function FieldAdministration({ subtype, report }: { subtype: Subtype; report: (m
     }
   }, [report, subtype.id]);
   useEffect(() => { void loadFields(); }, [loadFields]);
+  useEffect(() => { void get<RoleRef[]>("/admin/roles").then(setRoles).catch(error => report(error instanceof Error ? error.message : "Could not load roles.")); }, [report]);
+  useEffect(() => {
+    if (!selectedFieldId) return;
+    void get<GrantRoles & { viewRoleIds?: number[]; editRoleIds?: number[]; createRoleIds?: number[] }>(`/admin/fields/${selectedFieldId}/grants`).then(value => setGrants({ VIEW: value.VIEW ?? value.viewRoleIds ?? [], EDIT: value.EDIT ?? value.editRoleIds ?? [], CREATE: value.CREATE ?? value.createRoleIds ?? [] })).catch(error => report(error instanceof Error ? error.message : "Could not load field grants."));
+  }, [report, selectedFieldId]);
+  async function toggleGrant(operation: keyof GrantRoles, roleId: number) {
+    if (!selectedField) return;
+    const next = { ...grants, [operation]: grants[operation].includes(roleId) ? grants[operation].filter(id => id !== roleId) : [...grants[operation], roleId] };
+    try {
+      await put(`/admin/fields/${selectedField.id}/grants`, { viewRoleIds: next.VIEW, editRoleIds: next.EDIT, createRoleIds: next.CREATE });
+      setGrants(next); report("Field grants saved.");
+    } catch (error) { report(error instanceof Error ? error.message : "Could not save field grants."); }
+  }
 
   async function createField(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -457,6 +474,7 @@ function FieldAdministration({ subtype, report }: { subtype: Subtype; report: (m
           }} /></label>
           <label>Visibility<select className="field mt-1" value={field.visibility} onChange={event => void updateField(field, { visibility: event.target.value as Field["visibility"] })}><option value="PUBLIC">Public</option><option value="INTERNAL">Internal</option></select></label>
           <label className="flex items-center gap-2 pt-7"><input type="checkbox" checked={field.required} onChange={event => void updateField(field, { required: event.target.checked })} /> Required</label>
+          <div className="sm:col-span-2 rounded border p-3"><p className="text-sm font-bold">Role grants</p><p className="mt-1 text-xs text-slate-500">If no grants are selected, legacy PUBLIC/INTERNAL visibility applies. Once configured, grants are additive.</p><div className="mt-3 grid gap-3 md:grid-cols-3">{(["VIEW", "EDIT", "CREATE"] as const).map(operation => <fieldset key={operation}><legend className="text-xs font-bold">{operation}</legend>{roles.filter(role => role.party === "TICKETFLOW1" || field.visibility === "PUBLIC").map(role => <label className="mt-1 flex items-center gap-2 text-xs" key={role.id}><input type="checkbox" checked={grants[operation].includes(role.id)} onChange={() => void toggleGrant(operation, role.id)} />{role.name}</label>)}</fieldset>)}</div></div>
         </div> : null}
       </article>)}
       {!fields.length ? <p className="rounded-lg border border-dashed p-5 text-center text-sm text-slate-500">No fields yet.</p> : null}
