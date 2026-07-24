@@ -173,7 +173,7 @@ function DashboardContent() {
           href={`/tickets?type=DEFECT&severity=${key}`} tone="amber" />)}
     </section>
 
-    <DashboardWidgetGrid data={data} widgets={preferences.dashboardWidgets} />
+    <DashboardWidgetGrid data={data} widgets={customizing ? draftWidgets : preferences.dashboardWidgets} />
   </div>;
 }
 
