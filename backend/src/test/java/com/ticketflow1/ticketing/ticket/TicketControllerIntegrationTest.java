@@ -1077,6 +1077,136 @@ class TicketControllerIntegrationTest {
         assertStatus(request, "CLOSED", admin);
     }
 
+    @Test
+    void tasiApproval_enforcesActorCommandsEvidenceStaleStateAndRollback() throws Exception {
+        jdbcTemplate.update("update app_user set password_hash=?, active=true where email=?",
+                passwordEncoder.encode("manager123"), "test.manager@ticketflow1.app");
+        Cookie admin = login("admin@ticketflow1.demo", "admin123");
+        Cookie manager = login("test.manager@ticketflow1.app", "manager123");
+        Cookie client = login("client-a@demo.test", "client123");
+        Long internalOrgId = jdbcTemplate.queryForObject(
+                "select id from organization where name='TicketFlow1 Internal'", Long.class);
+        Long firewallSubtypeId = jdbcTemplate.queryForObject("""
+                select subtype.id
+                from ticket_subtype subtype
+                join ticket_type type on type.id=subtype.ticket_type_id
+                where type.organization_id=? and type.key='TASI' and subtype.key='FIREWALL'
+                """, Long.class, internalOrgId);
+
+        String approved = createInternalFirewallTicket(admin, internalOrgId, firewallSubtypeId, "Approval matrix");
+        transitionWithCsrf(approved, "ANALYSIS", admin);
+        transitionWithCsrf(approved, "PENDING_APPROVAL", admin);
+
+        mockMvc.perform(get("/api/tickets/{ticketKey}", approved).cookie(manager))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.workflowCommands").isArray())
+                .andExpect(jsonPath("$.workflowCommands").value(
+                        org.hamcrest.Matchers.containsInAnyOrder("WORKFLOW_APPROVE", "WORKFLOW_REJECT")));
+        mockMvc.perform(get("/api/tickets/{ticketKey}", approved).cookie(admin))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.workflowCommands").isEmpty());
+        mockMvc.perform(post("/api/tickets/{ticketKey}/workflow-approve", approved)
+                        .with(csrf()).cookie(admin).contentType("application/json").content("{}"))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.error").value("FORBIDDEN"));
+        mockMvc.perform(get("/api/tickets/{ticketKey}", approved).cookie(client))
+                .andExpect(status().isNotFound());
+
+        decide(approved, "workflow-approve", manager, "Ready for implementation");
+        assertStatus(approved, "IMPLEMENTATION", manager);
+        assertThat(jdbcTemplate.queryForObject("""
+                select count(*) from ticket_approval approval
+                join ticket ticket on ticket.id=approval.ticket_id
+                where ticket.ticket_key=? and approval.status='APPROVED'
+                """, Long.class, approved)).isEqualTo(1L);
+        assertThat(jdbcTemplate.queryForObject("""
+                select count(*) from ticket_decision decision
+                join ticket ticket on ticket.id=decision.ticket_id
+                where ticket.ticket_key=? and decision.decision='APPROVED'
+                """, Long.class, approved)).isEqualTo(1L);
+        assertThat(jdbcTemplate.queryForObject("""
+                select count(*) from audit_log audit
+                join ticket ticket on ticket.id=audit.ticket_id
+                where ticket.ticket_key=? and audit.action='WORKFLOW_APPROVED'
+                """, Long.class, approved)).isEqualTo(1L);
+        mockMvc.perform(post("/api/tickets/{ticketKey}/workflow-approve", approved)
+                        .with(csrf()).cookie(manager).contentType("application/json").content("{}"))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.error").value("CONFLICT"));
+
+        String inactive = createInternalFirewallTicket(admin, internalOrgId, firewallSubtypeId, "Inactive approver");
+        transitionWithCsrf(inactive, "ANALYSIS", admin);
+        transitionWithCsrf(inactive, "PENDING_APPROVAL", admin);
+        jdbcTemplate.update("update app_user set active=false where email='test.manager@ticketflow1.app'");
+        mockMvc.perform(get("/api/tickets/{ticketKey}", inactive).cookie(manager))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.workflowCommands").isEmpty());
+        mockMvc.perform(post("/api/tickets/{ticketKey}/workflow-approve", inactive)
+                        .with(csrf()).cookie(manager).contentType("application/json").content("{}"))
+                .andExpect(status().isForbidden());
+        jdbcTemplate.update("update app_user set active=true where email='test.manager@ticketflow1.app'");
+
+        String rejected = createInternalFirewallTicket(admin, internalOrgId, firewallSubtypeId, "Rejected approval");
+        transitionWithCsrf(rejected, "ANALYSIS", admin);
+        transitionWithCsrf(rejected, "PENDING_APPROVAL", admin);
+        decide(rejected, "workflow-reject", manager, "Needs a safer rollback plan");
+        assertStatus(rejected, "ANALYSIS", manager);
+        assertThat(jdbcTemplate.queryForObject("""
+                select count(*) from ticket_decision decision
+                join ticket ticket on ticket.id=decision.ticket_id
+                where ticket.ticket_key=? and decision.decision='REJECTED'
+                  and decision.reason='Needs a safer rollback plan'
+                """, Long.class, rejected)).isEqualTo(1L);
+
+        String rollback = createInternalFirewallTicket(admin, internalOrgId, firewallSubtypeId, "Rollback approval");
+        transitionWithCsrf(rollback, "ANALYSIS", admin);
+        transitionWithCsrf(rollback, "PENDING_APPROVAL", admin);
+        jdbcTemplate.execute("""
+                alter table audit_log add constraint test_workflow_approval_rollback
+                check (action <> 'WORKFLOW_APPROVED') not valid
+                """);
+        try {
+            mockMvc.perform(post("/api/tickets/{ticketKey}/workflow-approve", rollback)
+                            .with(csrf()).cookie(manager).contentType("application/json").content("{}"))
+                    .andExpect(status().isInternalServerError());
+        } finally {
+            jdbcTemplate.execute(
+                    "alter table audit_log drop constraint test_workflow_approval_rollback");
+        }
+        assertStatus(rollback, "PENDING_APPROVAL", manager);
+        assertThat(jdbcTemplate.queryForObject("""
+                select count(*) from ticket_decision decision
+                join ticket ticket on ticket.id=decision.ticket_id
+                where ticket.ticket_key=?
+                """, Long.class, rollback)).isZero();
+        assertThat(jdbcTemplate.queryForObject("""
+                select count(*) from ticket_approval approval
+                join ticket ticket on ticket.id=approval.ticket_id
+                where ticket.ticket_key=? and approval.status='PENDING'
+                """, Long.class, rollback)).isEqualTo(1L);
+    }
+
+    private String createInternalFirewallTicket(Cookie admin, Long organizationId,
+            Long subtypeId, String title) throws Exception {
+        return createTicketWithCsrf(admin, """
+                {
+                  "type":"TASI",
+                  "organizationId":%d,
+                  "subtypeId":%d,
+                  "title":"%s",
+                  "description":"Verify protected TASI approval",
+                  "priority":"HIGH",
+                  "dynamicValues":{
+                    "source_cidr":"10.20.0.0/24",
+                    "destination":"payroll.internal",
+                    "service_ports":"TCP/443",
+                    "environment":"PRODUCTION",
+                    "business_justification":"Required for the approval regression test"
+                  }
+                }
+                """.formatted(organizationId, subtypeId, title), "NEW");
+    }
+
     private void transitionWithCsrf(String key, String state, Cookie cookie) throws Exception {
         mockMvc.perform(post("/api/tickets/{ticketKey}/transition", key).with(csrf()).cookie(cookie)
                         .contentType("application/json").content("{\"toStatus\":\"" + state + "\"}"))

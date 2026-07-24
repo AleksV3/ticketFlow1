@@ -316,6 +316,54 @@ class TicketTransitionServiceTest {
     }
 
     @Test
+    void workflowCommands_exposesApprovalOnlyToActiveEligibleActor() {
+        Fixture fixture = fixture("TASI Workflow", "PENDING_APPROVAL", "IMPLEMENTATION",
+                "TICKET_TRANSITION", Responsibility.TICKETFLOW1, null);
+        TicketApproval approval = new TicketApproval(
+                fixture.ticket(), fixture.fromState(), fixture.actor(), null);
+        WorkflowTransition edge = new WorkflowTransition(fixture.workflow(), fixture.fromState(), fixture.toState(),
+                new Permission("TICKET_TRANSITION"), Responsibility.TICKETFLOW1, null,
+                TransitionOperationKind.WORKFLOW_APPROVE);
+        when(workflowTransitionRepository.findByWorkflowIdAndFromStateId(
+                fixture.workflow().getId(), fixture.fromState().getId())).thenReturn(List.of(edge));
+        when(ticketApprovalRepository.findByTicketIdAndStatus(
+                fixture.ticket().getId(), TicketApprovalStatus.PENDING))
+                .thenReturn(java.util.Optional.of(approval));
+        AuthPrincipal eligible = new AuthPrincipal(fixture.actor().getId(), Responsibility.TICKETFLOW1,
+                fixture.organization().getId(), Set.of("TICKET_TRANSITION"));
+        AuthPrincipal unrelated = new AuthPrincipal(999L, Responsibility.TICKETFLOW1,
+                fixture.organization().getId(), Set.of("TICKET_TRANSITION"));
+
+        assertThat(ticketTransitionService.workflowCommands(fixture.ticket(), eligible))
+                .containsExactly("WORKFLOW_APPROVE");
+        assertThat(ticketTransitionService.workflowCommands(fixture.ticket(), unrelated)).isEmpty();
+
+        fixture.actor().setActive(false);
+        assertThat(ticketTransitionService.workflowCommands(fixture.ticket(), eligible)).isEmpty();
+    }
+
+    @Test
+    void protectedApproval_returnsConflictAfterApprovalIsAlreadyDecided() {
+        Fixture fixture = fixture("TASI Workflow", "PENDING_APPROVAL", "IMPLEMENTATION",
+                "TICKET_TRANSITION", Responsibility.TICKETFLOW1, null);
+        AuthPrincipal principal = new AuthPrincipal(fixture.actor().getId(), Responsibility.TICKETFLOW1,
+                fixture.organization().getId(), Set.of("TICKET_TRANSITION"));
+        when(ticketRepository.findByTicketKey(fixture.ticket().getTicketKey()))
+                .thenReturn(java.util.Optional.of(fixture.ticket()));
+        when(ticketApprovalRepository.findForUpdate(
+                fixture.ticket().getId(), TicketApprovalStatus.PENDING))
+                .thenReturn(java.util.Optional.empty());
+
+        assertThatThrownBy(() -> ticketTransitionService.protectedDecision(
+                fixture.ticket().getTicketKey(), TransitionOperationKind.WORKFLOW_APPROVE,
+                null, principal))
+                .isInstanceOf(ApiException.class)
+                .extracting(error -> ((ApiException) error).getErrorCode())
+                .isEqualTo("CONFLICT");
+        verifyNoInteractions(ticketDecisionRepository, auditService, statusHistoryService);
+    }
+
+    @Test
     void clientAcceptance_requiresTheBusinessOwner() {
         Fixture fixture = fixture("REQ Workflow", "CLIENT_ACCEPTANCE", "DEPLOYMENT",
                 "TICKET_TRANSITION", Responsibility.CLIENT, Responsibility.TICKETFLOW1);

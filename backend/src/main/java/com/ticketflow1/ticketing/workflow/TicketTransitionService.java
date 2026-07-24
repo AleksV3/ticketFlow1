@@ -323,10 +323,12 @@ public class TicketTransitionService {
 
     private boolean isNormalWorkflowApprover(TicketApproval approval, AuthPrincipal principal) {
         if (approval.getAssignedApprover() != null) {
-            return approval.getAssignedApprover().getId().equals(principal.userId());
+            return approval.getAssignedApprover().isActive()
+                    && approval.getAssignedApprover().getId().equals(principal.userId());
         }
         return approval.getAssignedTeam() != null
                 && approval.getAssignedTeam().getLeader() != null
+                && approval.getAssignedTeam().getLeader().isActive()
                 && approval.getAssignedTeam().getLeader().getId().equals(principal.userId());
     }
 
