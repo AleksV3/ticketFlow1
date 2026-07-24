@@ -72,7 +72,7 @@ constitution, and the source todo list.
 - [ ] T036 **Verify**: restricted values are absent from every unauthorized API
   and UI surface.
 
-## Phase 5: Ticket, team, and user UX P3 (implementation complete; verification pending)
+## Phase 5: Ticket, team, and user UX P3
 
 - [x] T037 Make comments and attachments separate full-width responsive rows.
 - [x] T038 Separate ticket filter draft/applied state; add collapsed Show,
@@ -82,9 +82,9 @@ constitution, and the source todo list.
   and empty state.
 - [x] T041 Extract/reuse the searchable combobox selection pattern.
 - [x] T042 Build accessible searchable/filterable user selection cards.
-- [ ] T043 Test no implicit filter requests, clear/apply semantics, responsive
+- [x] T043 Test no implicit filter requests, clear/apply semantics, responsive
   ticket layout, invalid saved team, keyboard combobox, and card selection.
-- [ ] T044 **Verify**: ticket/team/user flows pass unit and end-to-end tests.
+- [x] T044 **Verify**: ticket/team/user flows pass unit and end-to-end tests.
 
 ## Phase 6: Workflow administration P3
 
