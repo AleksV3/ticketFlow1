@@ -58,7 +58,8 @@ public class TicketService {
     private static final String INTERNAL_ORGANIZATION_NAME = "TicketFlow1 Internal";
     private static final int DEFAULT_PAGE_SIZE = 20;
     private static final int MAX_PAGE_SIZE = 100;
-    private static final Set<String> CLIENT_CREATABLE_TYPES = Set.of("DFCT", "REQ", "DEFECT", "REQUEST");
+    private static final Set<String> CLIENT_CREATABLE_TYPES = Set.of(
+            "DFCT", "REQ", "DEFECT", "REQUEST", "CHANGE_REQUEST", "TASK");
     private static final Set<String> INTERNAL_WORKFLOW_TYPES = Set.of("TASI", "USR");
 
     private final TicketRepository ticketRepository;
@@ -162,7 +163,8 @@ public class TicketService {
         if (targetUser != null) { ticket.setTargetUser(targetUser); ticket.setTargetUserDisplaySnapshot(targetUser.getDisplayName()); }
         if (request.parentTicketKey() != null && !request.parentTicketKey().isBlank()) {
             Ticket parent = findVisibleParentTicket(request.parentTicketKey().trim(), organization, principal);
-            if (principal.party() == Responsibility.CLIENT && !Set.of("DFCT", "REQ", "DEFECT", "REQUEST").contains(parent.getTicketType().getKey()))
+            if (principal.party() == Responsibility.CLIENT
+                    && !CLIENT_CREATABLE_TYPES.contains(parent.getTicketType().getKey()))
                 throw ApiException.notFound("Parent ticket not found: " + request.parentTicketKey());
             for (Ticket ancestor = parent; ancestor != null; ancestor = ancestor.getParentTicket()) {
                 if (ancestor.getId() != null && ancestor.getId().equals(ticket.getId())) throw ApiException.validation("A ticket cannot be its own ancestor.");

@@ -1,7 +1,10 @@
 package com.ticketflow1.ticketing.rbac;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.ticketflow1.ticketing.auth.AuthPrincipal;
 import com.ticketflow1.ticketing.common.ApiException;
+import com.ticketflow1.ticketing.configaudit.ConfigurationAuditService;
 import com.ticketflow1.ticketing.organization.Organization;
 import com.ticketflow1.ticketing.organization.OrganizationRepository;
 import com.ticketflow1.ticketing.rbac.dto.CreateRoleRequest;
@@ -23,12 +26,18 @@ public class RoleAdminService {
     private final RoleRepository roleRepository;
     private final PermissionRepository permissionRepository;
     private final OrganizationRepository organizationRepository;
+    private final ConfigurationAuditService auditService;
+    private final ObjectMapper objectMapper;
 
     public RoleAdminService(RoleRepository roleRepository, PermissionRepository permissionRepository,
-            OrganizationRepository organizationRepository) {
+            OrganizationRepository organizationRepository,
+            ConfigurationAuditService auditService,
+            ObjectMapper objectMapper) {
         this.roleRepository = roleRepository;
         this.permissionRepository = permissionRepository;
         this.organizationRepository = organizationRepository;
+        this.auditService = auditService;
+        this.objectMapper = objectMapper;
     }
 
     @Transactional(readOnly = true)
@@ -61,8 +70,10 @@ public class RoleAdminService {
                                 "Organization not found: " + request.organizationId()));
 
         Role role = new Role(request.name(), request.party(), organization, false);
-        role.replacePermissions(resolvePermissions(request.permissionKeys()));
+        role.replacePermissions(resolvePermissions(request.permissionKeys(), request.party()));
         Role saved = roleRepository.saveAndFlush(role);
+        auditService.record(saved.getOrganization(), principal.userId(), "ROLE", saved.getId(),
+                "CREATED", null, snapshot(saved));
         return RoleResponse.from(saved);
     }
 
@@ -83,17 +94,25 @@ public class RoleAdminService {
             throw ApiException.conflict(
                     "Role was changed by another administrator. Reload and try again.");
         }
+        String oldValue = snapshot(role);
         if (request.name() != null && !request.name().isBlank()) {
             role.setName(request.name());
         }
         if (request.permissionKeys() != null) {
-            Set<Permission> replacement = resolvePermissions(request.permissionKeys());
+            Set<Permission> replacement = resolvePermissions(request.permissionKeys(), role.getParty());
             role.replacePermissions(replacement);
         }
-        return RoleResponse.from(roleRepository.saveAndFlush(role));
+        Role saved = roleRepository.saveAndFlush(role);
+        auditService.record(saved.getOrganization(), principal.userId(), "ROLE", saved.getId(),
+                "UPDATED", oldValue, snapshot(saved));
+        return RoleResponse.from(saved);
     }
 
-    private Set<Permission> resolvePermissions(Set<String> keys) {
+    private Set<Permission> resolvePermissions(Set<String> keys, Responsibility party) {
+        if (party != Responsibility.TICKETFLOW1 && keys.contains("APPROVE_ALL_TICKETS")) {
+            throw ApiException.validation(
+                    "APPROVE_ALL_TICKETS is available only to TICKETFLOW1-party roles.");
+        }
         Set<Permission> permissions = permissionRepository.findByKeyIn(keys);
         if (permissions.size() != keys.size()) {
             Set<String> resolved = permissions.stream()
@@ -104,5 +123,18 @@ public class RoleAdminService {
             throw ApiException.validation("Unknown permissions: " + unknown);
         }
         return permissions;
+    }
+
+    private String snapshot(Role role) {
+        try {
+            return objectMapper.writeValueAsString(java.util.Map.of(
+                    "name", role.getName(),
+                    "permissions", role.getPermissions().stream()
+                            .map(Permission::getKey)
+                            .sorted()
+                            .toList()));
+        } catch (JsonProcessingException exception) {
+            throw new IllegalStateException("Could not serialize role audit snapshot.", exception);
+        }
     }
 }

@@ -984,7 +984,8 @@ class TicketControllerIntegrationTest {
     @Test
     void serviceRequestTypesSubtypesAndChildTicket_areCreatedWithTenantAuditContext() throws Exception {
         Cookie admin = login("admin@ticketflow1.demo", "admin123");
-        Long orgId = jdbcTemplate.queryForObject("select id from organization where name='Client A'", Long.class);
+        Long orgId = jdbcTemplate.queryForObject(
+                "select id from organization where name='TicketFlow1 Internal'", Long.class);
         Long tasiSubtype = jdbcTemplate.queryForObject("""
                 select s.id from ticket_subtype s join ticket_type t on t.id=s.ticket_type_id
                 where t.organization_id=? and t.key='TASI' and s.key='FIREWALL'
@@ -1000,17 +1001,27 @@ class TicketControllerIntegrationTest {
         Long targetUser = jdbcTemplate.queryForObject("select id from app_user where email='client-a@demo.test'", Long.class);
 
         String tasi = createTicketWithCsrf(admin, """
-                {"type":"TASI","organizationId":%d,"subtypeId":%d,"title":"Firewall action","description":"Inspect firewall rule","priority":"HIGH"}
+                {"type":"TASI","organizationId":%d,"subtypeId":%d,"title":"Firewall action",
+                 "description":"Inspect firewall rule","priority":"HIGH",
+                 "dynamicValues":{"source_cidr":"10.30.0.0/24","destination":"inventory.internal",
+                 "service_ports":"TCP/443","environment":"PRODUCTION",
+                 "business_justification":"Required for the service workflow integration test"}}
                 """.formatted(orgId, tasiSubtype), "NEW");
         String usrNew = createTicketWithCsrf(admin, """
                 {"type":"USR","organizationId":%d,"subtypeId":%d,"title":"New user","description":"Provision user","priority":"MEDIUM"}
                 """.formatted(orgId, usrNewSubtype), "NEW");
         String usrModify = createTicketWithCsrf(admin, """
-                {"type":"USR","organizationId":%d,"subtypeId":%d,"targetUserId":%d,"title":"Modify user","description":"Change access","priority":"MEDIUM"}
+                {"type":"USR","organizationId":%d,"subtypeId":%d,"targetUserId":%d,
+                 "title":"Modify user","description":"Change access","priority":"MEDIUM",
+                 "dynamicValues":{"change_summary":"Grant the requested reporting access"}}
                 """.formatted(orgId, usrModifySubtype, targetUser), "NEW");
 
         String child = createTicketWithCsrf(admin, """
-                {"type":"TASI","organizationId":%d,"subtypeId":%d,"parentTicketKey":"%s","title":"Firewall follow-up","description":"Follow-up action","priority":"MEDIUM"}
+                {"type":"TASI","organizationId":%d,"subtypeId":%d,"parentTicketKey":"%s",
+                 "title":"Firewall follow-up","description":"Follow-up action","priority":"MEDIUM",
+                 "dynamicValues":{"source_cidr":"10.31.0.0/24","destination":"inventory.internal",
+                 "service_ports":"TCP/443","environment":"PRODUCTION",
+                 "business_justification":"Required follow-up for the service workflow integration test"}}
                 """.formatted(orgId, tasiSubtype, tasi), "NEW");
 
         mockMvc.perform(get("/api/tickets/{ticketKey}", child).cookie(admin))
@@ -1028,7 +1039,8 @@ class TicketControllerIntegrationTest {
     void allServiceRequestWorkflows_executeHappyPathsAndDecisionCommands() throws Exception {
         Cookie admin = login("admin@ticketflow1.demo", "admin123");
         Cookie client = login("client-a@demo.test", "client123");
-        Long orgId = jdbcTemplate.queryForObject("select id from organization where name='Client A'", Long.class);
+        Long orgId = jdbcTemplate.queryForObject(
+                "select id from organization where name='TicketFlow1 Internal'", Long.class);
         Long adminId = jdbcTemplate.queryForObject("select id from app_user where email='admin@ticketflow1.demo'", Long.class);
         Long firewall = jdbcTemplate.queryForObject("""
                 select s.id from ticket_subtype s join ticket_type t on t.id=s.ticket_type_id
@@ -1039,10 +1051,16 @@ class TicketControllerIntegrationTest {
         Long target = jdbcTemplate.queryForObject("select id from app_user where email='client-a@demo.test'", Long.class);
 
         String tasi = createTicketWithCsrf(admin, """
-                {"type":"TASI","organizationId":%d,"subtypeId":%d,"title":"TASI path","description":"TASI","priority":"MEDIUM"}
+                {"type":"TASI","organizationId":%d,"subtypeId":%d,"title":"TASI path",
+                 "description":"TASI","priority":"MEDIUM",
+                 "dynamicValues":{"source_cidr":"10.32.0.0/24","destination":"workflow.internal",
+                 "service_ports":"TCP/443","environment":"PRODUCTION",
+                 "business_justification":"Required for the complete workflow integration test"}}
                 """.formatted(orgId, firewall), "NEW");
         String usr = createTicketWithCsrf(admin, """
-                {"type":"USR","organizationId":%d,"subtypeId":%d,"targetUserId":%d,"title":"USR path","description":"USR","priority":"MEDIUM"}
+                {"type":"USR","organizationId":%d,"subtypeId":%d,"targetUserId":%d,
+                 "title":"USR path","description":"USR","priority":"MEDIUM",
+                 "dynamicValues":{"change_summary":"Update access for the workflow test"}}
                 """.formatted(orgId, modify, target), "NEW");
         jdbcTemplate.update("update ticket set resolved_approver_id=? where ticket_key in (?,?)", adminId, tasi, usr);
 
@@ -1081,8 +1099,11 @@ class TicketControllerIntegrationTest {
     void tasiApproval_enforcesActorCommandsEvidenceStaleStateAndRollback() throws Exception {
         jdbcTemplate.update("update app_user set password_hash=?, active=true where email=?",
                 passwordEncoder.encode("manager123"), "test.manager@ticketflow1.app");
+        jdbcTemplate.update("update app_user set password_hash=?, active=true where email=?",
+                passwordEncoder.encode("developer123"), "test.developer@ticketflow1.app");
         Cookie admin = login("admin@ticketflow1.demo", "admin123");
         Cookie manager = login("test.manager@ticketflow1.app", "manager123");
+        Cookie unrelatedDeveloper = login("test.developer@ticketflow1.app", "developer123");
         Cookie client = login("client-a@demo.test", "client123");
         Long internalOrgId = jdbcTemplate.queryForObject(
                 "select id from organization where name='TicketFlow1 Internal'", Long.class);
@@ -1102,11 +1123,11 @@ class TicketControllerIntegrationTest {
                 .andExpect(jsonPath("$.workflowCommands").isArray())
                 .andExpect(jsonPath("$.workflowCommands").value(
                         org.hamcrest.Matchers.containsInAnyOrder("WORKFLOW_APPROVE", "WORKFLOW_REJECT")));
-        mockMvc.perform(get("/api/tickets/{ticketKey}", approved).cookie(admin))
+        mockMvc.perform(get("/api/tickets/{ticketKey}", approved).cookie(unrelatedDeveloper))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.workflowCommands").isEmpty());
         mockMvc.perform(post("/api/tickets/{ticketKey}/workflow-approve", approved)
-                        .with(csrf()).cookie(admin).contentType("application/json").content("{}"))
+                        .with(csrf()).cookie(unrelatedDeveloper).contentType("application/json").content("{}"))
                 .andExpect(status().isForbidden())
                 .andExpect(jsonPath("$.error").value("FORBIDDEN"));
         mockMvc.perform(get("/api/tickets/{ticketKey}", approved).cookie(client))
@@ -1184,6 +1205,127 @@ class TicketControllerIntegrationTest {
                 join ticket ticket on ticket.id=approval.ticket_id
                 where ticket.ticket_key=? and approval.status='PENDING'
                 """, Long.class, rollback)).isEqualTo(1L);
+    }
+
+    @Test
+    void globalApprovalAndRolePermissionSets_roundTripAuditAndRejectStaleUpdates() throws Exception {
+        jdbcTemplate.update("update app_user set password_hash=?, active=true where email=?",
+                passwordEncoder.encode("manager123"), "test.manager@ticketflow1.app");
+        jdbcTemplate.update("update app_user set password_hash=?, active=true where email=?",
+                passwordEncoder.encode("developer123"), "test.developer@ticketflow1.app");
+        Cookie admin = login("admin@ticketflow1.demo", "admin123");
+        Cookie manager = login("test.manager@ticketflow1.app", "manager123");
+        Cookie developer = login("test.developer@ticketflow1.app", "developer123");
+        Long internalOrgId = jdbcTemplate.queryForObject(
+                "select id from organization where name='TicketFlow1 Internal'", Long.class);
+        Long firewallSubtypeId = jdbcTemplate.queryForObject("""
+                select subtype.id
+                from ticket_subtype subtype
+                join ticket_type type on type.id=subtype.ticket_type_id
+                where type.organization_id=? and type.key='TASI' and subtype.key='FIREWALL'
+                """, Long.class, internalOrgId);
+
+        String ticketKey = createInternalFirewallTicket(
+                admin, internalOrgId, firewallSubtypeId, "Global approval override");
+        transitionWithCsrf(ticketKey, "ANALYSIS", admin);
+        transitionWithCsrf(ticketKey, "PENDING_APPROVAL", admin);
+        Long assignedApproverId = jdbcTemplate.queryForObject("""
+                select assigned_approver_id from ticket_approval approval
+                join ticket ticket on ticket.id=approval.ticket_id
+                where ticket.ticket_key=? and approval.status='PENDING'
+                """, Long.class, ticketKey);
+        Long managerId = jdbcTemplate.queryForObject(
+                "select id from app_user where email='test.manager@ticketflow1.app'", Long.class);
+        assertThat(assignedApproverId).isEqualTo(managerId);
+
+        mockMvc.perform(get("/api/tickets/{ticketKey}", ticketKey).cookie(admin))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.workflowCommands").value(
+                        org.hamcrest.Matchers.containsInAnyOrder("WORKFLOW_APPROVE", "WORKFLOW_REJECT")));
+        mockMvc.perform(post("/api/tickets/{ticketKey}/workflow-approve", ticketKey)
+                        .with(csrf()).cookie(developer).contentType("application/json").content("{}"))
+                .andExpect(status().isForbidden());
+        decide(ticketKey, "workflow-approve", admin, "Administrator override");
+        assertStatus(ticketKey, "IMPLEMENTATION", admin);
+        Long adminId = jdbcTemplate.queryForObject(
+                "select id from app_user where email='admin@ticketflow1.demo'", Long.class);
+        assertThat(jdbcTemplate.queryForObject("""
+                select count(*) from ticket_decision decision
+                join ticket ticket on ticket.id=decision.ticket_id
+                where ticket.ticket_key=? and decision.actor_id=? and decision.decision='APPROVED'
+                """, Long.class, ticketKey, adminId)).isEqualTo(1L);
+
+        MvcResult permissionsResult = mockMvc.perform(get("/api/admin/permissions").cookie(admin))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[?(@.key == 'APPROVE_ALL_TICKETS')]").exists())
+                .andReturn();
+        JsonNode permissions = objectMapper.readTree(
+                permissionsResult.getResponse().getContentAsString());
+        java.util.List<String> fullCatalog = new java.util.ArrayList<>();
+        permissions.forEach(permission -> fullCatalog.add(permission.path("key").asText()));
+        String roleName = "Phase 2 Full Catalog";
+        java.util.Map<String, Object> createRolePayload = new java.util.LinkedHashMap<>();
+        createRolePayload.put("name", roleName);
+        createRolePayload.put("party", "TICKETFLOW1");
+        createRolePayload.put("organizationId", null);
+        createRolePayload.put("permissionKeys", fullCatalog);
+        String createBody = objectMapper.writeValueAsString(createRolePayload);
+        MvcResult createRole = mockMvc.perform(post("/api/admin/roles").with(csrf()).cookie(admin)
+                        .contentType("application/json").content(createBody))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.permissions.length()").value(fullCatalog.size()))
+                .andReturn();
+        JsonNode createdRole = objectMapper.readTree(
+                createRole.getResponse().getContentAsString());
+        long roleId = createdRole.path("id").asLong();
+        long originalVersion = createdRole.path("version").asLong();
+
+        java.util.List<String> withoutOne = fullCatalog.stream()
+                .filter(key -> !"COMMENT_PUBLIC_WRITE".equals(key))
+                .toList();
+        String updateBody = objectMapper.writeValueAsString(java.util.Map.of(
+                "name", roleName,
+                "permissionKeys", withoutOne,
+                "version", originalVersion));
+        mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders
+                        .patch("/api/admin/roles/{id}", roleId).with(csrf()).cookie(admin)
+                        .contentType("application/json").content(updateBody))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.permissions.length()").value(withoutOne.size()))
+                .andExpect(jsonPath("$.permissions",
+                        org.hamcrest.Matchers.not(org.hamcrest.Matchers.hasItem("COMMENT_PUBLIC_WRITE"))));
+        mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders
+                        .patch("/api/admin/roles/{id}", roleId).with(csrf()).cookie(admin)
+                        .contentType("application/json").content(updateBody))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.error").value("CONFLICT"));
+
+        assertThat(jdbcTemplate.queryForObject(
+                "select count(*) from role_permission where role_id=?", Long.class, roleId))
+                .isEqualTo(withoutOne.size());
+        assertThat(jdbcTemplate.queryForObject("""
+                select count(*) from configuration_audit_log
+                where target_type='ROLE' and target_id=? and action in ('CREATED','UPDATED')
+                """, Long.class, roleId)).isEqualTo(2L);
+
+        String duplicateBody = """
+                {"name":"Phase 2 Duplicate Normalization","party":"TICKETFLOW1",
+                 "organizationId":null,
+                 "permissionKeys":["TICKET_READ","TICKET_READ","TICKET_TRANSITION"]}
+                """;
+        mockMvc.perform(post("/api/admin/roles").with(csrf()).cookie(admin)
+                        .contentType("application/json").content(duplicateBody))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.permissions.length()").value(2));
+
+        String clientOverrideBody = """
+                {"name":"Invalid Client Override","party":"CLIENT","organizationId":%d,
+                 "permissionKeys":["TICKET_READ","APPROVE_ALL_TICKETS"]}
+                """.formatted(internalOrgId);
+        mockMvc.perform(post("/api/admin/roles").with(csrf()).cookie(admin)
+                        .contentType("application/json").content(clientOverrideBody))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error").value("VALIDATION_FAILED"));
     }
 
     private String createInternalFirewallTicket(Cookie admin, Long organizationId,

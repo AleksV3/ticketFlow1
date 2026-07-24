@@ -119,6 +119,16 @@ public class TicketTransitionService {
             throw ApiException.validation("A rejection reason of at least 2 characters is required.");
         }
         Ticket ticket = findVisibleTicket(ticketKey, principal);
+        if (operation == TransitionOperationKind.CLIENT_ACCEPT
+                || operation == TransitionOperationKind.CLIENT_REJECT) {
+            Ticket saved = transitionOwned(ticket, operation, principal);
+            if (reason != null && !reason.isBlank()) {
+                commentService.createForTicket(
+                        saved, reason.trim(), CommentVisibility.PUBLIC, principal);
+            }
+            return TicketDetailResponse.from(saved, allowedTransitions(saved, principal),
+                    proposalDetailService.detail(saved, principal), slaStatusService.status(saved));
+        }
         TicketApproval approval = ticketApprovalRepository.findForUpdate(
                         ticket.getId(), TicketApprovalStatus.PENDING)
                 .orElseThrow(() -> ApiException.conflict(

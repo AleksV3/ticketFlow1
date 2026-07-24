@@ -1,6 +1,6 @@
 # Tasks: Priority Fixes and UX Improvements
 
-**Status**: Phase 1 complete — awaiting review before Phase 2
+**Status**: Phase 2 complete — awaiting review before Phase 3
 
 **Input**: `spec.md`, `plan.md`, feature `002` approval contracts, current
 constitution, and the source todo list.
@@ -42,11 +42,11 @@ constitution, and the source todo list.
 - [x] T018 Implement validated transactional replace-set role updates with
   de-duplication and concurrency protection.
 - [x] T019 Add database uniqueness/invariant migration only where missing.
-- [ ] T020 Audit global decisions and role permission changes.
-- [ ] T021 Test Developer A assignment, global administrator decision, Developer
+- [x] T020 Audit global decisions and role permission changes.
+- [x] T021 Test Developer A assignment, global administrator decision, Developer
   B denial, cross-tenant denial, full-catalog role round-trip, removal of one
   permission, duplicates, and stale edits.
-- [ ] T022 **Verify**: P0/P1 backend, frontend, and authorization suites pass
+- [x] T022 **Verify**: P0/P1 backend, frontend, and authorization suites pass
   before starting P2.
 
 ## Phase 3: Dashboard preferences P2
