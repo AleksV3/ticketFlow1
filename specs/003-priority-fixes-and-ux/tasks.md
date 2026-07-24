@@ -51,9 +51,9 @@ constitution, and the source todo list.
 
 ## Phase 3: Dashboard preferences P2
 
-- [ ] T023 Add scoped user/organization preference schema and domain model.
-- [ ] T024 Add bounded dashboard layout get/replace/reset endpoints.
-- [ ] T025 Add “awaiting my approval” and other missing widget queries.
+- [x] T023 Add scoped user/organization preference schema and domain model.
+- [x] T024 Add bounded dashboard layout get/replace/reset endpoints.
+- [x] T025 Add “awaiting my approval” and other missing widget queries.
 - [ ] T026 Build widget visibility, reorder, save, and reset controls.
 - [ ] T027 Test invalid widget keys, retired widgets, reload persistence, reset,
   and two-user/two-organization isolation.

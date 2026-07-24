@@ -9,6 +9,7 @@ import com.ticketflow1.ticketing.sla.SlaCalculator;
 import com.ticketflow1.ticketing.sla.SlaStatusService;
 import com.ticketflow1.ticketing.ticket.Responsibility;
 import com.ticketflow1.ticketing.ticket.TicketRepository;
+import com.ticketflow1.ticketing.ticketconfig.TicketApprovalRepository;
 import java.time.Clock;
 import java.util.List;
 import java.util.Set;
@@ -26,6 +27,8 @@ class DashboardServiceTest {
 
     @Mock
     private TicketRepository ticketRepository;
+    @Mock
+    private TicketApprovalRepository ticketApprovalRepository;
     private DashboardService dashboardService;
 
     @BeforeEach
@@ -33,7 +36,7 @@ class DashboardServiceTest {
         SlaCalculator calculator = new SlaCalculator();
         Clock clock = Clock.systemUTC();
         dashboardService = new DashboardService(ticketRepository, calculator,
-                new SlaStatusService(calculator, clock), clock);
+                new SlaStatusService(calculator, clock), clock, ticketApprovalRepository);
     }
 
     @Test
@@ -55,5 +58,9 @@ class DashboardServiceTest {
         assertThat(response.waitingForClientApproval()).isEmpty();
         assertThat(response.waitingForClientConfirmation()).isEmpty();
         assertThat(response.myAssignedTickets()).isEmpty();
+        assertThat(response.myOpenTickets()).isEmpty();
+        assertThat(response.myTeamTickets()).isEmpty();
+        assertThat(response.awaitingMyApproval()).isEmpty();
+        assertThat(response.recentlyUpdated()).isEmpty();
     }
 }

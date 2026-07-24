@@ -14,5 +14,9 @@ public record DashboardResponse(
         List<TicketSummaryResponse> slaDueSoon,
         List<TicketSummaryResponse> waitingForClientApproval,
         List<TicketSummaryResponse> waitingForClientConfirmation,
-        List<TicketSummaryResponse> myAssignedTickets) {
+        List<TicketSummaryResponse> myAssignedTickets,
+        List<TicketSummaryResponse> myOpenTickets,
+        List<TicketSummaryResponse> myTeamTickets,
+        List<TicketSummaryResponse> awaitingMyApproval,
+        List<TicketSummaryResponse> recentlyUpdated) {
 }
