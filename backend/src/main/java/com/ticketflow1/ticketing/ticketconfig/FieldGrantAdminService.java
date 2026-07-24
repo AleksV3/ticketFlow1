@@ -21,7 +21,7 @@ public class FieldGrantAdminService {
   boolean internal=f.getSubtype().getTicketType().getOrganization()==null;
   if(rs.stream().anyMatch(r->r.getParty()!= (internal ? Responsibility.TICKETFLOW1 : Responsibility.CLIENT))) throw ApiException.validation("Role party does not match field configuration scope.");
   grants.deleteAll(grants.findByFieldId(fieldId)); Map<Long,Role> map=new HashMap<>();rs.forEach(r->map.put(r.getId(),r)); List<SubtypeFieldRoleGrant> out=new ArrayList<>(); add(out,f,map,view,FieldGrantOperation.VIEW);add(out,f,map,edit,FieldGrantOperation.EDIT);add(out,f,map,create,FieldGrantOperation.CREATE); List<SubtypeFieldRoleGrant> saved=grants.saveAll(out);
-  audit.record(f.getSubtype().getTicketType().getOrganization(),p.userId(),"SUBTYPE_FIELD",fieldId,"GRANTS_REPLACED",java.util.Map.of("view",new LinkedHashSet<>(view==null?List.of():view),"edit",new LinkedHashSet<>(edit==null?List.of():edit),"create",new LinkedHashSet<>(create==null?List.of():create)).toString());
+  audit.record(f.getSubtype().getTicketType().getOrganization(),p.userId(),"SUBTYPE_FIELD",fieldId,"GRANTS_REPLACED",null,java.util.Map.of("view",new LinkedHashSet<>(view==null?List.of():view),"edit",new LinkedHashSet<>(edit==null?List.of():edit),"create",new LinkedHashSet<>(create==null?List.of():create)).toString());
   return saved;
  }
  private void add(List<SubtypeFieldRoleGrant> out,SubtypeFieldDefinition f,Map<Long,Role> m,Collection<Long> ids,FieldGrantOperation op){if(ids!=null)for(Long id:new LinkedHashSet<>(ids)){Role r=m.get(id);if(r!=null)out.add(new SubtypeFieldRoleGrant(f,r,op));}}

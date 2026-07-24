@@ -41,6 +41,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
@@ -84,6 +85,7 @@ public class TicketService {
     private final DynamicFieldValidator dynamicFieldValidator;
     private final com.ticketflow1.ticketing.ticketconfig.FieldAuthorizationService fieldAuthorization;
 
+    @Autowired
     public TicketService(TicketRepository ticketRepository,
             TicketTypeRepository ticketTypeRepository,
             WorkflowStateRepository workflowStateRepository,
