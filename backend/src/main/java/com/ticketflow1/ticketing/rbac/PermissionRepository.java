@@ -1,6 +1,7 @@
 package com.ticketflow1.ticketing.rbac;
 
 import java.util.Optional;
+import java.util.Set;
 import org.springframework.data.jpa.repository.JpaRepository;
 
 public interface PermissionRepository extends JpaRepository<Permission, Long> {
@@ -9,4 +10,3 @@ public interface PermissionRepository extends JpaRepository<Permission, Long> {
 
     Set<Permission> findByKeyIn(Set<String> keys);
 }
-import java.util.Set;
