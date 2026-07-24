@@ -35,9 +35,9 @@ constitution, and the source todo list.
 
 ## Phase 2: Global approval and role sets P1
 
-- [ ] T014 Add and migrate fixed catalog permission `APPROVE_ALL_TICKETS`.
-- [ ] T015 Extend the central approval predicate with the tenant-scoped override.
-- [ ] T016 Expose the new permission through role administration.
+- [x] T014 Add and migrate fixed catalog permission `APPROVE_ALL_TICKETS`.
+- [x] T015 Extend the central approval predicate with the tenant-scoped override.
+- [x] T016 Expose the new permission through role administration.
 - [ ] T017 Remove frontend, DTO, validation, and service permission-count caps.
 - [ ] T018 Implement validated transactional replace-set role updates with
   de-duplication and concurrency protection.

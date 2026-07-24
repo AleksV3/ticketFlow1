@@ -120,7 +120,7 @@ public class TicketController {
     }
 
     @PostMapping("/{ticketKey}/workflow-approve")
-    @PreAuthorize("hasAuthority('TICKET_TRANSITION')")
+    @PreAuthorize("hasAnyAuthority('TICKET_TRANSITION', 'APPROVE_ALL_TICKETS')")
     public TicketDetailResponse workflowApprove(@PathVariable String ticketKey,
             @RequestBody(required = false) WorkflowDecisionRequest request,
             @AuthenticationPrincipal AuthPrincipal principal) {
@@ -129,7 +129,7 @@ public class TicketController {
     }
 
     @PostMapping("/{ticketKey}/workflow-reject")
-    @PreAuthorize("hasAuthority('TICKET_TRANSITION')")
+    @PreAuthorize("hasAnyAuthority('TICKET_TRANSITION', 'APPROVE_ALL_TICKETS')")
     public TicketDetailResponse workflowReject(@PathVariable String ticketKey,
             @Valid @RequestBody WorkflowDecisionRequest request,
             @AuthenticationPrincipal AuthPrincipal principal) {

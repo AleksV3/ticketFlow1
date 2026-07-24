@@ -343,6 +343,30 @@ class TicketTransitionServiceTest {
     }
 
     @Test
+    void workflowApproval_globalPermissionOverridesAssignedApproverRelationship() {
+        Fixture fixture = fixture("TASI Workflow", "PENDING_APPROVAL", "IMPLEMENTATION",
+                "TICKET_TRANSITION", Responsibility.TICKETFLOW1, null);
+        AppUser assignedApprover = appUser(
+                58L, "assigned@demo.test", Responsibility.TICKETFLOW1, fixture.organization());
+        TicketApproval approval = new TicketApproval(
+                fixture.ticket(), fixture.fromState(), assignedApprover, null);
+        WorkflowTransition edge = new WorkflowTransition(fixture.workflow(), fixture.fromState(), fixture.toState(),
+                new Permission("TICKET_TRANSITION"), Responsibility.TICKETFLOW1, null,
+                TransitionOperationKind.WORKFLOW_APPROVE);
+        when(workflowTransitionRepository.findByWorkflowIdAndFromStateId(
+                fixture.workflow().getId(), fixture.fromState().getId())).thenReturn(List.of(edge));
+        when(ticketApprovalRepository.findByTicketIdAndStatus(
+                fixture.ticket().getId(), TicketApprovalStatus.PENDING))
+                .thenReturn(java.util.Optional.of(approval));
+        AuthPrincipal globalApprover = new AuthPrincipal(
+                fixture.actor().getId(), Responsibility.TICKETFLOW1,
+                fixture.organization().getId(), Set.of("APPROVE_ALL_TICKETS"));
+
+        assertThat(ticketTransitionService.workflowCommands(fixture.ticket(), globalApprover))
+                .containsExactly("WORKFLOW_APPROVE");
+    }
+
+    @Test
     void protectedApproval_returnsConflictAfterApprovalIsAlreadyDecided() {
         Fixture fixture = fixture("TASI Workflow", "PENDING_APPROVAL", "IMPLEMENTATION",
                 "TICKET_TRANSITION", Responsibility.TICKETFLOW1, null);

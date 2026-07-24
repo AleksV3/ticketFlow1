@@ -38,6 +38,8 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 public class TicketTransitionService {
 
+    private static final String APPROVE_ALL_TICKETS = "APPROVE_ALL_TICKETS";
+
     private final TicketRepository ticketRepository;
     private final WorkflowStateRepository workflowStateRepository;
     private final WorkflowTransitionRepository workflowTransitionRepository;
@@ -268,21 +270,27 @@ public class TicketTransitionService {
     }
 
     private boolean isAllowed(Ticket ticket, WorkflowTransition transition, AuthPrincipal principal) {
-        if (!principal.hasPermission(transition.getRequiredPermission().getKey())) {
-            return false;
-        }
-        Responsibility requiredParty = transition.getRequiredParty();
-        if (requiredParty != null && requiredParty != principal.party()) return false;
         TransitionOperationKind operation = transition.getOperationKind();
         if (operation == TransitionOperationKind.WORKFLOW_APPROVE
                 || operation == TransitionOperationKind.WORKFLOW_REJECT) {
             if (principal.party() != Responsibility.TICKETFLOW1) {
                 return false;
             }
+            if (principal.hasPermission(APPROVE_ALL_TICKETS)) {
+                return pendingApproval(ticket).isPresent();
+            }
+            if (!principal.hasPermission(transition.getRequiredPermission().getKey())) {
+                return false;
+            }
             return pendingApproval(ticket)
                     .map(approval -> isNormalWorkflowApprover(approval, principal))
                     .orElse(false);
         }
+        if (!principal.hasPermission(transition.getRequiredPermission().getKey())) {
+            return false;
+        }
+        Responsibility requiredParty = transition.getRequiredParty();
+        if (requiredParty != null && requiredParty != principal.party()) return false;
         if (operation == TransitionOperationKind.CLIENT_ACCEPT
                 || operation == TransitionOperationKind.CLIENT_REJECT) {
             return principal.party() == Responsibility.CLIENT
@@ -334,16 +342,19 @@ public class TicketTransitionService {
 
     private boolean isAllowed(TicketApproval approval, Ticket ticket,
             WorkflowTransition transition, AuthPrincipal principal) {
-        if (!principal.hasPermission(transition.getRequiredPermission().getKey())) {
+        if (principal.party() != Responsibility.TICKETFLOW1) {
             return false;
         }
-        if (transition.getRequiredParty() != null
-                && transition.getRequiredParty() != principal.party()) {
-            return false;
-        }
-        return approval.getTicket().getId().equals(ticket.getId())
+        boolean validApproval = approval.getTicket().getId().equals(ticket.getId())
                 && approval.getPendingState().getId().equals(ticket.getCurrentState().getId())
-                && principal.party() == Responsibility.TICKETFLOW1
+                && approval.getStatus() == TicketApprovalStatus.PENDING;
+        if (!validApproval) {
+            return false;
+        }
+        if (principal.hasPermission(APPROVE_ALL_TICKETS)) {
+            return true;
+        }
+        return principal.hasPermission(transition.getRequiredPermission().getKey())
                 && isNormalWorkflowApprover(approval, principal);
     }
 
