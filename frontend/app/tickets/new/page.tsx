@@ -44,6 +44,7 @@ function TicketForm({ user }: { user: CurrentUser }) {
   const [teams, setTeams] = useState<Team[]>([]);
   const [org, setOrg] = useState(user.organizationId ? String(user.organizationId) : "");
   const [type, setType] = useState("");
+  const [selectedTypeId, setSelectedTypeId] = useState<number | null>(null);
   const [creationForm, setCreationForm] = useState<CreationForm | null>(null);
   const [subtypeId, setSubtypeId] = useState("");
   const [dynamicValues, setDynamicValues] = useState<Record<string, unknown>>({});
@@ -60,7 +61,7 @@ function TicketForm({ user }: { user: CurrentUser }) {
   const [teamIds, setTeamIds] = useState<number[]>([]);
   const [error, setError] = useState("");
 
-  const selectedType = useMemo(() => types.find(item => item.key === type || item.name.toLowerCase() === type.toLowerCase()) ?? null, [type, types]);
+  const selectedType = useMemo(() => types.find(item => item.id === selectedTypeId) ?? null, [selectedTypeId, types]);
   const selectedSubtype = useMemo(() => creationForm?.subtypes.find(item => String(item.id) === subtypeId) ?? null, [creationForm, subtypeId]);
   const needsUsrTarget = selectedType?.key === "USR" && ["MODIFY", "DELETE"].includes(selectedSubtype?.key ?? "");
   const isSubticket = parentTicketKey.trim().length > 0;
@@ -90,6 +91,7 @@ function TicketForm({ user }: { user: CurrentUser }) {
     void get<Ref[]>(`/reference/ticket-types?organizationId=${org}`).then(values => {
       setTypes(values);
       setType("");
+      setSelectedTypeId(null);
       setCreationForm(null);
       setSubtypeId("");
       setDynamicValues({});
@@ -133,16 +135,17 @@ function TicketForm({ user }: { user: CurrentUser }) {
   async function submit(event: FormEvent) {
     event.preventDefault();
     setError("");
-    if (!selectedType?.key) { setError("Select a ticket type from the available results."); return; }
+    if (!selectedType) { setError("Select a ticket type from the available results."); return; }
+    const selectedTypeKey = selectedType.key ?? selectedType.name;
     if (creationForm?.subtypes.length && !selectedSubtype) { setError("Select a subtype."); return; }
     if (needsUsrTarget && !targetUser) { setError("Select the user affected by this USR request."); return; }
     try {
       const ticket = await post<TicketDetail>("/tickets", {
-        type: selectedType.key,
+        type: selectedTypeKey,
         title,
         description,
         priority,
-        severity: selectedType.key === "DEFECT" || selectedType.key === "DFCT" ? severity : null,
+        severity: selectedTypeKey === "DEFECT" || selectedTypeKey === "DFCT" ? severity : null,
         organizationId: user.party === "TICKETFLOW1" ? Number(org) : null,
         ticketLeadId: canAssign && leadId ? Number(leadId) : null,
         developerIds: canAssign ? developerIds : null,
@@ -162,7 +165,7 @@ function TicketForm({ user }: { user: CurrentUser }) {
     <h1 className="text-3xl font-bold">Create ticket</h1>
     <form className="card mt-6 space-y-5" onSubmit={submit}>
       {user.party === "TICKETFLOW1" ? <Select label="Organization" value={org} set={setOrg} disabled={isSubticket} options={orgs.map(item => [String(item.id), item.name])} help={isSubticket ? "Subtickets created by TicketFlow1 are internal work items. The parent can still be a client ticket." : "TASI and USR are saved under TicketFlow1 Internal automatically."}/> : null}
-      <label className="block"><span>Ticket type</span><input className="field mt-1" required list="ticket-type-options" value={type} onChange={event => setType(event.target.value)} placeholder="Search standard or custom ticket types..."/><datalist id="ticket-type-options">{types.map(item => <option key={item.id} value={item.key}>{item.name}</option>)}</datalist><small className="text-slate-500">Start typing to search all ticket types configured for this organization.</small></label>
+      <fieldset className="rounded-lg border p-4"><legend className="px-2 font-bold">Ticket type</legend><label className="block"><span className="sr-only">Search ticket types</span><input aria-label="Ticket type" className="field mt-1" required value={type} onChange={event => { setType(event.target.value); setSelectedTypeId(null); setCreationForm(null); setSubtypeId(""); }} placeholder="Search standard or custom ticket types..." autoComplete="off"/><small className="text-slate-500">Search, then explicitly select a configured ticket type to open its subtype form.</small></label>{type.trim() && !selectedType ? <div className="mt-3 grid gap-2 sm:grid-cols-2" role="listbox" aria-label="Available ticket types">{types.filter(item => (item.key ?? item.name).toLowerCase().includes(type.trim().toLowerCase()) || item.name.toLowerCase().includes(type.trim().toLowerCase())).map(item => <button type="button" role="option" aria-selected={false} className="permission-option w-full text-left" key={item.id} onClick={() => { setType(item.key ?? item.name); setSelectedTypeId(item.id); }}><span><strong>{item.name}</strong><small>{item.key ?? item.name}</small></span></button>)}{!types.some(item => (item.key ?? item.name).toLowerCase().includes(type.trim().toLowerCase()) || item.name.toLowerCase().includes(type.trim().toLowerCase())) ? <p className="text-sm text-slate-500">No matching ticket types.</p> : null}</div> : null}{selectedType ? <p className="mt-3 rounded border border-blue-500/30 bg-blue-950/20 p-2 text-sm">Selected: <strong>{selectedType.name}</strong> ({selectedType.key ?? selectedType.name})</p> : null}</fieldset>
       {creationForm?.subtypes.length ? <SubtypeAndFields subtypeId={subtypeId} setSubtypeId={setSubtypeId} selectedSubtype={selectedSubtype} form={creationForm} values={dynamicValues} setValue={setDynamic} people={people} teams={teams}/> : null}
       {needsUsrTarget ? <TargetUserSearch query={targetQuery} setQuery={setTargetQuery} results={targetResults} selected={targetUser} setSelected={setTargetUser}/> : null}
       <label className="block"><span>Parent ticket key</span><input className="field mt-1" value={parentTicketKey} onChange={event => setParentTicketKey(event.target.value.toUpperCase())} placeholder="Optional, e.g. TKT-1234"/><small className="text-slate-500">Use this when creating a subticket from an existing ticket.</small></label>

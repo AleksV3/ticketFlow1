@@ -14,8 +14,8 @@ public record WorkflowResponse(Long id, String name, Long organizationId, long v
                 states.stream().map(State::from).toList(),
                 transitions.stream().sorted(Comparator.comparing(WorkflowTransition::getId)).map(Transition::from).toList());
     }
-    public record State(Long id, String key, boolean isInitial, boolean isTerminal, int sortOrder) {
-        static State from(WorkflowState s) { return new State(s.getId(), s.getKey(), s.isInitial(), s.isTerminal(), s.getSortOrder()); }
+    public record State(Long id, String key, String name, boolean isInitial, boolean isTerminal, int sortOrder) {
+        static State from(WorkflowState s) { return new State(s.getId(), s.getKey(), s.getName(), s.isInitial(), s.isTerminal(), s.getSortOrder()); }
     }
     public record Transition(Long id, Long fromStateId, Long toStateId, String requiredPermission,
             String requiredParty, String responsibilityAfter, String operationKind) {

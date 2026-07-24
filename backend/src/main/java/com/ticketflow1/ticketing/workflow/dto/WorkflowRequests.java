@@ -12,6 +12,7 @@ public final class WorkflowRequests {
             Responsibility requiredParty, Responsibility responsibilityAfter, TransitionOperationKind operationKind) {}
     public record Create(String name, Long organizationId, List<State> states, List<Transition> transitions) {}
     public record Update(Long version, List<State> states, List<Transition> transitions, String canvasLayout) {}
+    public record RenameState(Long version, String name) {}
     public record CreateType(String key, String name, Long workflowId, Long organizationId,
             boolean requiresProposal, Boolean active, Integer sortOrder, TicketTypeCapability capability) {}
     public record UpdateType(Long version, String name, Long workflowId, Boolean active, Integer sortOrder,

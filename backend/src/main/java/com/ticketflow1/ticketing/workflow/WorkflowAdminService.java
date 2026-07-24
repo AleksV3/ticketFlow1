@@ -103,6 +103,36 @@ public class WorkflowAdminService {
         states.delete(state);
     }
     /**
+     * Renames one state in place.  The state id is retained, so all standard
+     * and protected transitions (and tickets/status history) stay connected.
+     * Workflow versioning makes stale canvas edits fail with a conflict.
+     */
+    @Transactional public WorkflowResponse renameState(AuthPrincipal p, Long workflowId, Long stateId,
+            WorkflowRequests.RenameState request) {
+        Workflow workflow = visible(p, workflowId);
+        if (request == null || request.version() == null || request.version() != workflow.getVersion())
+            throw ApiException.conflict("Workflow was modified by another user.");
+        String name = request.name() == null ? "" : request.name().trim();
+        if (name.isBlank()) throw ApiException.validation("State name cannot be blank.");
+        if (name.length() > 100) throw ApiException.validation("State name cannot exceed 100 characters.");
+        WorkflowState state = states.findById(stateId)
+                .filter(item -> item.getWorkflow().getId().equals(workflowId))
+                .orElseThrow(() -> ApiException.notFound("Workflow state not found: " + stateId));
+        states.findByWorkflowIdAndName(workflowId, name).filter(other -> !other.getId().equals(stateId))
+                .ifPresent(other -> { throw ApiException.validation("State names must be unique."); });
+        String oldName = state.getName();
+        if (!java.util.Objects.equals(oldName, name)) {
+            state.rename(name);
+            workflow.touchForAudit();
+            workflows.flush();
+            audit.record(workflow.getOrganization(), p.userId(), "WORKFLOW_STATE", stateId, "RENAMED",
+                    "{\"name\":\"" + auditValue(oldName) + "\"}",
+                    "{\"name\":\"" + auditValue(name) + "\"}");
+        }
+        return response(workflow);
+    }
+    private String auditValue(String value) { return value.replace("\\", "\\\\").replace("\"", "\\\""); }
+    /**
      * Lists ticket types that belong to the current scope.
      */
     @Transactional(readOnly=true) public List<TicketTypeAdminResponse> listTypes(AuthPrincipal p,Long orgId){Long s=scope(p,orgId);return (s==null?types.findByOrganizationIsNull():types.findByOrganizationId(s)).stream().map(TicketTypeAdminResponse::from).toList();}

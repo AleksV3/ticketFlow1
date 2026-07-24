@@ -88,15 +88,15 @@ constitution, and the source todo list.
 
 ## Phase 6: Workflow administration P3
 
-- [ ] T045 Contextualize “Create ticket type” below persisted workflow edit
+- [x] T045 Contextualize “Create ticket type” below persisted workflow edit
   canvas only.
-- [ ] T046 Stop automatic subtype-form opening; require explicit type selection.
-- [ ] T047 Add versioned in-place workflow state rename with blank/duplicate
+- [x] T046 Stop automatic subtype-form opening; require explicit type selection.
+- [x] T047 Add versioned in-place workflow state rename with blank/duplicate
   validation and transition preservation.
-- [ ] T048 Record workflow state rename in configuration audit.
-- [ ] T049 Test create/edit context, explicit subtype opening, duplicate/blank
+- [x] T048 Record workflow state rename in configuration audit.
+- [x] T049 Test create/edit context, explicit subtype opening, duplicate/blank
   rename, connected transitions, stale edit, and audit.
-- [ ] T050 **Verify**: rename a connected state and execute its preserved path.
+- [x] T050 **Verify**: rename a connected state and execute its preserved path.
 
 ## Phase 7: Layout, theme, and contrast P3
 

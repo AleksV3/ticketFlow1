@@ -43,6 +43,9 @@ public class WorkflowAdminController {
      */
     @DeleteMapping("/workflows/{id}/states/{stateId}") @ResponseStatus(HttpStatus.NO_CONTENT) @PreAuthorize("hasAuthority('WORKFLOW_MANAGE')")
     void removeState(@AuthenticationPrincipal AuthPrincipal p,@PathVariable Long id,@PathVariable Long stateId){service.removeState(p,id,stateId);}
+    /** Renames a state without rebuilding its transition graph. */
+    @PatchMapping("/workflows/{id}/states/{stateId}") @PreAuthorize("hasAuthority('WORKFLOW_MANAGE')")
+    WorkflowResponse renameState(@AuthenticationPrincipal AuthPrincipal p,@PathVariable Long id,@PathVariable Long stateId,@RequestBody WorkflowRequests.RenameState r){return service.renameState(p,id,stateId,r);}
     /**
      * Lists ticket types visible to the current user.
      */

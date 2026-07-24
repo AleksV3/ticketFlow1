@@ -26,6 +26,9 @@ public class WorkflowState extends Auditable {
     @Column(nullable = false, length = 40)
     private String key;
 
+    @Column(nullable = false, length = 100)
+    private String name;
+
     @Column(name = "is_initial", nullable = false)
     private boolean initial;
 
@@ -42,6 +45,7 @@ public class WorkflowState extends Auditable {
     public WorkflowState(Workflow workflow, String key, boolean initial, boolean terminal, int sortOrder) {
         this.workflow = workflow;
         this.key = key;
+        this.name = key;
         this.initial = initial;
         this.terminal = terminal;
         this.sortOrder = sortOrder;
@@ -57,6 +61,14 @@ public class WorkflowState extends Auditable {
 
     public String getKey() {
         return key;
+    }
+
+    public String getName() { return name; }
+
+    /** Renames this state in place; transition rows reference the state id and
+     * therefore remain connected when the display name changes. */
+    public void rename(String name) {
+        this.name = name;
     }
 
     public boolean isInitial() {
