@@ -46,9 +46,15 @@ public class AuthController {
     }
 
     @GetMapping("/users/me")
-    public CurrentUserResponse me(@AuthenticationPrincipal AuthPrincipal principal, CsrfToken csrfToken) {
+    public ResponseEntity<CurrentUserResponse> me(
+            @AuthenticationPrincipal AuthPrincipal principal, CsrfToken csrfToken) {
         // Resolve the deferred token so the browser receives its XSRF-TOKEN cookie.
         csrfToken.getToken();
-        return authService.currentUser(principal);
+        var currentUser = authService.currentUser(principal);
+        var response = ResponseEntity.ok();
+        if (currentUser.refreshedCookie() != null) {
+            response.header(HttpHeaders.SET_COOKIE, currentUser.refreshedCookie().toString());
+        }
+        return response.body(currentUser.response());
     }
 }

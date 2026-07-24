@@ -1343,6 +1343,63 @@ class TicketControllerIntegrationTest {
     }
 
     @Test
+    void currentUserRefreshesStalePermissionCookieForGlobalApproval() throws Exception {
+        Long adminRoleId = jdbcTemplate.queryForObject("""
+                select id from role
+                where name='Admin' and party='TICKETFLOW1' and organization_id is null
+                """, Long.class);
+        Long approvalPermissionId = jdbcTemplate.queryForObject(
+                "select id from permission where key='APPROVE_ALL_TICKETS'", Long.class);
+        jdbcTemplate.update("""
+                delete from role_permission where role_id=? and permission_id=?
+                """, adminRoleId, approvalPermissionId);
+
+        Cookie staleAdmin = login("admin@ticketflow1.demo", "admin123");
+        try {
+            jdbcTemplate.update("""
+                    insert into role_permission (role_id, permission_id)
+                    values (?, ?) on conflict do nothing
+                    """, adminRoleId, approvalPermissionId);
+
+            Long internalOrgId = jdbcTemplate.queryForObject(
+                    "select id from organization where name='TicketFlow1 Internal'", Long.class);
+            Long firewallSubtypeId = jdbcTemplate.queryForObject("""
+                    select subtype.id
+                    from ticket_subtype subtype
+                    join ticket_type type on type.id=subtype.ticket_type_id
+                    where type.organization_id=? and type.key='TASI' and subtype.key='FIREWALL'
+                    """, Long.class, internalOrgId);
+            String ticketKey = createInternalFirewallTicket(
+                    staleAdmin, internalOrgId, firewallSubtypeId, "Refresh stale approval permission");
+            transitionWithCsrf(ticketKey, "ANALYSIS", staleAdmin);
+            transitionWithCsrf(ticketKey, "PENDING_APPROVAL", staleAdmin);
+
+            mockMvc.perform(get("/api/tickets/{ticketKey}", ticketKey).cookie(staleAdmin))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.workflowCommands").isEmpty());
+
+            MvcResult me = mockMvc.perform(get("/api/users/me").cookie(staleAdmin))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.permissions",
+                            org.hamcrest.Matchers.hasItem("APPROVE_ALL_TICKETS")))
+                    .andReturn();
+            Cookie refreshedAdmin = me.getResponse().getCookie("ticketflow1_auth");
+            assertThat(refreshedAdmin).isNotNull();
+
+            mockMvc.perform(get("/api/tickets/{ticketKey}", ticketKey).cookie(refreshedAdmin))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.workflowCommands").value(
+                            org.hamcrest.Matchers.containsInAnyOrder(
+                                    "WORKFLOW_APPROVE", "WORKFLOW_REJECT")));
+        } finally {
+            jdbcTemplate.update("""
+                    insert into role_permission (role_id, permission_id)
+                    values (?, ?) on conflict do nothing
+                    """, adminRoleId, approvalPermissionId);
+        }
+    }
+
+    @Test
     void dashboardPreferences_validatePersistResetAndRemainUserTenantScoped() throws Exception {
         Cookie clientA = login("client-a@demo.test", "client123");
         Cookie approverA = login("approver-a@demo.test", "client123");

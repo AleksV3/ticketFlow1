@@ -60,19 +60,25 @@ public class AuthService {
     }
 
     @Transactional(readOnly = true)
-    public CurrentUserResponse currentUser(AuthPrincipal principal) {
+    public CurrentUserResult currentUser(AuthPrincipal principal) {
         AppUser user = userRepository.findById(principal.userId())
                 .orElseThrow(() -> ApiException.notFound("Current user no longer exists."));
         Organization org = user.getOrganization();
         Set<String> permissions = user.getRoles().stream().flatMap(role -> role.getPermissions().stream())
                 .map(Permission::getKey)
                 .collect(Collectors.toSet());
-        return new CurrentUserResponse(
+        var response = new CurrentUserResponse(
                 user.getId(), user.getEmail(), user.getDisplayName(),
                 user.getRole().getName(), user.getParty(),
                 org == null ? null : org.getId(),
                 org == null ? null : org.getName(),
                 permissions);
+        ResponseCookie refreshedCookie = null;
+        if (!permissions.equals(principal.permissions())) {
+            JwtService.IssuedToken issued = jwtService.issue(user);
+            refreshedCookie = jwtService.buildAuthCookie(issued.token());
+        }
+        return new CurrentUserResult(response, refreshedCookie);
     }
 
     private static ApiException invalidCredentials() {
@@ -80,5 +86,13 @@ public class AuthService {
     }
 
     public record LoginResult(LoginResponse response, ResponseCookie cookie) {
+    }
+
+    /**
+     * The current-user endpoint reads permissions from the database. When they
+     * differ from the JWT claims, return a refreshed cookie so subsequent
+     * authorization checks immediately use the current role configuration.
+     */
+    public record CurrentUserResult(CurrentUserResponse response, ResponseCookie refreshedCookie) {
     }
 }
