@@ -1,6 +1,6 @@
 # Tasks: Priority Fixes and UX Improvements
 
-**Status**: Phase 1 implemented — T013 integration execution blocked by unavailable Docker
+**Status**: Phase 1 complete — awaiting review before Phase 2
 
 **Input**: `spec.md`, `plan.md`, feature `002` approval contracts, current
 constitution, and the source todo list.
@@ -30,7 +30,7 @@ constitution, and the source todo list.
 - [x] T011 Fix approval control visibility/enabled state and request handling.
 - [x] T012 Test assigned approver, team lead, unrelated user, inactive approver,
   stale decision, rollback, and cross-organization isolation.
-- [ ] T013 **Verify**: execute complete TASI approve and reject paths through API
+- [x] T013 **Verify**: execute complete TASI approve and reject paths through API
   and UI with attributable audit/history.
 
 ## Phase 2: Global approval and role sets P1

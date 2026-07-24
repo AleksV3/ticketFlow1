@@ -33,38 +33,35 @@ adds the database/API matrix for:
 - attributable approval audit;
 - forced audit failure rolling back ticket, approval, decision, and history.
 
-## Environment-blocked check
+## Integration and UI execution
 
-The targeted Testcontainers integration test was attempted both inside the
-sandbox and with an escalation request. This host does not expose a usable
-Docker socket:
+Docker became available and the targeted Testcontainers test was rerun on
+2026-07-24. It passed against a fresh PostgreSQL 16 container after Flyway
+successfully validated and applied all 28 migrations:
 
 ```text
-DOCKER_HOST unix:///var/run/docker.sock is not listening
-Could not find a valid Docker environment
+TicketControllerIntegrationTest
+#tasiApproval_enforcesActorCommandsEvidenceStaleStateAndRollback
+Tests run: 1, Failures: 0, Errors: 0
 ```
 
-No local backend/PostgreSQL socket is accessible from the execution
-environment. Therefore T013 remains unchecked: the integration test is written
-and compiled, but the complete API/UI/database walkthrough has not been
-executed here.
+The focused Playwright browser walkthrough also passed:
 
-## Command to finish T013
-
-Run on a host with Docker access:
-
-```bash
-cd backend
-JAVA_HOME=/usr/lib/jvm/java-21-openjdk-amd64 \
-PATH=/usr/lib/jvm/java-21-openjdk-amd64/bin:$PATH \
-./mvnw -Dtest=TicketControllerIntegrationTest#tasiApproval_enforcesActorCommandsEvidenceStaleStateAndRollback test
+```text
+TASI routing, approval, and subticket creation flow
+1 passed
 ```
 
-Then run the frontend focused check:
+The focused Vitest UI suite remained green:
 
-```bash
-cd frontend
-npm test -- --run test/workflow-ui.test.tsx
+```text
+Test Files: 1 passed
+Tests: 3 passed
 ```
 
-T013 may be checked only after the Testcontainers command passes.
+The Playwright development server reported pre-existing duplicate React-key
+and `ResizeObserver` console warnings, but the approval walkthrough completed
+successfully. Those warnings are not approval failures and remain candidates
+for the later UI quality phases.
+
+T013 is complete.
