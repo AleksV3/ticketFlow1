@@ -1,6 +1,6 @@
 # Tasks: Priority Fixes and UX Improvements
 
-**Status**: Phase 2 complete — awaiting review before Phase 3
+**Status**: Phase 3 complete — awaiting review before Phase 4
 
 **Input**: `spec.md`, `plan.md`, feature `002` approval contracts, current
 constitution, and the source todo list.
@@ -54,10 +54,10 @@ constitution, and the source todo list.
 - [x] T023 Add scoped user/organization preference schema and domain model.
 - [x] T024 Add bounded dashboard layout get/replace/reset endpoints.
 - [x] T025 Add “awaiting my approval” and other missing widget queries.
-- [ ] T026 Build widget visibility, reorder, save, and reset controls.
-- [ ] T027 Test invalid widget keys, retired widgets, reload persistence, reset,
+- [x] T026 Build widget visibility, reorder, save, and reset controls.
+- [x] T027 Test invalid widget keys, retired widgets, reload persistence, reset,
   and two-user/two-organization isolation.
-- [ ] T028 **Verify**: all initial widgets render and preferences remain isolated.
+- [x] T028 **Verify**: all initial widgets render and preferences remain isolated.
 
 ## Phase 4: Field-level visibility P2
 

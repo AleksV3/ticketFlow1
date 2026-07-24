@@ -14,7 +14,7 @@ public interface TicketApprovalRepository extends JpaRepository<TicketApproval, 
 
     @EntityGraph(attributePaths = {
             "ticket", "assignedApprover", "assignedTeam",
-            "assignedTeam.leader", "assignedTeam.members"
+            "assignedTeam.leader"
     })
     List<TicketApproval> findByStatus(TicketApprovalStatus status);
 

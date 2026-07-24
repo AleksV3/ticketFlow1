@@ -731,6 +731,9 @@ class TicketControllerIntegrationTest {
         assertThat(containsTicket(dashboard.path("slaDueSoon"), dueSoon)).isTrue();
         assertThat(containsTicket(dashboard.path("slaBreached"), otherTenant)).isFalse();
         assertThat(dashboard.path("myAssignedTickets").isEmpty()).isTrue();
+        assertThat(containsTicket(dashboard.path("myOpenTickets"), activeTask)).isTrue();
+        assertThat(containsTicket(dashboard.path("myOpenTickets"), closedTask)).isFalse();
+        assertThat(containsTicket(dashboard.path("recentlyUpdated"), otherTenant)).isFalse();
 
         JsonNode internalDashboard = objectMapper.readTree(mockMvc.perform(get("/api/dashboard").cookie(internal))
                 .andExpect(status().isOk()).andReturn().getResponse().getContentAsString());
@@ -1238,6 +1241,17 @@ class TicketControllerIntegrationTest {
                 "select id from app_user where email='test.manager@ticketflow1.app'", Long.class);
         assertThat(assignedApproverId).isEqualTo(managerId);
 
+        JsonNode adminDashboard = objectMapper.readTree(
+                mockMvc.perform(get("/api/dashboard").cookie(admin))
+                        .andExpect(status().isOk()).andReturn()
+                        .getResponse().getContentAsString());
+        JsonNode developerDashboard = objectMapper.readTree(
+                mockMvc.perform(get("/api/dashboard").cookie(developer))
+                        .andExpect(status().isOk()).andReturn()
+                        .getResponse().getContentAsString());
+        assertThat(containsTicket(adminDashboard.path("awaitingMyApproval"), ticketKey)).isTrue();
+        assertThat(containsTicket(developerDashboard.path("awaitingMyApproval"), ticketKey)).isFalse();
+
         mockMvc.perform(get("/api/tickets/{ticketKey}", ticketKey).cookie(admin))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.workflowCommands").value(
@@ -1326,6 +1340,115 @@ class TicketControllerIntegrationTest {
                         .contentType("application/json").content(clientOverrideBody))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.error").value("VALIDATION_FAILED"));
+    }
+
+    @Test
+    void dashboardPreferences_validatePersistResetAndRemainUserTenantScoped() throws Exception {
+        Cookie clientA = login("client-a@demo.test", "client123");
+        Cookie approverA = login("approver-a@demo.test", "client123");
+        Cookie clientB = login("client-b@demo.test", "client123");
+
+        mockMvc.perform(get("/api/preferences").cookie(clientA))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.dashboardWidgets.length()").value(6))
+                .andExpect(jsonPath("$.version").value(0));
+
+        String savedBody = """
+                {"dashboardWidgets":["RECENTLY_UPDATED","MY_OPEN_TICKETS"],
+                 "enabledTicketFilters":["TYPE","STATUS"],
+                 "lastViewedTeamId":null,"theme":"SYSTEM","version":0}
+                """;
+        MvcResult savedResult = mockMvc.perform(
+                        org.springframework.test.web.servlet.request.MockMvcRequestBuilders
+                                .put("/api/preferences").with(csrf()).cookie(clientA)
+                                .contentType("application/json").content(savedBody))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.dashboardWidgets[0]").value("RECENTLY_UPDATED"))
+                .andExpect(jsonPath("$.dashboardWidgets[1]").value("MY_OPEN_TICKETS"))
+                .andExpect(jsonPath("$.version").value(0))
+                .andReturn();
+        long savedVersion = objectMapper.readTree(
+                savedResult.getResponse().getContentAsString()).path("version").asLong();
+
+        mockMvc.perform(get("/api/preferences").cookie(clientA))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.dashboardWidgets.length()").value(2));
+        mockMvc.perform(get("/api/preferences").cookie(approverA))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.dashboardWidgets.length()").value(6))
+                .andExpect(jsonPath("$.version").value(0));
+        mockMvc.perform(get("/api/preferences").cookie(clientB))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.dashboardWidgets.length()").value(6))
+                .andExpect(jsonPath("$.version").value(0));
+
+        String updatedBody = """
+                {"dashboardWidgets":["MY_OPEN_TICKETS"],
+                 "enabledTicketFilters":["TYPE"],"lastViewedTeamId":null,
+                 "theme":"LIGHT","version":%d}
+                """.formatted(savedVersion);
+        MvcResult updatedResult = mockMvc.perform(
+                        org.springframework.test.web.servlet.request.MockMvcRequestBuilders
+                                .put("/api/preferences").with(csrf()).cookie(clientA)
+                                .contentType("application/json").content(updatedBody))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.version").value(savedVersion + 1))
+                .andReturn();
+        long updatedVersion = objectMapper.readTree(
+                updatedResult.getResponse().getContentAsString()).path("version").asLong();
+        mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders
+                        .put("/api/preferences").with(csrf()).cookie(clientA)
+                        .contentType("application/json").content(updatedBody))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.error").value("CONFLICT"));
+        mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders
+                        .put("/api/preferences").with(csrf()).cookie(clientB)
+                        .contentType("application/json").content("""
+                                {"dashboardWidgets":["UNKNOWN_WIDGET"],
+                                 "enabledTicketFilters":[],"lastViewedTeamId":null,
+                                 "theme":"SYSTEM","version":0}
+                                """))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error").value("VALIDATION_FAILED"));
+
+        Long clientAUserId = jdbcTemplate.queryForObject(
+                "select id from app_user where email='client-a@demo.test'", Long.class);
+        Long unrelatedTeamId = jdbcTemplate.queryForObject(
+                "select id from developer_team order by id limit 1", Long.class);
+        jdbcTemplate.update("""
+                update user_organization_preference
+                set dashboard_widgets='["RETIRED_WIDGET","MY_OPEN_TICKETS"]'::jsonb,
+                    last_viewed_team_id=?
+                where user_id=?
+                """, unrelatedTeamId, clientAUserId);
+        mockMvc.perform(get("/api/preferences").cookie(clientA))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.dashboardWidgets.length()").value(1))
+                .andExpect(jsonPath("$.dashboardWidgets[0]").value("MY_OPEN_TICKETS"))
+                .andExpect(jsonPath("$.lastViewedTeamId").value(
+                        org.hamcrest.Matchers.nullValue()));
+
+        mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders
+                        .put("/api/preferences").with(csrf()).cookie(clientA)
+                        .contentType("application/json").content("""
+                                {"dashboardWidgets":["MY_OPEN_TICKETS"],
+                                 "enabledTicketFilters":[],"lastViewedTeamId":%d,
+                                 "theme":"SYSTEM","version":%d}
+                                """.formatted(unrelatedTeamId, updatedVersion)))
+                .andExpect(status().isConflict());
+
+        mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders
+                        .delete("/api/preferences").with(csrf()).cookie(clientA))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.dashboardWidgets.length()").value(6))
+                .andExpect(jsonPath("$.version").value(0));
+        mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders
+                        .delete("/api/preferences").with(csrf()).cookie(clientA))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.dashboardWidgets.length()").value(6));
+        assertThat(jdbcTemplate.queryForObject(
+                "select count(*) from user_organization_preference where user_id=?",
+                Long.class, clientAUserId)).isZero();
     }
 
     private String createInternalFirewallTicket(Cookie admin, Long organizationId,

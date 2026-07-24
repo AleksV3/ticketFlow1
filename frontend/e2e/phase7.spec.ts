@@ -80,7 +80,8 @@ async function mockApi(page: Page, initial = detail()) {
     if (path === "/users/me" && !authenticated) body = null;
     else if (path === "/users/me") body = user;
     else if (path === "/auth/login") { authenticated = true; body = { expiresAt: now(), user }; }
-    else if (path === "/dashboard") body = { activeCount: 1, closedCount: 0, byType: { TASI: 1 }, byStatus: { ANALYSIS: 1 }, defectsBySeverity: {}, slaBreached: [], slaDueSoon: [], waitingForClientApproval: [], waitingForClientConfirmation: [], myAssignedTickets: [] };
+    else if (path === "/dashboard") body = { activeCount: 1, closedCount: 0, byType: { TASI: 1 }, byStatus: { ANALYSIS: 1 }, defectsBySeverity: {}, slaBreached: [], slaDueSoon: [], waitingForClientApproval: [], waitingForClientConfirmation: [], myAssignedTickets: [], myOpenTickets: [current], myTeamTickets: [current], awaitingMyApproval: [], recentlyUpdated: [current] };
+    else if (path === "/preferences") body = { dashboardWidgets: ["MY_OPEN_TICKETS","MY_TEAM_TICKETS","TICKETS_BY_STATUS","TICKETS_BY_TYPE","AWAITING_MY_APPROVAL","RECENTLY_UPDATED"], enabledTicketFilters: ["TYPE","STATUS","PRIORITY","TEAM"], lastViewedTeamId: null, theme: "SYSTEM", version: 0 };
     else if (path === "/reference/organizations") body = [org];
     else if (path === "/reference/ticket-leads") body = [{ id: 8, name: "Network Dev" }, { id: 9, name: "Request Dev" }];
     else if (path === "/teams") body = [{ id: 4, name: "Network" }];

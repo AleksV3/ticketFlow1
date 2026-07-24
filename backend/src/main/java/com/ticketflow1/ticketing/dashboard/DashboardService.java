@@ -118,9 +118,7 @@ public class DashboardService {
             boolean assigned = approval.getAssignedApprover() != null
                     && approval.getAssignedApprover().getId().equals(principal.userId());
             boolean team = approval.getAssignedTeam() != null
-                    && (approval.getAssignedTeam().getLeader().getId().equals(principal.userId())
-                    || approval.getAssignedTeam().getMembers().stream()
-                            .anyMatch(member -> member.getId().equals(principal.userId())));
+                    && approval.getAssignedTeam().getLeader().getId().equals(principal.userId());
             if (global || assigned || team) {
                 eligible.put(ticket.getId(), ticket);
             }
