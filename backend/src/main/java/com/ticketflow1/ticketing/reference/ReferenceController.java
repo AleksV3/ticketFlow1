@@ -8,7 +8,9 @@ import com.ticketflow1.ticketing.ticket.Responsibility;
 import com.ticketflow1.ticketing.ticketconfig.*;
 import com.ticketflow1.ticketing.user.AppUserRepository;
 import com.ticketflow1.ticketing.workflow.TicketTypeRepository;
+import com.ticketflow1.ticketing.workflow.TicketType;
 import java.util.List;
+import java.util.Set;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -27,7 +29,7 @@ public class ReferenceController {
             AppUserRepository users,RoleRepository roles,TicketSubtypeRepository subtypes,
             SubtypeFieldDefinitionRepository fields,SubtypeFieldOptionRepository options,FieldAuthorizationService fieldAuthorization){this.types=types;this.organizations=organizations;this.users=users;this.roles=roles;this.subtypes=subtypes;this.fields=fields;this.options=options;this.fieldAuthorization=fieldAuthorization;}
     @GetMapping("/ticket-types") @PreAuthorize("hasAuthority('TICKET_CREATE')")
-    public List<TypeRef> types(@AuthenticationPrincipal AuthPrincipal p,@RequestParam(required=false)Long organizationId){Long id=p.party()==Responsibility.CLIENT?p.organizationId():organizationId;if(id==null){id=organizations.findByNameIgnoreCase(INTERNAL_ORGANIZATION_NAME).map(o->o.getId()).orElseThrow(()->ApiException.validation("organizationId is required."));}return types.findByOrganizationId(id).stream().filter(t->p.party()==Responsibility.TICKETFLOW1||CLIENT_CREATABLE_TYPES.contains(t.getKey())).map(t->new TypeRef(t.getId(),t.getKey(),t.getName())).toList();}
+    public List<TypeRef> types(@AuthenticationPrincipal AuthPrincipal p,@RequestParam(required=false)Long organizationId){Long id=p.party()==Responsibility.CLIENT?p.organizationId():organizationId;if(id==null){id=organizations.findByNameIgnoreCase(INTERNAL_ORGANIZATION_NAME).map(o->o.getId()).orElseThrow(()->ApiException.validation("organizationId is required."));}final Long scope=id;boolean internal=organizations.findById(scope).map(o->INTERNAL_ORGANIZATION_NAME.equalsIgnoreCase(o.getName())).orElse(false);return types.findByOrganizationId(scope).stream().filter(TicketType::isActive).filter(t->p.party()==Responsibility.TICKETFLOW1&&internal||p.party()==Responsibility.TICKETFLOW1&&!Set.of("TASI","USR").contains(t.getKey())||p.party()==Responsibility.CLIENT&&CLIENT_CREATABLE_TYPES.contains(t.getKey())).map(t->new TypeRef(t.getId(),t.getKey(),t.getName())).toList();}
     @GetMapping("/ticket-types/{typeId}/creation-form") @PreAuthorize("hasAuthority('TICKET_CREATE')")
     public CreationForm creationForm(@AuthenticationPrincipal AuthPrincipal p,@PathVariable Long typeId){
         var type=types.findById(typeId).filter(t->t.isActive()&&authorized(p,t.getOrganization()==null?null:t.getOrganization().getId()))

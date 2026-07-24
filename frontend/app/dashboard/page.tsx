@@ -101,10 +101,14 @@ function DashboardContent() {
     setSaving(true);
     setError("");
     try {
-      const saved = await put<Preferences>("/preferences", {
-        ...preferences,
-        dashboardWidgets: draftWidgets,
-      });
+      let saved: Preferences;
+      try { saved = await put<Preferences>("/preferences", { ...preferences, dashboardWidgets: draftWidgets }); }
+      catch (cause) {
+        // Theme/team changes can update the same preference row in another tab.
+        // Reload once and merge the widget draft instead of losing the layout.
+        const latest = await get<Preferences>("/preferences");
+        saved = await put<Preferences>("/preferences", { ...latest, dashboardWidgets: draftWidgets });
+      }
       setPreferences(saved);
       setDraftWidgets(saved.dashboardWidgets);
       setCustomizing(false);
@@ -197,6 +201,16 @@ export function DashboardPreferencesEditor({
     onChange(next);
   }
 
+  function drop(key: string) {
+    const dragged = (window as Window & { __dashboardDrag?: string }).__dashboardDrag;
+    if (!dragged || dragged === key) return;
+    const next = widgets.filter(item => item !== dragged);
+    const target = next.indexOf(key);
+    next.splice(target < 0 ? next.length : target, 0, dragged);
+    onChange(next);
+    delete (window as Window & { __dashboardDrag?: string }).__dashboardDrag;
+  }
+
   return <section className="card" aria-labelledby="dashboard-customization-title">
     <div className="flex flex-wrap items-center justify-between gap-3">
       <div>
@@ -216,11 +230,11 @@ export function DashboardPreferencesEditor({
       {DASHBOARD_WIDGETS.map(key => {
         const enabled = widgets.includes(key);
         const position = widgets.indexOf(key);
-        return <li key={key} className="rounded-xl border border-slate-200 p-3">
+        return <li key={key} draggable onDragStart={() => { (window as Window & { __dashboardDrag?: string }).__dashboardDrag = key; }} onDragOver={event => event.preventDefault()} onDrop={() => drop(key)} className="dashboard-widget-item rounded-xl border border-slate-200 p-3">
           <div className="flex items-center justify-between gap-3">
             <label className="flex cursor-pointer items-center gap-3 text-sm font-semibold">
-              <input type="checkbox" checked={enabled} onChange={() => toggle(key)} />
-              {WIDGET_LABELS[key]}
+              <input type="checkbox" aria-label={WIDGET_LABELS[key]} checked={enabled} onChange={() => toggle(key)} />
+              <span aria-hidden="true" className="cursor-grab">⠿</span>{WIDGET_LABELS[key]}
             </label>
             <div className="flex gap-1">
               <button type="button" className="btn-secondary px-2 py-1 text-xs"
