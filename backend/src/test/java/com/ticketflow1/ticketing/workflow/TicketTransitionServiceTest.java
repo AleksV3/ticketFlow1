@@ -19,6 +19,7 @@ import com.ticketflow1.ticketing.proposal.ProposalDetailService;
 import com.ticketflow1.ticketing.rbac.Permission;
 import com.ticketflow1.ticketing.rbac.Role;
 import com.ticketflow1.ticketing.statushistory.StatusHistoryService;
+import com.ticketflow1.ticketing.team.DeveloperTeam;
 import com.ticketflow1.ticketing.ticket.Priority;
 import com.ticketflow1.ticketing.ticket.Responsibility;
 import com.ticketflow1.ticketing.ticket.Ticket;
@@ -216,6 +217,39 @@ class TicketTransitionServiceTest {
                 fixture.organization().getId(), Set.of("TICKET_TRANSITION"));
 
         ticketTransitionService.transitionOwned(fixture.ticket(), TransitionOperationKind.WORKFLOW_APPROVE, principal);
+
+        assertThat(fixture.ticket().getCurrentState().getKey()).isEqualTo("IMPLEMENTATION");
+    }
+
+    /**
+     * Feature 003 regression baseline.
+     *
+     * This test intentionally fails until Phase 1 implements the documented
+     * team-lead fallback. A TASI routed to a team without an explicit approver
+     * currently exposes no decision command and rejects its team leader, which
+     * is the production symptom reported as "nobody can approve".
+     */
+    @Test
+    void workflowApproval_allowsAssignedTeamLeaderWhenNoExplicitApprover() {
+        Fixture fixture = fixture("TASI Workflow", "PENDING_APPROVAL", "IMPLEMENTATION",
+                "TICKET_TRANSITION", Responsibility.TICKETFLOW1, null);
+        DeveloperTeam assignedTeam = new DeveloperTeam(
+                "TASI Delivery", "Approves TASI implementation", fixture.actor(), fixture.actor());
+        ReflectionTestUtils.setField(assignedTeam, "id", 67L);
+        fixture.ticket().replaceTeams(Set.of(assignedTeam));
+        WorkflowTransition edge = new WorkflowTransition(fixture.workflow(), fixture.fromState(), fixture.toState(),
+                new Permission("TICKET_TRANSITION"), Responsibility.TICKETFLOW1, null,
+                TransitionOperationKind.WORKFLOW_APPROVE);
+        when(workflowTransitionRepository.findByWorkflowIdAndFromStateId(
+                fixture.workflow().getId(), fixture.fromState().getId())).thenReturn(List.of(edge));
+        when(appUserRepository.findById(fixture.actor().getId()))
+                .thenReturn(java.util.Optional.of(fixture.actor()));
+        when(ticketRepository.save(any(Ticket.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        AuthPrincipal principal = new AuthPrincipal(fixture.actor().getId(), Responsibility.TICKETFLOW1,
+                fixture.organization().getId(), Set.of("TICKET_TRANSITION"));
+
+        ticketTransitionService.transitionOwned(
+                fixture.ticket(), TransitionOperationKind.WORKFLOW_APPROVE, principal);
 
         assertThat(fixture.ticket().getCurrentState().getKey()).isEqualTo("IMPLEMENTATION");
     }
