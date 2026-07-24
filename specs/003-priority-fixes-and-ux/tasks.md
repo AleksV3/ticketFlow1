@@ -1,6 +1,6 @@
 # Tasks: Priority Fixes and UX Improvements
 
-**Status**: Planned
+**Status**: Phase 0 complete — awaiting review before Phase 1
 
 **Input**: `spec.md`, `plan.md`, feature `002` approval contracts, current
 constitution, and the source todo list.
@@ -13,9 +13,9 @@ constitution, and the source todo list.
   flow and add a failing regression test reproducing “nobody can approve”.
 - [x] T003 Write approval, role, preferences, field grants, filters, and workflow
   rename contracts with `403`/`404`/`409` behavior.
-- [ ] T004 Threat-model global approval, field-value disclosure, direct field
+- [x] T004 Threat-model global approval, field-value disclosure, direct field
   mutation, role mass assignment, stale decisions, and preference tenant scope.
-- [ ] T005 **Verify**: root cause is documented and no approval implementation
+- [x] T005 **Verify**: root cause is documented and no approval implementation
   begins without a reproducible failing test.
 
 ## Phase 1: TASI approval P0

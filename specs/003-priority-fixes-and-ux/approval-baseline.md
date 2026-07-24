@@ -50,6 +50,21 @@ cd backend
 The test is intentionally red in Phase 0. Phase 1 must turn it green without
 weakening tenant, party, permission, active-state, or protected-edge checks.
 
+### Captured execution
+
+The targeted Maven invocation was run on 2026-07-24 and produced the expected
+red baseline:
+
+```text
+Tests run: 1, Failures: 0, Errors: 1
+IllegalTransitionException:
+Cannot move ticket TF-1001 from PENDING_APPROVAL to IMPLEMENTATION.
+```
+
+The exception originates from `TicketTransitionService.apply` after
+`isAllowed` rejects the assigned team leader. This is the required reproducible
+failure for T002/T005, not a passing implementation claim.
+
 ## Root-cause statement
 
 The immediate “nobody can approve” path is caused by incomplete approver
