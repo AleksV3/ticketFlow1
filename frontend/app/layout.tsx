@@ -16,7 +16,7 @@ type RootLayoutProps = Readonly<{
 export default function RootLayout({ children }: RootLayoutProps) {
   return (
     <html lang="en">
-      <body>{children}<DevLogPanel /></body>
+      <body><script dangerouslySetInnerHTML={{__html:`(function(){try{var t=localStorage.getItem('ticketflow1-theme')||'SYSTEM';var l=t==='LIGHT'||(t==='SYSTEM'&&matchMedia('(prefers-color-scheme: light)').matches);document.documentElement.dataset.theme=l?'light':'dark';document.documentElement.style.colorScheme=l?'light':'dark'}catch(e){}})()`}} />{children}<DevLogPanel /></body>
     </html>
   );
 }

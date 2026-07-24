@@ -74,6 +74,30 @@ body {
 a { color: inherit; }
 ::selection { color: white; background: var(--signature-blue); }
 :focus-visible { outline: 2px solid var(--accent-blue); outline-offset: 3px; }
+
+[data-theme="light"] {
+  color-scheme: light;
+  --signature-blue: rgb(23 82 160);
+  --accent-blue: rgb(24 112 210);
+  --fintech-navy: rgb(239 244 250);
+  --dark-slate: rgb(255 255 255);
+  --off-white: rgb(20 32 48);
+  --muted: rgb(75 93 116);
+  --line: rgb(148 163 184 / 48%);
+}
+[data-theme="light"] body { background: linear-gradient(135deg, rgb(226 236 249), rgb(248 250 252)); color: var(--off-white); }
+[data-theme="light"] .app-frame { background: linear-gradient(180deg, rgb(255 255 255 / 80%), rgb(226 236 249 / 55%)); }
+[data-theme="light"] .app-header { background: rgb(255 255 255 / 92%); }
+[data-theme="light"] .card, [data-theme="light"] .auth-panel { background: rgb(255 255 255 / 94%); box-shadow: 0 12px 30px rgb(15 23 42 / 10%); }
+[data-theme="light"] .btn-secondary, [data-theme="light"] .field { color: var(--off-white); background: rgb(255 255 255 / 90%); }
+[data-theme="light"] .bg-white { background-color: rgb(255 255 255 / 96%) !important; }
+[data-theme="light"] .bg-slate-50, [data-theme="light"] .bg-slate-100 { background-color: rgb(241 245 249 / 95%) !important; }
+[data-theme="light"] .text-slate-900, [data-theme="light"] .text-slate-700 { color: rgb(20 32 48) !important; }
+[data-theme="light"] .text-slate-600, [data-theme="light"] .text-slate-500, [data-theme="light"] .text-slate-400 { color: var(--muted) !important; }
+[data-theme="light"] .react-flow-shell { background: rgb(248 250 252); }
+.page-shell { width: 100%; }
+@media (min-width: 1536px) { .page-shell { max-width: 1500px !important; } }
+@media (max-width: 640px) { .page-shell { padding: 1rem !important; } .app-header nav { order: 3; width: 100%; overflow-x: auto; flex-wrap: nowrap; } .app-header .theme-toggle { margin-left: auto; } }
 input::placeholder, textarea::placeholder { color: rgb(159 174 196 / 70%); }
 option { color: var(--off-white); background: var(--dark-slate); }
 

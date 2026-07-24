@@ -100,13 +100,13 @@ constitution, and the source todo list.
 
 ## Phase 7: Layout, theme, and contrast P3
 
-- [ ] T051 Add page-aware full-width shell variants for data-heavy screens.
-- [ ] T052 Define semantic light/dark design tokens and theme initialization.
-- [ ] T053 Persist theme per user and use system theme when no preference exists.
-- [ ] T054 Correct team-board description contrast and truncation in both themes.
-- [ ] T055 Test hydration/theme initialization, preference reload/isolation,
+- [x] T051 Add page-aware full-width shell variants for data-heavy screens.
+- [x] T052 Define semantic light/dark design tokens and theme initialization.
+- [x] T053 Persist theme per user and use system theme when no preference exists.
+- [x] T054 Correct team-board description contrast and truncation in both themes.
+- [x] T055 Test hydration/theme initialization, preference reload/isolation,
   desktop/mobile layout, long descriptions, focus, and WCAG AA contrast.
-- [ ] T056 **Verify**: keyboard and visual review passes in light/dark modes at
+- [x] T056 **Verify**: keyboard and visual review passes in light/dark modes at
   mobile and wide desktop widths.
 
 ## Phase 8: Release
