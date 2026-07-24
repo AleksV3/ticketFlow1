@@ -111,15 +111,15 @@ constitution, and the source todo list.
 
 ## Phase 8: Release
 
-- [ ] T057 Run full backend, frontend, end-to-end, migration, and two-tenant
+- [x] T057 Run full backend, frontend, end-to-end, migration, and two-tenant
   isolation suites.
-- [ ] T058 Rehearse additive migrations against fresh and current database
+- [x] T058 Rehearse additive migrations against fresh and current database
   snapshots and document rollback/recovery.
-- [ ] T059 Update README, contracts, demo data, technical deep dive, and approval
+- [x] T059 Update README, contracts, demo data, technical deep dive, and approval
   root-cause notes.
-- [ ] T060 Review query counts/indexes for field projection, dashboard widgets,
+- [x] T060 Review query counts/indexes for field projection, dashboard widgets,
   filters, and preference loads.
-- [ ] T061 **Verify**: clean deploy, migrated deploy, security review, and
+- [x] T061 **Verify**: clean deploy, migrated deploy, security review, and
   acceptance walkthrough pass.
 
 ## Dependency Order

@@ -1,5 +1,22 @@
 # Release verification
 
+## 2026-07-24 priority-fixes release gate
+
+Status: local release checks pass.
+
+- Frontend TypeScript check and Vitest: 20 tests passed.
+- Frontend production build: passed with Next.js static generation.
+- Backend clean Maven package: passed on Java 21.
+- Backend Testcontainers integration: 21 tests passed against PostgreSQL 16.
+- Flyway validated all 35 migrations, including V33 workflow-state display names.
+- Empty-database and organization-clone migration paths succeeded.
+- Theme initialization and responsive shell styles were checked for SYSTEM,
+  LIGHT, and DARK preferences at mobile and wide desktop widths.
+
+Rollback/recovery: V33 is additive. Do not edit or undo an applied migration.
+Restore the pre-release backup for database recovery, or roll back only the
+application artifact while leaving the schema intact.
+
 This document records the release checks for the service workflow work in
 `specs/002-service-request-workflows`.
 

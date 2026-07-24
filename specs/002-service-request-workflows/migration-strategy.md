@@ -99,3 +99,13 @@ history, or drop the additive tables as part of an application rollback.
   `--spring.flyway.validate-on-migrate=false` as described above. For database
   recovery, restore the pre-migration backup and replay any accepted business
   events created after the backup point.
+
+## Priority-fixes rehearsal record (2026-07-24)
+
+- V33 adds workflow-state display names and a per-workflow unique index while
+  retaining immutable state keys and transition IDs.
+- A fresh PostgreSQL 16 Testcontainers database migrated through all 35
+  migrations successfully, including organization template cloning and the
+  full ticket integration suite.
+- The change is additive; recovery uses the pre-release backup and replayed
+  business events rather than destructive Flyway undo.

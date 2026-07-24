@@ -7,6 +7,10 @@ includes runtime subtype forms, automatic routing to teams/developers,
 relationship-aware approvals, comments, attachments, audit history, defect
 SLAs, dashboards, and a Next.js frontend.
 
+The current UI includes per-user light/dark/system theme preferences, responsive
+full-width ticket and team workspaces, explicit ticket-type selection, and
+versioned workflow-state renaming that preserves connected transitions.
+
 ## Public demo on Render
 
 The repository includes [`render.yaml`](render.yaml), which provisions a
