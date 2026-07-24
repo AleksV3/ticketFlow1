@@ -52,7 +52,7 @@ export function TicketCommunication({ ticketKey, internal = false }: { ticketKey
   const [fullPreview, setFullPreview] = useState(false);
   const autoPreviewed = useRef(false);
   useEffect(() => () => { if (preview?.url) URL.revokeObjectURL(preview.url); }, [preview]);
-  const contentUrl = (attachment: Attachment) => `${process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8081/api"}/tickets/${ticketKey}/attachments/${attachment.id}/content`;
+  const contentUrl = (attachment: Attachment) => `${process.env.NEXT_PUBLIC_API_BASE_URL ?? "https://ticketflow1-cm62j5alfq-og.a.run.app/api"}/tickets/${ticketKey}/attachments/${attachment.id}/content`;
   async function openPreview(attachment: Attachment) {
     if (!attachment.contentAvailable) return;
     setAttachmentError("");

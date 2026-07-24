@@ -1,6 +1,6 @@
 import { recordDevLog } from "@/lib/devLogs";
 
-const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8081/api";
+const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? "https://ticketflow1-cm62j5alfq-og.a.run.app/api";
 
 export type FieldError = { field: string; message: string };
 export type ApiErrorBody = {
