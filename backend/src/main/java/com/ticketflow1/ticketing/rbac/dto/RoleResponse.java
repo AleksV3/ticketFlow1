@@ -12,7 +12,8 @@ public record RoleResponse(
         Responsibility party,
         Long organizationId,
         boolean template,
-        Set<String> permissions) {
+        Set<String> permissions,
+        long version) {
 
     public static RoleResponse from(Role role) {
         return new RoleResponse(
@@ -21,6 +22,7 @@ public record RoleResponse(
                 role.getParty(),
                 role.getOrganization() == null ? null : role.getOrganization().getId(),
                 role.isTemplate(),
-                role.getPermissions().stream().map(Permission::getKey).collect(Collectors.toSet()));
+                role.getPermissions().stream().map(Permission::getKey).collect(Collectors.toSet()),
+                role.getVersion());
     }
 }

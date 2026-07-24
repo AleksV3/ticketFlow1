@@ -46,7 +46,7 @@ public class RoleAdminController {
 
     @PatchMapping("/{id}")
     public RoleResponse update(@AuthenticationPrincipal AuthPrincipal principal,
-            @PathVariable Long id, @RequestBody UpdateRoleRequest request) {
+            @PathVariable Long id, @Valid @RequestBody UpdateRoleRequest request) {
         return roleAdminService.update(principal, id, request);
     }
 }

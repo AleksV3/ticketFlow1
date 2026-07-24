@@ -38,10 +38,10 @@ constitution, and the source todo list.
 - [x] T014 Add and migrate fixed catalog permission `APPROVE_ALL_TICKETS`.
 - [x] T015 Extend the central approval predicate with the tenant-scoped override.
 - [x] T016 Expose the new permission through role administration.
-- [ ] T017 Remove frontend, DTO, validation, and service permission-count caps.
-- [ ] T018 Implement validated transactional replace-set role updates with
+- [x] T017 Remove frontend, DTO, validation, and service permission-count caps.
+- [x] T018 Implement validated transactional replace-set role updates with
   de-duplication and concurrency protection.
-- [ ] T019 Add database uniqueness/invariant migration only where missing.
+- [x] T019 Add database uniqueness/invariant migration only where missing.
 - [ ] T020 Audit global decisions and role permission changes.
 - [ ] T021 Test Developer A assignment, global administrator decision, Developer
   B denial, cross-tenant denial, full-catalog role round-trip, removal of one

@@ -8,7 +8,6 @@ import com.ticketflow1.ticketing.rbac.dto.CreateRoleRequest;
 import com.ticketflow1.ticketing.rbac.dto.RoleResponse;
 import com.ticketflow1.ticketing.rbac.dto.UpdateRoleRequest;
 import com.ticketflow1.ticketing.ticket.Responsibility;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import org.springframework.stereotype.Service;
@@ -62,7 +61,7 @@ public class RoleAdminService {
                                 "Organization not found: " + request.organizationId()));
 
         Role role = new Role(request.name(), request.party(), organization, false);
-        role.getPermissions().addAll(resolvePermissions(request.permissionKeys()));
+        role.replacePermissions(resolvePermissions(request.permissionKeys()));
         Role saved = roleRepository.saveAndFlush(role);
         return RoleResponse.from(saved);
     }
@@ -80,24 +79,29 @@ public class RoleAdminService {
             throw ApiException.validation(
                     "Template roles cannot be edited directly — edit an organization's cloned copy.");
         }
+        if (!java.util.Objects.equals(request.version(), role.getVersion())) {
+            throw ApiException.conflict(
+                    "Role was changed by another administrator. Reload and try again.");
+        }
         if (request.name() != null && !request.name().isBlank()) {
             role.setName(request.name());
         }
         if (request.permissionKeys() != null) {
-            role.getPermissions().clear();
-            role.getPermissions().addAll(resolvePermissions(request.permissionKeys()));
-            // Join-table writes alone don't dirty the role row — force the
-            // UPDATE so updated_at/updated_by_id reflect this change.
-            role.touchForAudit();
+            Set<Permission> replacement = resolvePermissions(request.permissionKeys());
+            role.replacePermissions(replacement);
         }
-        return RoleResponse.from(role);
+        return RoleResponse.from(roleRepository.saveAndFlush(role));
     }
 
     private Set<Permission> resolvePermissions(Set<String> keys) {
-        Set<Permission> permissions = new HashSet<>();
-        for (String key : keys) {
-            permissions.add(permissionRepository.findByKey(key)
-                    .orElseThrow(() -> ApiException.validation("Unknown permission: " + key)));
+        Set<Permission> permissions = permissionRepository.findByKeyIn(keys);
+        if (permissions.size() != keys.size()) {
+            Set<String> resolved = permissions.stream()
+                    .map(Permission::getKey)
+                    .collect(java.util.stream.Collectors.toSet());
+            Set<String> unknown = new java.util.TreeSet<>(keys);
+            unknown.removeAll(resolved);
+            throw ApiException.validation("Unknown permissions: " + unknown);
         }
         return permissions;
     }

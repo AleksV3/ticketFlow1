@@ -2,7 +2,6 @@ package com.ticketflow1.ticketing.rbac.dto;
 
 import com.ticketflow1.ticketing.ticket.Responsibility;
 import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;
 import java.util.Set;
 
@@ -16,5 +15,5 @@ public record CreateRoleRequest(
         @NotBlank String name,
         @NotNull Responsibility party,
         Long organizationId,
-        @NotEmpty Set<String> permissionKeys) {
+        @NotNull Set<String> permissionKeys) {
 }

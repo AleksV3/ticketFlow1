@@ -16,6 +16,7 @@ import jakarta.persistence.JoinTable;
 import jakarta.persistence.ManyToMany;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
+import jakarta.persistence.Version;
 import java.util.HashSet;
 import java.util.Set;
 
@@ -47,6 +48,10 @@ public class Role extends Auditable {
 
     @Column(name = "is_template", nullable = false)
     private boolean template;
+
+    @Version
+    @Column(nullable = false)
+    private long version;
 
     @ManyToMany(fetch = FetchType.LAZY)
     @JoinTable(name = "role_permission",
@@ -91,6 +96,16 @@ public class Role extends Auditable {
 
     public Set<Permission> getPermissions() {
         return permissions;
+    }
+
+    public void replacePermissions(Set<Permission> permissions) {
+        this.permissions.clear();
+        this.permissions.addAll(permissions);
+        touchForAudit();
+    }
+
+    public long getVersion() {
+        return version;
     }
 
     public boolean hasPermission(String permissionKey) {
