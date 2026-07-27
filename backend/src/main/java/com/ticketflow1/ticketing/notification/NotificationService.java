@@ -20,9 +20,16 @@ public class NotificationService {
     private final TicketFollowerRepository followers;
     public NotificationService(NotificationRepository notifications, AppUserRepository users, TicketRepository tickets, TicketFollowerRepository followers){this.notifications=notifications;this.users=users;this.tickets=tickets;this.followers=followers;}
 
-    @Transactional(readOnly=true) public boolean isFollowing(String key, AuthPrincipal principal){Ticket ticket=visibleTicket(key,principal); return followers.existsByIdTicketIdAndIdUserId(ticket.getId(),principal.userId()) || recipientIds(ticket).contains(principal.userId());}
-    @Transactional public void follow(String key, AuthPrincipal principal){Ticket ticket=visibleTicket(key,principal); AppUser actor=users.getReferenceById(principal.userId()); if(!followers.existsByIdTicketIdAndIdUserId(ticket.getId(),principal.userId())) { followers.save(new TicketFollower(ticket,actor)); notifications.save(new Notification(actor,ticket,actor,"TICKET_FOLLOWED","Following ticket",ticket.getTicketKey()+" — you are now following this ticket.")); }}
-    @Transactional public void unfollow(String key, AuthPrincipal principal){Ticket ticket=visibleTicket(key,principal); followers.deleteByIdTicketIdAndIdUserId(ticket.getId(),principal.userId());}
+    @Transactional(readOnly=true) public boolean isFollowing(String key, AuthPrincipal principal){Ticket ticket=visibleTicket(key,principal); return followers.findByIdTicketIdAndIdUserId(ticket.getId(),principal.userId()).map(f->!f.isMuted()).orElseGet(()->recipientIds(ticket).contains(principal.userId()));}
+    @Transactional public void follow(String key, AuthPrincipal principal){
+        Ticket ticket=visibleTicket(key,principal); AppUser actor=users.getReferenceById(principal.userId());
+        TicketFollower existing=followers.findByIdTicketIdAndIdUserId(ticket.getId(),principal.userId()).orElse(null);
+        boolean alreadyFollowing=existing!=null && !existing.isMuted();
+        TicketFollower row=existing==null?new TicketFollower(ticket,actor):existing;
+        row.setMuted(false); followers.save(row);
+        if(!alreadyFollowing) notifications.save(new Notification(actor,ticket,actor,"TICKET_FOLLOWED","Following ticket",ticket.getTicketKey()+" — you are now following this ticket."));
+    }
+    @Transactional public void unfollow(String key, AuthPrincipal principal){Ticket ticket=visibleTicket(key,principal); AppUser actor=users.getReferenceById(principal.userId()); TicketFollower row=followers.findByIdTicketIdAndIdUserId(ticket.getId(),principal.userId()).orElseGet(()->new TicketFollower(ticket,actor)); row.setMuted(true); followers.save(row);}
 
     @Transactional(readOnly = true)
     public List<NotificationResponse> list(Long recipientId){
@@ -84,6 +91,7 @@ public class NotificationService {
         if(ticket.getBusinessOwner()!=null) result.add(ticket.getBusinessOwner().getId());
         for(DeveloperTeam team: ticket.getTeams()) team.getMembers().forEach(user -> result.add(user.getId()));
         result.addAll(followers.findUserIdsByTicketId(ticket.getId()));
+        result.removeAll(followers.findMutedUserIdsByTicketId(ticket.getId()));
         return result;
     }
     private Ticket visibleTicket(String key, AuthPrincipal principal){
