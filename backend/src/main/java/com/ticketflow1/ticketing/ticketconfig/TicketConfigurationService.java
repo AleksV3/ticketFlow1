@@ -63,12 +63,11 @@ public class TicketConfigurationService {
     @Transactional public SubtypeRoutingRule putRouting(AuthPrincipal p,Long subtypeId,Long organizationId,Long teamId,
             Long primaryId,Long fallbackId,Long approverId,boolean active,Long suppliedVersion){
         requireManage(p);TicketSubtype subtype=subtype(subtypeId);Organization scope=routingScope(subtype,organizationId);
-        if(teamId==null)throw ApiException.validation("teamId is required.");
-        DeveloperTeam team=teams.findById(teamId)
+        DeveloperTeam team=teamId==null?null:teams.findById(teamId)
                 .orElseThrow(()->ApiException.notFound("Team not found: "+teamId));
-        AppUser primary=selectableMember(primaryId,team,"Primary developer");
-        AppUser fallback=selectableMember(fallbackId,team,"Fallback developer");
-        AppUser approver=selectableMember(approverId,team,"Approver");
+        AppUser primary=selectableUser(primaryId,"Primary developer");
+        AppUser fallback=selectableUser(fallbackId,"Fallback developer");
+        AppUser approver=selectableUser(approverId,"Approver");
         Optional<SubtypeRoutingRule> existing=findRule(subtypeId,scope);
         SubtypeRoutingRule saved;
         if(existing.isPresent()){
@@ -96,8 +95,7 @@ public class TicketConfigurationService {
     }
     private Optional<SubtypeRoutingRule> findRule(Long subtypeId,Organization scope){return scope==null?routing.findBySubtypeIdAndOrganizationIsNull(subtypeId):routing.findBySubtypeIdAndOrganizationId(subtypeId,scope.getId());}
     private SubtypeRoutingRule rule(Long subtypeId,Organization scope){return findRule(subtypeId,scope).orElseThrow(()->ApiException.notFound("Routing rule not found for subtype: "+subtypeId));}
-    private AppUser selectableMember(Long id,DeveloperTeam team,String label){if(id==null)return null;AppUser user=users.findById(id).filter(AppUser::isActive).filter(u->u.getParty()==Responsibility.TICKETFLOW1).orElseThrow(()->ApiException.notFound("User not found: "+id));
-        if(!team.getLeader().getId().equals(id)&&team.getMembers().stream().noneMatch(m->m.getId().equals(id)))throw ApiException.validation(label+" must be an active member of the selected team.");return user;}
+    private AppUser selectableUser(Long id,String label){if(id==null)return null;return users.findById(id).filter(AppUser::isActive).filter(u->u.getParty()==Responsibility.TICKETFLOW1).orElseThrow(()->ApiException.notFound(label+" user not found: "+id));}
     private Organization organization(TicketSubtype s){return s.getTicketType().getOrganization();}
     private int order(int v){if(v<0)throw ApiException.validation("sortOrder cannot be negative.");return v;}
     private void version(Long supplied,long current){if(supplied==null||supplied!=current)throw ApiException.conflict("Configuration was modified by another user.");}

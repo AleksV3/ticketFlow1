@@ -436,7 +436,7 @@ public class TicketService {
                 .orElseGet(() -> routingRuleRepository.findBySubtypeIdAndOrganizationIsNullAndActiveTrue(subtype.getId()).orElse(null));
         if (rule == null) return;
         ticket.setRoutingRule(rule); ticket.setResolvedApprover(rule.getApprover()); ticket.setTicketLead(rule.getPrimaryDeveloper());
-        ticket.setAssignedTeam(rule.getTeam().getName()); ticket.replaceTeams(Set.of(rule.getTeam()));
+        if (rule.getTeam() != null) { ticket.setAssignedTeam(rule.getTeam().getName()); ticket.replaceTeams(Set.of(rule.getTeam())); }
     }
 
     private AppUser validateUsrTarget(TicketType type, TicketSubtype subtype, CreateTicketRequest request,

@@ -326,13 +326,13 @@ function SubtypeAdministration({ organizationId, type, reloadTypes, report }: {
       </div>
     </div>
     {selectedSubtype ? <div className="grid gap-5 xl:grid-cols-2">
-      <FieldAdministration subtype={selectedSubtype} report={report} />
+      <FieldAdministration organizationId={organizationId} subtype={selectedSubtype} report={report} />
       <RoutingAdministration organizationId={organizationId} subtype={selectedSubtype} reloadTypes={reloadTypes} report={report} />
     </div> : null}
   </section>;
 }
 
-function FieldAdministration({ subtype, report }: { subtype: Subtype; report: (message: string) => void }) {
+function FieldAdministration({ organizationId, subtype, report }: { organizationId: string; subtype: Subtype; report: (message: string) => void }) {
   const [fields, setFields] = useState<Field[]>([]);
   const [selectedFieldId, setSelectedFieldId] = useState<number | null>(null);
   const selectedField = fields.find(field => field.id === selectedFieldId) ?? null;
@@ -351,10 +351,13 @@ function FieldAdministration({ subtype, report }: { subtype: Subtype; report: (m
     }
   }, [report, subtype.id]);
   useEffect(() => { void loadFields(); }, [loadFields]);
-  useEffect(() => { void get<RoleRef[]>("/admin/roles").then(setRoles).catch(error => report(error instanceof Error ? error.message : "Could not load roles.")); }, [report]);
+  useEffect(() => {
+    const query = organizationId === "internal" ? "" : `?organizationId=${organizationId}`;
+    void get<RoleRef[]>(`/admin/roles${query}`).then(setRoles).catch(error => report(error instanceof Error ? error.message : "Could not load roles."));
+  }, [organizationId, report]);
   useEffect(() => {
     if (!selectedFieldId) return;
-    void get<GrantRoles & { viewRoleIds?: number[]; editRoleIds?: number[]; createRoleIds?: number[] }>(`/admin/fields/${selectedFieldId}/grants`).then(value => setGrants({ VIEW: value.VIEW ?? value.viewRoleIds ?? [], EDIT: value.EDIT ?? value.editRoleIds ?? [], CREATE: value.CREATE ?? value.createRoleIds ?? [] })).catch(error => report(error instanceof Error ? error.message : "Could not load field grants."));
+    void get<GrantRoles & { viewRoleIds?: number[]; editRoleIds?: number[]; createRoleIds?: number[] }>(`/admin/fields/${selectedFieldId}/grants`).then(value => setGrants({ VIEW: (value.VIEW ?? value.viewRoleIds ?? []).map(Number), EDIT: (value.EDIT ?? value.editRoleIds ?? []).map(Number), CREATE: (value.CREATE ?? value.createRoleIds ?? []).map(Number) })).catch(error => report(error instanceof Error ? error.message : "Could not load field grants."));
   }, [report, selectedFieldId]);
   async function toggleGrant(operation: keyof GrantRoles, roleId: number) {
     if (!selectedField) return;
@@ -612,7 +615,7 @@ function RoutingAdministration({ organizationId, subtype, report }: { organizati
       setPeople(opts.people);
       setRouting(route);
       setMissingRouting(!route);
-      setTeamId(route?.teamId ? String(route.teamId) : teamRows[0]?.id ? String(teamRows[0].id) : "");
+      setTeamId(route?.teamId ? String(route.teamId) : "");
       setPrimaryDeveloperId(route?.primaryDeveloperId ? String(route.primaryDeveloperId) : "");
       setFallbackDeveloperId(route?.fallbackDeveloperId ? String(route.fallbackDeveloperId) : "");
       setApproverId(route?.approverId ? String(route.approverId) : "");
@@ -628,11 +631,10 @@ function RoutingAdministration({ organizationId, subtype, report }: { organizati
   }, [organizationId, people]);
   async function save(event: FormEvent) {
     event.preventDefault();
-    if (!teamId) { report("Routing needs a team."); return; }
     try {
       await put(`/admin/subtypes/${subtype.id}/routing`, {
         organizationId: organizationId === "internal" ? null : Number(organizationId),
-        teamId: Number(teamId),
+        teamId: teamId ? Number(teamId) : null,
         primaryDeveloperId: idOrNull(primaryDeveloperId),
         fallbackDeveloperId: idOrNull(fallbackDeveloperId),
         approverId: idOrNull(approverId),
@@ -663,7 +665,7 @@ function RoutingAdministration({ organizationId, subtype, report }: { organizati
     </div>
     {missingRouting ? <p className="mb-3 rounded-lg border border-dashed p-3 text-sm text-slate-500">No routing rule exists yet for this subtype and scope.</p> : null}
     <form className="grid gap-3" onSubmit={event => void save(event)}>
-      <label>Team<select className="field mt-1" required value={teamId} onChange={event => setTeamId(event.target.value)}>
+      <label>Team<select className="field mt-1" value={teamId} onChange={event => setTeamId(event.target.value)}>
         <option value="">Select a team</option>
         {teams.map(team => <option value={team.id} key={team.id}>{team.name}</option>)}
       </select></label>

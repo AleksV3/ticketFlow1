@@ -7,7 +7,7 @@ public class SubtypeRoutingRule extends Auditable {
     @Id @GeneratedValue(strategy=GenerationType.IDENTITY) private Long id;
     @ManyToOne(fetch=FetchType.LAZY,optional=false) @JoinColumn(name="subtype_id") private TicketSubtype subtype;
     @ManyToOne(fetch=FetchType.LAZY) @JoinColumn(name="organization_id") private Organization organization;
-    @ManyToOne(fetch=FetchType.LAZY,optional=false) @JoinColumn(name="team_id") private DeveloperTeam team;
+    @ManyToOne(fetch=FetchType.LAZY) @JoinColumn(name="team_id") private DeveloperTeam team;
     @ManyToOne(fetch=FetchType.LAZY) @JoinColumn(name="primary_developer_id") private AppUser primaryDeveloper;
     @ManyToOne(fetch=FetchType.LAZY) @JoinColumn(name="fallback_developer_id") private AppUser fallbackDeveloper;
     @ManyToOne(fetch=FetchType.LAZY) @JoinColumn(name="approver_id") private AppUser approver;

@@ -28,7 +28,7 @@ public final class TicketConfigurationDtos {
     public record RoutingResponse(Long id,Long subtypeId,Long organizationId,Long teamId,Long primaryDeveloperId,
             Long fallbackDeveloperId,Long approverId,boolean active,long version){
         public static RoutingResponse from(SubtypeRoutingRule r){return new RoutingResponse(r.getId(),r.getSubtype().getId(),
-                r.getOrganization()==null?null:r.getOrganization().getId(),r.getTeam().getId(),
+                r.getOrganization()==null?null:r.getOrganization().getId(),r.getTeam()==null?null:r.getTeam().getId(),
                 r.getPrimaryDeveloper()==null?null:r.getPrimaryDeveloper().getId(),
                 r.getFallbackDeveloper()==null?null:r.getFallbackDeveloper().getId(),
                 r.getApprover()==null?null:r.getApprover().getId(),r.isActive(),r.getVersion());}}
