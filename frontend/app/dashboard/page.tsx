@@ -190,6 +190,16 @@ export function DashboardPreferencesEditor({
   onSave: () => void;
   onReset: () => void;
 }) {
+  const [tab, setTab] = useState<"metrics" | "widgets">("widgets");
+  const metricKeys = DASHBOARD_WIDGETS.filter(key => key.startsWith("METRIC_"));
+  const widgetKeys = DASHBOARD_WIDGETS.filter(key => !key.startsWith("METRIC_"));
+  const catalog = tab === "metrics" ? metricKeys : widgetKeys;
+  const activeItems = widgets.filter(key => catalog.includes(key));
+  function replaceActive(next: string[]) {
+    const inactive = widgets.filter(key => !catalog.includes(key));
+    onChange(tab === "metrics" ? [...next, ...inactive] : [...inactive, ...next]);
+  }
+
   function toggle(key: string) {
     onChange(widgets.includes(key)
       ? widgets.filter(widget => widget !== key)
@@ -197,29 +207,30 @@ export function DashboardPreferencesEditor({
   }
 
   function move(key: string, direction: -1 | 1) {
-    const current = widgets.indexOf(key);
+    const current = activeItems.indexOf(key);
     const target = current + direction;
-    if (current < 0 || target < 0 || target >= widgets.length) return;
-    const next = [...widgets];
+    if (current < 0 || target < 0 || target >= activeItems.length) return;
+    const next = [...activeItems];
     [next[current], next[target]] = [next[target], next[current]];
-    onChange(next);
+    replaceActive(next);
   }
 
   function drop(key: string) {
     const dragged = (window as Window & { __dashboardDrag?: string }).__dashboardDrag;
     if (!dragged || dragged === key) return;
-    const next = widgets.filter(item => item !== dragged);
+    if (!catalog.includes(dragged)) return;
+    const next = activeItems.filter(item => item !== dragged);
     const target = next.indexOf(key);
     next.splice(target < 0 ? next.length : target, 0, dragged);
-    onChange(next);
+    replaceActive(next);
     delete (window as Window & { __dashboardDrag?: string }).__dashboardDrag;
   }
 
   return <section className="card" aria-labelledby="dashboard-customization-title">
     <div className="flex flex-wrap items-center justify-between gap-3">
       <div>
-        <h2 id="dashboard-customization-title" className="text-lg font-bold">Dashboard widgets</h2>
-        <p className="mt-1 text-sm text-slate-500">Show, hide, and reorder your personal layout.</p>
+        <h2 id="dashboard-customization-title" className="text-lg font-bold">Dashboard customization</h2>
+        <p className="mt-1 text-sm text-slate-500">Edit summary metric cards and dashboard widgets separately.</p>
       </div>
       <div className="flex gap-2">
         <button type="button" className="btn-secondary" disabled={saving} onClick={onReset}>
@@ -230,10 +241,14 @@ export function DashboardPreferencesEditor({
         </button>
       </div>
     </div>
+    <div className="mt-5 flex gap-2 border-b border-slate-700/50 pb-3" role="tablist" aria-label="Dashboard customization sections">
+      <button type="button" role="tab" aria-selected={tab === "widgets"} className={`btn-secondary ${tab === "widgets" ? "border-blue-500 bg-blue-950/30" : ""}`} onClick={() => setTab("widgets")}>Widgets</button>
+      <button type="button" role="tab" aria-selected={tab === "metrics"} className={`btn-secondary ${tab === "metrics" ? "border-blue-500 bg-blue-950/30" : ""}`} onClick={() => setTab("metrics")}>Metric cards</button>
+    </div>
     <ul className="mt-5 grid gap-3 md:grid-cols-2">
-      {[...widgets, ...DASHBOARD_WIDGETS.filter(key => !widgets.includes(key))].map(key => {
+      {[...activeItems, ...catalog.filter(key => !activeItems.includes(key))].map(key => {
         const enabled = widgets.includes(key);
-        const position = widgets.indexOf(key);
+        const position = activeItems.indexOf(key);
         return <li key={key} draggable onDragStart={() => { (window as Window & { __dashboardDrag?: string }).__dashboardDrag = key; }} onDragOver={event => event.preventDefault()} onDrop={() => drop(key)} className="dashboard-widget-item rounded-xl border border-slate-200 p-3">
           <div className="flex items-center justify-between gap-3">
             <label className="flex cursor-pointer items-center gap-3 text-sm font-semibold">
@@ -247,7 +262,7 @@ export function DashboardPreferencesEditor({
                 onClick={() => move(key, -1)}>↑</button>
               <button type="button" className="btn-secondary px-2 py-1 text-xs"
                 aria-label={`Move ${WIDGET_LABELS[key]} down`}
-                disabled={!enabled || position === widgets.length - 1}
+                disabled={!enabled || position === activeItems.length - 1}
                 onClick={() => move(key, 1)}>↓</button>
             </div>
           </div>
