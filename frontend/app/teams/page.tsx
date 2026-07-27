@@ -1,6 +1,6 @@
 "use client";
 import Link from "next/link";
-import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
+import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AppShell } from "@/components/AppShell";
 import { get, post, put } from "@/lib/api";
 import { useTicketEvents } from "@/lib/realtime";
@@ -15,10 +15,18 @@ type GroupField="status"|"type"|"severity"|"priority"|"responsibility";
 export default function TeamsPage(){return <AppShell require="TICKET_READ">{user=><Teams currentUserId={user.id} internal={user.party==="TICKETFLOW1"}/>}</AppShell>}
 function Teams({currentUserId,internal}:{currentUserId:number;internal:boolean}){
   const [teams,setTeams]=useState<Team[]>([]),[options,setOptions]=useState<Options>({people:[],tickets:[]}),[selectedId,setSelectedId]=useState<number|null>(null),[preference,setPreference]=useState<{dashboardWidgets:string[];enabledTicketFilters:string[];theme:string;version:number}|null>(null),[creating,setCreating]=useState(false),[error,setError]=useState("");
+  const preferenceSaveQueue = useRef(Promise.resolve());
   const selected=teams.find(t=>t.id===selectedId)??null;
   const load=useCallback(async()=>{try{const [list,opts,prefs]=await Promise.all([get<Team[]>("/teams"),get<Options>("/teams/options"),get<{dashboardWidgets:string[];enabledTicketFilters:string[];lastViewedTeamId:number|null;theme:string;version:number}>("/preferences")]);setTeams(list);setOptions(opts);setPreference(prefs);setError("");setSelectedId(current=>{if(current&&list.some(t=>t.id===current))return current;return prefs.lastViewedTeamId&&list.some(t=>t.id===prefs.lastViewedTeamId)?prefs.lastViewedTeamId:list[0]?.id??null})}catch(e){setError(e instanceof Error?e.message:"Could not load teams.")}},[]);
   useEffect(()=>{void load()},[load]);useTicketEvents(load);
-  async function selectTeam(id:number){setSelectedId(id);setCreating(false);if(!preference)return;try{const saved=await put<typeof preference & {lastViewedTeamId:number}>("/preferences",{...preference,lastViewedTeamId:id,version:preference.version});setPreference(saved)}catch(e){setError(e instanceof Error?e.message:"Could not save last viewed team.")}}
+  function selectTeam(id:number){setSelectedId(id);setCreating(false);preferenceSaveQueue.current=preferenceSaveQueue.current.then(async()=>{try{
+      // Always read the current version immediately before writing. Rapid team
+      // switching can otherwise send several PUTs with the same optimistic-lock
+      // version and make a perfectly valid selection look like a conflict.
+      const latest=await get<{dashboardWidgets:string[];enabledTicketFilters:string[];theme:string;version:number}>("/preferences");
+      const saved=await put<typeof latest & {lastViewedTeamId:number}>("/preferences",{...latest,lastViewedTeamId:id,version:latest.version});
+      setPreference(saved);setError("");
+    }catch(e){setError(e instanceof Error?e.message:"Could not save last viewed team.")}}).catch(()=>{});}
   return <div className="space-y-6"><header className="flex flex-wrap items-end justify-between gap-4"><div><p className="eyebrow">Shared workspace</p><h1 className="mt-1 text-3xl font-bold">Teams</h1><p className="mt-2 text-slate-500">Plan work with internal colleagues and invited client members.</p></div>{internal?<button className="btn-primary" onClick={()=>{setCreating(true);setSelectedId(null)}}>+ Create team</button>:null}</header>
     {error?<p className="card text-red-400">{error}</p>:null}
     <div className="grid gap-5 lg:grid-cols-[300px_minmax(0,1fr)]"><aside className="card self-start"><div className="mb-3 flex justify-between"><h2 className="font-bold">My teams</h2><span className="badge bg-slate-100 text-slate-700">{teams.length}</span></div><div className="space-y-2">{teams.map(team=><button className={`block w-full rounded-lg border p-3 text-left ${selectedId===team.id?"border-blue-500 bg-blue-950/30":""}`} key={team.id} onClick={()=>void selectTeam(team.id)}><strong className="text-sm">{team.name}</strong><span className="mt-1 block text-xs text-slate-500">{team.members.length} members · {team.tickets.length} tickets</span></button>)}{!teams.length?<p className="text-sm text-slate-500">You do not belong to a team yet.</p>:null}</div></aside>

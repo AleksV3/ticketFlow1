@@ -36,7 +36,7 @@ type Field = {
 type GrantRoles = { VIEW: number[]; EDIT: number[]; CREATE: number[] };
 type RoleRef = { id: number; name: string; party: string };
 type Option = { id: number; fieldId: number; key: string; label: string; active: boolean; sortOrder: number; version: number };
-type Routing = { id: number; subtypeId: number; organizationId: number | null; teamId: number; primaryDeveloperId: number | null; fallbackDeveloperId: number | null; approverId: number | null; active: boolean; version: number };
+type Routing = { id: number; subtypeId: number; organizationId: number | null; teamId: number | null; primaryDeveloperId: number | null; fallbackDeveloperId: number | null; approverId: number | null; active: boolean; version: number };
 type Person = { id: number; name: string; party: string; organizationName: string | null };
 type Team = { id: number; name: string; members: Person[]; leader: Person };
 type FieldKind = "SHORT_TEXT" | "LONG_TEXT" | "INTEGER" | "DECIMAL" | "DATE" | "BOOLEAN" | "SINGLE_SELECT" | "MULTI_SELECT" | "USER_REFERENCE" | "TEAM_REFERENCE";
@@ -661,8 +661,8 @@ function RoutingAdministration({ organizationId, subtype, report }: { organizati
     </div>
     {missingRouting ? <p className="mb-3 rounded-lg border border-dashed p-3 text-sm text-slate-500">No routing rule exists yet for this subtype and scope.</p> : null}
     <form className="grid gap-3" onSubmit={event => void save(event)}>
-      <label>Team<select className="field mt-1" value={teamId} onChange={event => setTeamId(event.target.value)}>
-        <option value="">Select a team</option>
+      <label>Team <span className="text-xs font-normal text-slate-500">(optional)</span><select className="field mt-1" value={teamId} onChange={event => setTeamId(event.target.value)}>
+        <option value="">No team — assign later</option>
         {teams.map(team => <option value={team.id} key={team.id}>{team.name}</option>)}
       </select></label>
       <label>Primary developer<select className="field mt-1" value={primaryDeveloperId} onChange={event => setPrimaryDeveloperId(event.target.value)}>
