@@ -43,7 +43,7 @@ function Detail({ canEdit, canAssign, internal }: { canEdit: boolean; canAssign:
     <TicketCommunication ticketKey={ticketKey} internal={internal}/>
     <ProcessMap ticket={ticket} history={history}/>
     <ProposalActions ticketKey={ticketKey} proposal={ticket.latestProposal} commands={ticket.proposalCommands ?? []} onDone={load}/>
-    <details className="card"><summary className="cursor-pointer font-bold">Status history and audit log</summary><div className="mt-5"><TicketHistory ticketKey={ticketKey}/></div></details>
+    <details id="audit-history" className="card"><summary className="cursor-pointer font-bold">Status history and audit log</summary><div className="mt-5"><TicketHistory ticketKey={ticketKey}/></div></details>
   </div>;
 }
 
@@ -62,7 +62,7 @@ function ProcessMap({ ticket, history }: { ticket: TicketDetail; history: Histor
     });
     return { nodes, edges };
   }, [history, ticket]);
-  return <section className="card py-4"><div className="mb-2 flex flex-wrap items-center justify-between gap-2"><div><p className="eyebrow">Process overview</p><h2 className="text-sm font-bold">{ticket.processMap.name}</h2></div><div className="flex gap-2 text-[10px] text-slate-500"><span className="text-emerald-400">● Done</span><span className="text-yellow-300">● Current</span><span className="text-blue-400">● Next</span></div></div><div className="react-flow-shell ticket-view-map"><ReactFlow nodes={elements.nodes} edges={elements.edges} nodeTypes={workflowNodeTypes} edgeTypes={workflowEdgeTypes} nodesDraggable={false} nodesConnectable={false} edgesFocusable={false} elementsSelectable={false} fitView fitViewOptions={{ padding: .12 }} minZoom={.2} maxZoom={2} colorMode="dark"><Controls showInteractive={false}/><Background gap={20} size={1}/></ReactFlow></div></section>;
+  return <details className="card py-4"><summary className="flex cursor-pointer list-none flex-wrap items-center justify-between gap-2"><div><p className="eyebrow">Process overview</p><h2 className="text-sm font-bold">{ticket.processMap.name}</h2></div><div className="flex gap-2 text-[10px] text-slate-500"><span className="text-emerald-400">● Done</span><span className="text-yellow-300">● Current</span><span className="text-blue-400">● Next</span></div></summary><div className="mt-3 react-flow-shell ticket-view-map"><ReactFlow nodes={elements.nodes} edges={elements.edges} nodeTypes={workflowNodeTypes} edgeTypes={workflowEdgeTypes} nodesDraggable={false} nodesConnectable={false} edgesFocusable={false} elementsSelectable={false} fitView fitViewOptions={{ padding: .12 }} minZoom={.2} maxZoom={2} colorMode="dark"><Controls showInteractive={false}/><Background gap={20} size={1}/></ReactFlow></div></details>;
 }
 
 function TicketSidebar({ ticket, audit, onTransition }: { ticket: TicketDetail; audit: Audit[]; onTransition: (status: string) => Promise<void> }) {
@@ -73,6 +73,7 @@ function TicketSidebar({ ticket, audit, onTransition }: { ticket: TicketDetail; 
     <dl className="grid gap-3 border-t border-slate-700 pt-4"><Row k="Title" v={ticket.title}/><Row k="Type" v={ticket.type}/><Row k="Subtype" v={ticket.subtype ?? "None"}/><Row k="Created" v={formatDate(ticket.createdAt)}/><Row k="Created by" v={created?.actor.displayName ?? "Unknown"}/><Row k="Last edited by" v={lastEdited?.actor.displayName ?? "Unknown"}/><Row k="Last edited" v={lastEdited ? formatDate(lastEdited.createdAt) : formatDate(ticket.updatedAt)}/><Row k="Business owner" v={ticket.businessOwner.displayName}/><Row k="Organization" v={ticket.organization.name}/><Row k="Team" v={ticket.teams?.map(team => team.name).join(", ") || "Not assigned"}/><Row k="Priority" v={ticket.priority}/>{ticket.severity ? <Row k="Severity" v={ticket.severity}/> : null}</dl>
     <div className="border-t border-slate-700 pt-4"><p className="eyebrow">Workflow position</p><p className="mt-1 text-sm font-semibold">{ticket.processMap.name}</p><div className="mt-3 rounded-lg border border-yellow-400/50 bg-yellow-400/10 p-3"><p className="text-[10px] uppercase tracking-wider text-slate-400">Current state</p><strong className="text-yellow-200">{ticket.status.replaceAll("_", " ")}</strong></div></div>
     <div className="border-t border-slate-700 pt-4"><p className="eyebrow">Next move</p><p className="mt-1 text-xs text-slate-400">Available actions from this workflow state.</p><div className="mt-3 grid gap-2"><TransitionButtons allowedTransitions={ticket.allowedTransitions} onTransition={onTransition}/></div>{!ticket.allowedTransitions.length ? <p className="mt-2 text-sm text-slate-500">No status transitions available.</p> : null}</div>
+    <Link className="btn-secondary block w-full text-center" href="#audit-history">View audit history</Link>
   </aside>;
 }
 
