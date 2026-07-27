@@ -217,7 +217,7 @@ public class TicketService {
             applyDeadlines(saved, saved.getSeverity(), saved.getCreatedAt());
             saved = ticketRepository.saveAndFlush(saved);
         }
-        if (notificationService != null) notificationService.notifyNewAssignments(saved, actor.getId(), Set.of());
+        if (notificationService != null) { notificationService.notifyCreated(saved, actor.getId()); notificationService.notifyNewAssignments(saved, actor.getId(), Set.of()); }
         auditService.record(saved, actor.getId(), AuditAction.TICKET_CREATED);
         if (subtype != null && request.dynamicValues() != null && !request.dynamicValues().isEmpty()) {
             // Never persist submitted values in the audit feed: dynamic fields may

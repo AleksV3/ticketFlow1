@@ -49,6 +49,14 @@ public class NotificationService {
         notifications.saveAll(created);
     }
     @Transactional
+    public void notifyCreated(Ticket ticket, Long actorId){
+        if (ticket == null || actorId == null) return;
+        AppUser actor = users.findById(actorId).orElse(null);
+        if (actor == null) return;
+        notifications.save(new Notification(actor, ticket, actor, "TICKET_CREATED", "Ticket created",
+                actor.getDisplayName()+" created "+ticket.getTicketKey()+" — "+ticket.getTitle()+"."));
+    }
+    @Transactional
     public void notifyUpdate(Ticket ticket, Long actorId, String action){
         if (ticket == null) return;
         Set<Long> recipients = recipientIds(ticket); recipients.remove(actorId);
@@ -73,6 +81,7 @@ public class NotificationService {
         if(ticket.getTicketLead()!=null) result.add(ticket.getTicketLead().getId());
         ticket.getDevelopers().forEach(user -> result.add(user.getId()));
         if(ticket.getResolvedApprover()!=null) result.add(ticket.getResolvedApprover().getId());
+        if(ticket.getBusinessOwner()!=null) result.add(ticket.getBusinessOwner().getId());
         for(DeveloperTeam team: ticket.getTeams()) team.getMembers().forEach(user -> result.add(user.getId()));
         result.addAll(followers.findUserIdsByTicketId(ticket.getId()));
         return result;
