@@ -1,6 +1,9 @@
 package com.ticketflow1.ticketing.notification;
 
 import com.ticketflow1.ticketing.ticket.Ticket;
+import com.ticketflow1.ticketing.ticket.TicketRepository;
+import com.ticketflow1.ticketing.ticket.Responsibility;
+import com.ticketflow1.ticketing.auth.AuthPrincipal;
 import com.ticketflow1.ticketing.team.DeveloperTeam;
 import com.ticketflow1.ticketing.user.AppUser;
 import com.ticketflow1.ticketing.user.AppUserRepository;
@@ -13,7 +16,13 @@ import org.springframework.transaction.annotation.Transactional;
 public class NotificationService {
     private final NotificationRepository notifications;
     private final AppUserRepository users;
-    public NotificationService(NotificationRepository notifications, AppUserRepository users){this.notifications=notifications;this.users=users;}
+    private final TicketRepository tickets;
+    private final TicketFollowerRepository followers;
+    public NotificationService(NotificationRepository notifications, AppUserRepository users, TicketRepository tickets, TicketFollowerRepository followers){this.notifications=notifications;this.users=users;this.tickets=tickets;this.followers=followers;}
+
+    @Transactional(readOnly=true) public boolean isFollowing(String key, AuthPrincipal principal){return followers.existsByIdTicketIdAndIdUserId(visibleTicket(key,principal).getId(),principal.userId());}
+    @Transactional public void follow(String key, AuthPrincipal principal){Ticket ticket=visibleTicket(key,principal); if(!followers.existsByIdTicketIdAndIdUserId(ticket.getId(),principal.userId())) followers.save(new TicketFollower(ticket,users.getReferenceById(principal.userId())));}
+    @Transactional public void unfollow(String key, AuthPrincipal principal){Ticket ticket=visibleTicket(key,principal); followers.deleteByIdTicketIdAndIdUserId(ticket.getId(),principal.userId());}
 
     @Transactional(readOnly = true)
     public List<NotificationResponse> list(Long recipientId){
@@ -54,7 +63,12 @@ public class NotificationService {
         ticket.getDevelopers().forEach(user -> result.add(user.getId()));
         if(ticket.getResolvedApprover()!=null) result.add(ticket.getResolvedApprover().getId());
         for(DeveloperTeam team: ticket.getTeams()) team.getMembers().forEach(user -> result.add(user.getId()));
+        result.addAll(followers.findUserIdsByTicketId(ticket.getId()));
         return result;
+    }
+    private Ticket visibleTicket(String key, AuthPrincipal principal){
+        if(principal.party()==Responsibility.CLIENT) return tickets.findByTicketKeyAndOrganizationId(key,principal.organizationId()).orElseThrow(() -> com.ticketflow1.ticketing.common.ApiException.notFound("Ticket not found: "+key));
+        return tickets.findByTicketKey(key).orElseThrow(() -> com.ticketflow1.ticketing.common.ApiException.notFound("Ticket not found: "+key));
     }
     public record NotificationResponse(Long id, String eventType, String title, String message, String ticketKey,
             String ticketTitle, boolean read, java.time.Instant createdAt){

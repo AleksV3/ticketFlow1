@@ -6,7 +6,7 @@ import { Background, BaseEdge, Controls, Handle, MarkerType, Position, ReactFlow
 import { AppShell } from "@/components/AppShell";
 import { ProposalActions, TicketCommunication, TicketHistory } from "@/components/TicketExtras";
 import { SlaBadge, StatusBadge, TransitionButtons } from "@/components/TicketUi";
-import { get, patch, post } from "@/lib/api";
+import { api, get, patch, post } from "@/lib/api";
 import type { TicketDetail } from "@/lib/types";
 import { useTicketEvents } from "@/lib/realtime";
 
@@ -24,8 +24,10 @@ export default function TicketPage() { return <AppShell require="TICKET_READ">{u
 
 function Detail({ canEdit, canAssign, internal }: { canEdit: boolean; canAssign: boolean; internal: boolean }) {
   const { ticketKey } = useParams<{ ticketKey: string }>();
-  const [ticket, setTicket] = useState<TicketDetail | null>(null), [history, setHistory] = useState<History[]>([]), [audit, setAudit] = useState<Audit[]>([]), [error, setError] = useState(""), [editing, setEditing] = useState(false);
-  const load = useCallback(async () => { try { const [detail, events, log] = await Promise.all([get<TicketDetail>(`/tickets/${ticketKey}`), get<History[]>(`/tickets/${ticketKey}/status-history`), get<Audit[]>(`/tickets/${ticketKey}/audit-log`)]); setTicket(detail); setHistory(events); setAudit(log); } catch (error) { setError(error instanceof Error ? error.message : "Could not load ticket."); } }, [ticketKey]);
+  const [ticket, setTicket] = useState<TicketDetail | null>(null), [history, setHistory] = useState<History[]>([]), [audit, setAudit] = useState<Audit[]>([]), [following, setFollowing] = useState(false), [followSaving, setFollowSaving] = useState(false), [error, setError] = useState(""), [editing, setEditing] = useState(false);
+  const load = useCallback(async () => { try { const [detail, events, log, followed] = await Promise.all([get<TicketDetail>(`/tickets/${ticketKey}`), get<History[]>(`/tickets/${ticketKey}/status-history`), get<Audit[]>(`/tickets/${ticketKey}/audit-log`), get<boolean>(`/tickets/${ticketKey}/follow`)]); setTicket(detail); setHistory(events); setAudit(log); setFollowing(followed); } catch (error) { setError(error instanceof Error ? error.message : "Could not load ticket."); } }, [ticketKey]);
+  async function toggleFollow(){setFollowSaving(true);try{if(following){await fetchFollow("DELETE");setFollowing(false)}else{await fetchFollow("PUT");setFollowing(true)}}catch(error){setError(error instanceof Error?error.message:"Could not update notification subscription.")}finally{setFollowSaving(false)}}
+  async function fetchFollow(method:"PUT"|"DELETE"){await api(`/tickets/${ticketKey}/follow`,{method})}
   useEffect(() => { void load(); }, [load]);
   useTicketEvents(load);
   if (error) return <div className="card text-red-700">{error}</div>;
@@ -33,7 +35,7 @@ function Detail({ canEdit, canAssign, internal }: { canEdit: boolean; canAssign:
   return <div className="space-y-4">
     <div className="grid items-start gap-4 xl:grid-cols-[minmax(0,1fr)_300px]">
       <main className="min-w-0 overflow-hidden rounded-2xl border border-blue-500/70 bg-slate-900/60 shadow-xl">
-        <header className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-700 bg-slate-950/70 px-5 py-4"><div className="flex min-w-0 items-center gap-3"><span className="rounded-lg bg-blue-600 px-3 py-1 text-sm font-bold text-white">{ticket.ticketKey}</span><span className="truncate text-lg font-semibold" title={ticket.title}>{ticket.title}</span><StatusBadge value={ticket.status}/>{ticket.sla ? <SlaBadge value={ticket.sla.status}/> : null}</div>{canEdit||canAssign ? <button className="btn-secondary" onClick={() => setEditing(value => !value)}>{editing ? "Close edit" : "Edit ticket"}</button> : null}</header>
+        <header className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-700 bg-slate-950/70 px-5 py-4"><div className="flex min-w-0 items-center gap-3"><span className="rounded-lg bg-blue-600 px-3 py-1 text-sm font-bold text-white">{ticket.ticketKey}</span><span className="truncate text-lg font-semibold" title={ticket.title}>{ticket.title}</span><StatusBadge value={ticket.status}/>{ticket.sla ? <SlaBadge value={ticket.sla.status}/> : null}</div><div className="flex flex-wrap gap-2"><button className={following?"btn-primary":"btn-secondary"} disabled={followSaving} onClick={() => void toggleFollow()}>{followSaving?"Saving…":following?"Following":"Follow ticket"}</button>{canEdit||canAssign ? <button className="btn-secondary" onClick={() => setEditing(value => !value)}>{editing ? "Close edit" : "Edit ticket"}</button> : null}</div></header>
         <div className="space-y-4 p-4"><section className="rounded-xl border border-slate-700 bg-slate-900/70 p-4"><div className="grid gap-3 sm:grid-cols-3 lg:grid-cols-5"><Row k="Type" v={ticket.type}/><Row k="Priority" v={ticket.priority}/><Row k="Responsibility" v={ticket.currentResponsibility}/><Row k="Organization" v={ticket.organization.name}/><Row k="Owner" v={ticket.businessOwner.displayName}/></div><div className="mt-4 border-t border-slate-700 pt-4"><p className="text-[10px] uppercase tracking-wider text-slate-500">Description</p><p className="mt-2 text-sm leading-6 text-slate-300 whitespace-pre-wrap">{ticket.description}</p></div></section>
           <TeamPanel ticket={ticket}/><TicketContext ticket={ticket}/>{editing ? <Edit ticket={ticket} canEdit={canEdit} canAssign={false} done={async () => { setEditing(false); await load(); }}/> : null}{canAssign ? <details className="rounded-xl border border-slate-700 p-3"><summary className="cursor-pointer font-bold">Edit assignment</summary><div className="mt-4"><Edit ticket={ticket} canEdit={false} canAssign done={load}/></div></details> : null}</div>
         <TicketCommunication ticketKey={ticketKey} internal={internal}/>
