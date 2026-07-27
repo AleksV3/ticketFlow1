@@ -249,7 +249,7 @@ export function DashboardPreferencesEditor({
         const enabled = widgets.includes(key);
         return <li key={key} draggable onDragStart={() => { (window as Window & { __dashboardDrag?: string }).__dashboardDrag = key; }} onDragOver={event => event.preventDefault()} onDrop={() => drop(key)} className={`dashboard-widget-item rounded-xl border p-3 ${enabled ? "dashboard-widget-item-selected" : ""}`}>
           <div className="flex items-center justify-between gap-3">
-            <label className="flex cursor-pointer items-center gap-3 text-sm font-semibold">
+            <label className="-m-3 flex w-full cursor-pointer items-center gap-3 p-3 text-sm font-semibold">
               <input type="checkbox" aria-label={WIDGET_LABELS[key]} checked={enabled} onChange={() => toggle(key)} />
               <span aria-hidden="true" className="cursor-grab">⠿</span>{WIDGET_LABELS[key]}
             </label>
