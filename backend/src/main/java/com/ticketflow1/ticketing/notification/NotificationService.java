@@ -38,6 +38,16 @@ public class NotificationService {
                 "Ticket assigned to you", ticket.getTicketKey()+" — "+ticket.getTitle()+" was assigned to you.")).toList();
         notifications.saveAll(created);
     }
+    @Transactional
+    public void notifyUpdate(Ticket ticket, Long actorId, String action){
+        if (ticket == null) return;
+        Set<Long> recipients = recipientIds(ticket); recipients.remove(actorId);
+        if (recipients.isEmpty()) return;
+        String label = action.replace('_', ' ').toLowerCase(Locale.ROOT);
+        List<Notification> created = users.findAllById(recipients).stream().map(user -> new Notification(user, ticket, "TICKET_UPDATED",
+                "Ticket updated", ticket.getTicketKey()+" — "+label+".")).toList();
+        notifications.saveAll(created);
+    }
     public Set<Long> recipientIds(Ticket ticket){
         Set<Long> result = new LinkedHashSet<>();
         if(ticket.getTicketLead()!=null) result.add(ticket.getTicketLead().getId());

@@ -7,6 +7,7 @@ import com.ticketflow1.ticketing.ticket.Responsibility;
 import com.ticketflow1.ticketing.ticket.Ticket;
 import com.ticketflow1.ticketing.ticket.TicketRepository;
 import com.ticketflow1.ticketing.user.AppUserRepository;
+import com.ticketflow1.ticketing.notification.NotificationService;
 import java.util.List;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -17,12 +18,18 @@ public class AuditService {
     private final AuditLogRepository auditLogRepository;
     private final AppUserRepository appUserRepository;
     private final TicketRepository ticketRepository;
+    private final NotificationService notificationService;
 
+    @org.springframework.beans.factory.annotation.Autowired
     public AuditService(AuditLogRepository auditLogRepository, AppUserRepository appUserRepository,
-            TicketRepository ticketRepository) {
+            TicketRepository ticketRepository, NotificationService notificationService) {
         this.auditLogRepository = auditLogRepository;
         this.appUserRepository = appUserRepository;
         this.ticketRepository = ticketRepository;
+        this.notificationService = notificationService;
+    }
+    public AuditService(AuditLogRepository auditLogRepository, AppUserRepository appUserRepository, TicketRepository ticketRepository) {
+        this(auditLogRepository, appUserRepository, ticketRepository, null);
     }
 
     @Transactional
@@ -40,7 +47,11 @@ public class AuditService {
                 fieldName,
                 oldValue,
                 newValue);
-        return auditLogRepository.save(auditLog);
+        AuditLog saved = auditLogRepository.save(auditLog);
+        if (notificationService != null && action != AuditAction.TICKET_CREATED && action != AuditAction.ASSIGNEE_CHANGED) {
+            notificationService.notifyUpdate(ticket, actorId, action.name());
+        }
+        return saved;
     }
 
     @Transactional(readOnly = true)
