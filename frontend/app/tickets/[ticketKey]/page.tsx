@@ -30,14 +30,16 @@ function Detail({ canEdit, canAssign, internal }: { canEdit: boolean; canAssign:
   if (error) return <div className="card text-red-700">{error}</div>;
   if (!ticket) return <div className="card">Loading ticket…</div>;
   return <div className="space-y-4">
-    <header className="flex flex-wrap items-start justify-between gap-3"><div><div className="flex flex-wrap items-center gap-2"><h1 className="text-2xl font-bold">{ticket.ticketKey}</h1><StatusBadge value={ticket.status}/>{ticket.sla ? <SlaBadge value={ticket.sla.status}/> : null}</div><h2 className="mt-2 text-lg font-semibold">{ticket.title}</h2></div>{canEdit||canAssign ? <button className="btn-secondary" onClick={() => setEditing(value => !value)}>{editing ? "Close edit" : "Edit ticket"}</button> : null}</header>
-    <section className="card py-4"><div className="grid gap-3 sm:grid-cols-3 lg:grid-cols-5"><Row k="Type" v={ticket.type}/><Row k="Priority" v={ticket.priority}/><Row k="Responsibility" v={ticket.currentResponsibility}/><Row k="Organization" v={ticket.organization.name}/><Row k="Owner" v={ticket.businessOwner.displayName}/></div><p className="mt-4 border-t pt-4 text-sm leading-6 text-slate-600 whitespace-pre-wrap">{ticket.description}</p></section>
-    <TeamPanel ticket={ticket}/>
-    <TicketContext ticket={ticket}/>
-    {editing ? <Edit ticket={ticket} canEdit={canEdit} canAssign={false} done={async () => { setEditing(false); await load(); }}/> : null}
-    {canAssign ? <details className="card"><summary className="cursor-pointer font-bold">Quickly assign ticket lead and developers</summary><div className="mt-4"><Edit ticket={ticket} canEdit={false} canAssign done={load}/></div></details> : null}
+    <div className="grid items-start gap-4 xl:grid-cols-[minmax(0,1fr)_300px]">
+      <main className="min-w-0 overflow-hidden rounded-2xl border border-blue-500/70 bg-slate-900/60 shadow-xl">
+        <header className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-700 bg-slate-950/70 px-5 py-4"><div className="flex min-w-0 items-center gap-3"><span className="rounded-lg bg-blue-600 px-3 py-1 text-sm font-bold text-white">{ticket.ticketKey}</span><span className="truncate text-lg font-semibold" title={ticket.title}>{ticket.title}</span><StatusBadge value={ticket.status}/>{ticket.sla ? <SlaBadge value={ticket.sla.status}/> : null}</div>{canEdit||canAssign ? <button className="btn-secondary" onClick={() => setEditing(value => !value)}>{editing ? "Close edit" : "Edit ticket"}</button> : null}</header>
+        <div className="space-y-4 p-4"><section className="rounded-xl border border-slate-700 bg-slate-900/70 p-4"><div className="grid gap-3 sm:grid-cols-3 lg:grid-cols-5"><Row k="Type" v={ticket.type}/><Row k="Priority" v={ticket.priority}/><Row k="Responsibility" v={ticket.currentResponsibility}/><Row k="Organization" v={ticket.organization.name}/><Row k="Owner" v={ticket.businessOwner.displayName}/></div><div className="mt-4 border-t border-slate-700 pt-4"><p className="text-[10px] uppercase tracking-wider text-slate-500">Description</p><p className="mt-2 text-sm leading-6 text-slate-300 whitespace-pre-wrap">{ticket.description}</p></div></section>
+          <TeamPanel ticket={ticket}/><TicketContext ticket={ticket}/>{editing ? <Edit ticket={ticket} canEdit={canEdit} canAssign={false} done={async () => { setEditing(false); await load(); }}/> : null}{canAssign ? <details className="rounded-xl border border-slate-700 p-3"><summary className="cursor-pointer font-bold">Edit assignment</summary><div className="mt-4"><Edit ticket={ticket} canEdit={false} canAssign done={load}/></div></details> : null}</div>
+      </main>
+      <TicketSidebar ticket={ticket} onTransition={async status => { await post(`/tickets/${ticketKey}/transition`, { toStatus: status }); await load(); }}/>
+    </div>
     <TicketCommunication ticketKey={ticketKey} internal={internal}/>
-    <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_300px]"><ProcessMap ticket={ticket} history={history}/><section className="card py-4"><div className="mb-3"><p className="eyebrow">Next step</p><h2 className="text-sm font-bold">Available actions</h2></div><TransitionButtons allowedTransitions={ticket.allowedTransitions} onTransition={async status => { await post(`/tickets/${ticketKey}/transition`, { toStatus: status }); await load(); }}/></section></div>
+    <ProcessMap ticket={ticket} history={history}/>
     <WorkflowDecisionPanel ticketKey={ticketKey} commands={ticket.workflowCommands ?? []} onDone={load}/>
     <ProposalActions ticketKey={ticketKey} proposal={ticket.latestProposal} commands={ticket.proposalCommands ?? []} onDone={load}/>
     <details className="card"><summary className="cursor-pointer font-bold">Status history and audit log</summary><div className="mt-5"><TicketHistory ticketKey={ticketKey}/></div></details>
@@ -60,6 +62,19 @@ function ProcessMap({ ticket, history }: { ticket: TicketDetail; history: Histor
     return { nodes, edges };
   }, [history, ticket]);
   return <section className="card py-4"><div className="mb-2 flex flex-wrap items-center justify-between gap-2"><div><p className="eyebrow">Process overview</p><h2 className="text-sm font-bold">{ticket.processMap.name}</h2></div><div className="flex gap-2 text-[10px] text-slate-500"><span className="text-emerald-400">● Done</span><span className="text-yellow-300">● Current</span><span className="text-blue-400">● Next</span></div></div><div className="react-flow-shell ticket-view-map"><ReactFlow nodes={elements.nodes} edges={elements.edges} nodeTypes={workflowNodeTypes} edgeTypes={workflowEdgeTypes} nodesDraggable={false} nodesConnectable={false} edgesFocusable={false} elementsSelectable={false} fitView fitViewOptions={{ padding: .12 }} minZoom={.2} maxZoom={2} colorMode="dark"><Controls showInteractive={false}/><Background gap={20} size={1}/></ReactFlow></div></section>;
+}
+
+function TicketSidebar({ ticket, onTransition }: { ticket: TicketDetail; onTransition: (status: string) => Promise<void> }) {
+  return <aside className="card sticky top-4 space-y-5 py-4">
+    <div><p className="eyebrow">Ticket metadata</p><h2 className="mt-1 text-lg font-bold">{ticket.ticketKey}</h2></div>
+    <dl className="grid gap-3 border-t border-slate-700 pt-4"><Row k="Title" v={ticket.title}/><Row k="Type" v={ticket.type}/><Row k="Subtype" v={ticket.subtype ?? "None"}/><Row k="Created" v={formatDate(ticket.createdAt)}/><Row k="Business owner" v={ticket.businessOwner.displayName}/><Row k="Organization" v={ticket.organization.name}/><Row k="Team" v={ticket.teams?.map(team => team.name).join(", ") || "Not assigned"}/><Row k="Priority" v={ticket.priority}/>{ticket.severity ? <Row k="Severity" v={ticket.severity}/> : null}</dl>
+    <div className="border-t border-slate-700 pt-4"><p className="eyebrow">Workflow position</p><p className="mt-1 text-sm font-semibold">{ticket.processMap.name}</p><div className="mt-3 rounded-lg border border-yellow-400/50 bg-yellow-400/10 p-3"><p className="text-[10px] uppercase tracking-wider text-slate-400">Current state</p><strong className="text-yellow-200">{ticket.status.replaceAll("_", " ")}</strong></div></div>
+    <div className="border-t border-slate-700 pt-4"><p className="eyebrow">Next move</p><p className="mt-1 text-xs text-slate-400">Available actions from this workflow state.</p><div className="mt-3 grid gap-2"><TransitionButtons allowedTransitions={ticket.allowedTransitions} onTransition={onTransition}/></div>{!ticket.allowedTransitions.length ? <p className="mt-2 text-sm text-slate-500">No status transitions available.</p> : null}</div>
+  </aside>;
+}
+
+function formatDate(value: string) {
+  try { return new Intl.DateTimeFormat(undefined, { dateStyle: "medium", timeStyle: "short" }).format(new Date(value)); } catch { return value; }
 }
 
 function processLayout(ticket: TicketDetail) {
