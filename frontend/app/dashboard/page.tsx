@@ -170,7 +170,7 @@ function DashboardContent() {
         href="/tickets?lifecycle=closed" tone="green" />
       {Object.entries(data.defectsBySeverity).map(([key, value]) =>
         <Metric key={key} label={`${humanize(key)} defects`} value={value}
-          href={`/tickets?type=DEFECT&severity=${key}`} tone="amber" />)}
+          href={`/tickets?type=DFCT&severity=${key}`} tone="amber" />)}
     </section>
 
     <DashboardWidgetGrid data={data} widgets={customizing ? draftWidgets : preferences.dashboardWidgets} />
