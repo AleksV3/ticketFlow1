@@ -297,6 +297,12 @@ tbody tr:hover { background: rgb(0 84 166 / 10%); }
 [data-theme="light"] .dashboard-card-heading { background: rgb(241 245 249 / 95%) !important; }
 [data-theme="light"] .dashboard-metric p, [data-theme="light"] .dashboard-ticket-card small, [data-theme="light"] .dashboard-empty { color: rgb(71 85 105) !important; }
 [data-theme="light"] .dashboard-metric strong, [data-theme="light"] .dashboard-ticket-card strong { color: rgb(20 32 48) !important; }
+[data-theme="light"] .dashboard-metric-blue { border-top: 4px solid rgb(37 99 235) !important; background: linear-gradient(145deg, rgb(239 246 255), rgb(255 255 255)) !important; }
+[data-theme="light"] .dashboard-metric-green { border-top: 4px solid rgb(5 150 105) !important; background: linear-gradient(145deg, rgb(236 253 245), rgb(255 255 255)) !important; }
+[data-theme="light"] .dashboard-metric-amber { border-top: 4px solid rgb(217 119 6) !important; background: linear-gradient(145deg, rgb(255 251 235), rgb(255 255 255)) !important; }
+[data-theme="light"] .dashboard-metric > span { background: rgb(219 234 254) !important; color: rgb(29 78 216) !important; }
+[data-theme="light"] .dashboard-card-heading b { background: rgb(191 219 254) !important; color: rgb(30 64 175) !important; }
+[data-theme="light"] .dashboard-ticket-card { border-top: 3px solid rgb(96 165 250); }
 
 @media (max-width: 640px) {
   .card { padding: 1rem; border-radius: 1rem; }
