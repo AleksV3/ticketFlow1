@@ -11,6 +11,7 @@ import type { TicketDetail } from "@/lib/types";
 import { useTicketEvents } from "@/lib/realtime";
 
 type History = { id: number; fromStatus: string | null; toStatus: string; createdAt: string };
+type Audit = { id: number; actor: { id: number; displayName: string }; action: string; createdAt: string };
 
 /**
  * Ticket detail page.
@@ -23,8 +24,8 @@ export default function TicketPage() { return <AppShell require="TICKET_READ">{u
 
 function Detail({ canEdit, canAssign, internal }: { canEdit: boolean; canAssign: boolean; internal: boolean }) {
   const { ticketKey } = useParams<{ ticketKey: string }>();
-  const [ticket, setTicket] = useState<TicketDetail | null>(null), [history, setHistory] = useState<History[]>([]), [error, setError] = useState(""), [editing, setEditing] = useState(false);
-  const load = useCallback(async () => { try { const [detail, events] = await Promise.all([get<TicketDetail>(`/tickets/${ticketKey}`), get<History[]>(`/tickets/${ticketKey}/status-history`)]); setTicket(detail); setHistory(events); } catch (error) { setError(error instanceof Error ? error.message : "Could not load ticket."); } }, [ticketKey]);
+  const [ticket, setTicket] = useState<TicketDetail | null>(null), [history, setHistory] = useState<History[]>([]), [audit, setAudit] = useState<Audit[]>([]), [error, setError] = useState(""), [editing, setEditing] = useState(false);
+  const load = useCallback(async () => { try { const [detail, events, log] = await Promise.all([get<TicketDetail>(`/tickets/${ticketKey}`), get<History[]>(`/tickets/${ticketKey}/status-history`), get<Audit[]>(`/tickets/${ticketKey}/audit-log`)]); setTicket(detail); setHistory(events); setAudit(log); } catch (error) { setError(error instanceof Error ? error.message : "Could not load ticket."); } }, [ticketKey]);
   useEffect(() => { void load(); }, [load]);
   useTicketEvents(load);
   if (error) return <div className="card text-red-700">{error}</div>;
@@ -36,7 +37,7 @@ function Detail({ canEdit, canAssign, internal }: { canEdit: boolean; canAssign:
         <div className="space-y-4 p-4"><section className="rounded-xl border border-slate-700 bg-slate-900/70 p-4"><div className="grid gap-3 sm:grid-cols-3 lg:grid-cols-5"><Row k="Type" v={ticket.type}/><Row k="Priority" v={ticket.priority}/><Row k="Responsibility" v={ticket.currentResponsibility}/><Row k="Organization" v={ticket.organization.name}/><Row k="Owner" v={ticket.businessOwner.displayName}/></div><div className="mt-4 border-t border-slate-700 pt-4"><p className="text-[10px] uppercase tracking-wider text-slate-500">Description</p><p className="mt-2 text-sm leading-6 text-slate-300 whitespace-pre-wrap">{ticket.description}</p></div></section>
           <TeamPanel ticket={ticket}/><TicketContext ticket={ticket}/>{editing ? <Edit ticket={ticket} canEdit={canEdit} canAssign={false} done={async () => { setEditing(false); await load(); }}/> : null}{canAssign ? <details className="rounded-xl border border-slate-700 p-3"><summary className="cursor-pointer font-bold">Edit assignment</summary><div className="mt-4"><Edit ticket={ticket} canEdit={false} canAssign done={load}/></div></details> : null}</div>
       </main>
-      <TicketSidebar ticket={ticket} onTransition={async status => { await post(`/tickets/${ticketKey}/transition`, { toStatus: status }); await load(); }}/>
+      <TicketSidebar ticket={ticket} audit={audit} onTransition={async status => { await post(`/tickets/${ticketKey}/transition`, { toStatus: status }); await load(); }}/>
     </div>
     <WorkflowDecisionPanel ticketKey={ticketKey} commands={ticket.workflowCommands ?? []} onDone={load}/>
     <TicketCommunication ticketKey={ticketKey} internal={internal}/>
@@ -64,10 +65,12 @@ function ProcessMap({ ticket, history }: { ticket: TicketDetail; history: Histor
   return <section className="card py-4"><div className="mb-2 flex flex-wrap items-center justify-between gap-2"><div><p className="eyebrow">Process overview</p><h2 className="text-sm font-bold">{ticket.processMap.name}</h2></div><div className="flex gap-2 text-[10px] text-slate-500"><span className="text-emerald-400">● Done</span><span className="text-yellow-300">● Current</span><span className="text-blue-400">● Next</span></div></div><div className="react-flow-shell ticket-view-map"><ReactFlow nodes={elements.nodes} edges={elements.edges} nodeTypes={workflowNodeTypes} edgeTypes={workflowEdgeTypes} nodesDraggable={false} nodesConnectable={false} edgesFocusable={false} elementsSelectable={false} fitView fitViewOptions={{ padding: .12 }} minZoom={.2} maxZoom={2} colorMode="dark"><Controls showInteractive={false}/><Background gap={20} size={1}/></ReactFlow></div></section>;
 }
 
-function TicketSidebar({ ticket, onTransition }: { ticket: TicketDetail; onTransition: (status: string) => Promise<void> }) {
+function TicketSidebar({ ticket, audit, onTransition }: { ticket: TicketDetail; audit: Audit[]; onTransition: (status: string) => Promise<void> }) {
+  const created = audit.find(item => item.action === "CREATED") ?? audit[0];
+  const lastEdited = audit.length ? audit[audit.length - 1] : null;
   return <aside className="card sticky top-4 space-y-5 py-4">
     <div><p className="eyebrow">Ticket metadata</p><h2 className="mt-1 text-lg font-bold">{ticket.ticketKey}</h2></div>
-    <dl className="grid gap-3 border-t border-slate-700 pt-4"><Row k="Title" v={ticket.title}/><Row k="Type" v={ticket.type}/><Row k="Subtype" v={ticket.subtype ?? "None"}/><Row k="Created" v={formatDate(ticket.createdAt)}/><Row k="Business owner" v={ticket.businessOwner.displayName}/><Row k="Organization" v={ticket.organization.name}/><Row k="Team" v={ticket.teams?.map(team => team.name).join(", ") || "Not assigned"}/><Row k="Priority" v={ticket.priority}/>{ticket.severity ? <Row k="Severity" v={ticket.severity}/> : null}</dl>
+    <dl className="grid gap-3 border-t border-slate-700 pt-4"><Row k="Title" v={ticket.title}/><Row k="Type" v={ticket.type}/><Row k="Subtype" v={ticket.subtype ?? "None"}/><Row k="Created" v={formatDate(ticket.createdAt)}/><Row k="Created by" v={created?.actor.displayName ?? "Unknown"}/><Row k="Last edited by" v={lastEdited?.actor.displayName ?? "Unknown"}/><Row k="Last edited" v={lastEdited ? formatDate(lastEdited.createdAt) : formatDate(ticket.updatedAt)}/><Row k="Business owner" v={ticket.businessOwner.displayName}/><Row k="Organization" v={ticket.organization.name}/><Row k="Team" v={ticket.teams?.map(team => team.name).join(", ") || "Not assigned"}/><Row k="Priority" v={ticket.priority}/>{ticket.severity ? <Row k="Severity" v={ticket.severity}/> : null}</dl>
     <div className="border-t border-slate-700 pt-4"><p className="eyebrow">Workflow position</p><p className="mt-1 text-sm font-semibold">{ticket.processMap.name}</p><div className="mt-3 rounded-lg border border-yellow-400/50 bg-yellow-400/10 p-3"><p className="text-[10px] uppercase tracking-wider text-slate-400">Current state</p><strong className="text-yellow-200">{ticket.status.replaceAll("_", " ")}</strong></div></div>
     <div className="border-t border-slate-700 pt-4"><p className="eyebrow">Next move</p><p className="mt-1 text-xs text-slate-400">Available actions from this workflow state.</p><div className="mt-3 grid gap-2"><TransitionButtons allowedTransitions={ticket.allowedTransitions} onTransition={onTransition}/></div>{!ticket.allowedTransitions.length ? <p className="mt-2 text-sm text-slate-500">No status transitions available.</p> : null}</div>
   </aside>;
