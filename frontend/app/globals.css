@@ -294,6 +294,23 @@ tbody tr:hover { background: rgb(0 84 166 / 10%); }
 [data-theme="light"] .permission-option-selected strong, [data-theme="light"] .permission-option-selected small { color: rgb(20 55 110) !important; }
 [data-theme="light"] .app-frame main article.border-blue-500.bg-blue-950\/30 { background: linear-gradient(135deg, rgb(219 234 254), rgb(239 246 255)) !important; border-color: rgb(37 99 235) !important; box-shadow: 0 0 0 2px rgb(147 197 253 / 45%), 0 8px 20px rgb(37 99 235 / 12%); }
 [data-theme="light"] .badge.bg-blue-100 { color: rgb(30 64 175) !important; background: rgb(191 219 254) !important; border-color: rgb(59 130 246 / 55%) !important; }
+[data-theme="light"] tbody td { color: rgb(15 23 42) !important; }
+[data-theme="light"] tbody tr:hover { background: rgb(191 219 254 / 78%) !important; }
+[data-theme="light"] tbody a { color: rgb(29 78 216) !important; }
+[data-theme="light"] tbody a:hover { color: rgb(30 64 175) !important; }
+[data-theme="light"] .badge.bg-emerald-100 { color: rgb(6 95 70) !important; background: rgb(167 243 208) !important; border-color: rgb(16 185 129 / 60%) !important; }
+[data-theme="light"] .badge.bg-red-100 { color: rgb(153 27 27) !important; background: rgb(254 202 202) !important; }
+[data-theme="light"] .badge.bg-amber-100 { color: rgb(146 64 14) !important; background: rgb(254 243 199) !important; }
+[data-theme="light"] .badge.bg-slate-100 { color: rgb(15 23 42) !important; background: rgb(226 232 240) !important; border-color: rgb(100 116 139 / 55%) !important; }
+[data-theme="light"] .badge.bg-rose-100 { color: rgb(159 18 57) !important; background: rgb(255 228 230) !important; border-color: rgb(244 63 94 / 55%) !important; }
+[data-theme="light"] .badge.bg-violet-100 { color: rgb(91 33 182) !important; background: rgb(237 233 254) !important; border-color: rgb(139 92 246 / 55%) !important; }
+[data-theme="light"] .badge.bg-sky-100 { color: rgb(7 89 133) !important; background: rgb(224 242 254) !important; border-color: rgb(14 165 233 / 55%) !important; }
+[data-theme="light"] .nav-link:hover, [data-theme="light"] .nav-link:focus-visible { color: rgb(15 59 130) !important; background: linear-gradient(135deg, rgb(191 219 254), rgb(147 197 253)) !important; box-shadow: 0 3px 10px rgb(37 99 235 / 22%); }
+[data-theme="light"] table { color: rgb(15 23 42) !important; background: rgb(255 255 255 / 96%) !important; }
+[data-theme="light"] thead { color: rgb(30 64 175) !important; background: linear-gradient(180deg, rgb(239 246 255), rgb(219 234 254)) !important; }
+[data-theme="light"] tbody tr { transition: background-color .16s ease, box-shadow .16s ease; }
+[data-theme="light"] tbody tr:nth-child(even) { background: rgb(248 250 252 / 88%); }
+[data-theme="light"] tbody tr:hover { background: linear-gradient(90deg, rgb(191 219 254 / 95%), rgb(219 234 254 / 88%)) !important; box-shadow: inset 4px 0 0 rgb(37 99 235); }
 [data-theme="light"] .app-frame main .rounded-lg.border:not(.permission-option) { background: rgb(248 250 252 / 96%) !important; color: rgb(20 32 48); }
 [data-theme="light"] .bg-slate-900\/60, [data-theme="light"] .bg-slate-900\/70, [data-theme="light"] .bg-slate-900\/40, [data-theme="light"] .bg-slate-950\/70, [data-theme="light"] .bg-blue-950\/30, [data-theme="light"] .bg-blue-950\/20 { background-color: rgb(248 250 252 / 96%) !important; }
 [data-theme="light"] .text-slate-300, [data-theme="light"] .text-slate-200 { color: rgb(51 65 85) !important; }
