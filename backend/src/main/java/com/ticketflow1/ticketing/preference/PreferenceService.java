@@ -89,7 +89,8 @@ public class PreferenceService {
 
     private PreferenceResponse response(
             UserOrganizationPreference preference, AuthPrincipal principal) {
-        List<String> widgets = knownWidgets(preference.getDashboardWidgets());
+        List<String> widgets = knownValues(
+                preference.getDashboardWidgets(), DashboardWidget.class);
         List<String> filters = knownValues(
                 preference.getEnabledTicketFilters(), TicketFilterPreference.class);
         DeveloperTeam team = preference.getLastViewedTeam();
@@ -169,13 +170,4 @@ public class PreferenceService {
         }).distinct().toList();
     }
 
-    private List<String> knownWidgets(List<String> values) {
-        List<String> known = knownValues(values, DashboardWidget.class);
-        Set<String> present = new HashSet<>(known);
-        List<String> merged = new ArrayList<>(known);
-        DashboardWidget.defaults().stream()
-                .filter(value -> !present.contains(value))
-                .forEach(merged::add);
-        return List.copyOf(merged);
-    }
 }

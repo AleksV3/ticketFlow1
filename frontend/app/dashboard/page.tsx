@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { AppShell } from "@/components/AppShell";
 import { SlaBadge, StatusBadge } from "@/components/TicketUi";
 import { api, ApiError, get, put } from "@/lib/api";
@@ -191,10 +191,12 @@ export function DashboardPreferencesEditor({
   onReset: () => void;
 }) {
   const [tab, setTab] = useState<"metrics" | "widgets">("widgets");
+  const orderRef = useRef<string[]>([...DASHBOARD_WIDGETS]);
   const metricKeys = DASHBOARD_WIDGETS.filter(key => key.startsWith("METRIC_"));
   const widgetKeys = DASHBOARD_WIDGETS.filter(key => !key.startsWith("METRIC_"));
   const catalog = tab === "metrics" ? metricKeys : widgetKeys;
-  const activeItems = widgets.filter(key => catalog.includes(key));
+  const activeItems = orderRef.current.filter(key => catalog.includes(key) && widgets.includes(key));
+  const displayedItems = orderRef.current.filter(key => catalog.includes(key));
   function replaceActive(next: string[]) {
     const inactive = widgets.filter(key => !catalog.includes(key));
     onChange(tab === "metrics" ? [...next, ...inactive] : [...inactive, ...next]);
@@ -212,6 +214,10 @@ export function DashboardPreferencesEditor({
     if (current < 0 || target < 0 || target >= activeItems.length) return;
     const next = [...activeItems];
     [next[current], next[target]] = [next[target], next[current]];
+    const order = [...orderRef.current];
+    const first = order.indexOf(key); const second = order.indexOf(next[current]);
+    if (first >= 0 && second >= 0) [order[first], order[second]] = [order[second], order[first]];
+    orderRef.current = order;
     replaceActive(next);
   }
 
@@ -219,9 +225,15 @@ export function DashboardPreferencesEditor({
     const dragged = (window as Window & { __dashboardDrag?: string }).__dashboardDrag;
     if (!dragged || dragged === key) return;
     if (!catalog.includes(dragged)) return;
-    const next = activeItems.filter(item => item !== dragged);
-    const target = next.indexOf(key);
-    next.splice(target < 0 ? next.length : target, 0, dragged);
+    const categoryOrder = orderRef.current.filter(item => catalog.includes(item));
+    const from = categoryOrder.indexOf(dragged); const target = categoryOrder.indexOf(key);
+    if (from < 0 || target < 0) return;
+    categoryOrder.splice(from, 1); categoryOrder.splice(target, 0, dragged);
+    const next = categoryOrder.filter(item => widgets.includes(item));
+    const order = orderRef.current.filter(item => !catalog.includes(item));
+    const categoryIndex = orderRef.current.findIndex(item => catalog.includes(item));
+    order.splice(categoryIndex < 0 ? order.length : categoryIndex, 0, ...categoryOrder);
+    orderRef.current = order;
     replaceActive(next);
     delete (window as Window & { __dashboardDrag?: string }).__dashboardDrag;
   }
@@ -246,7 +258,7 @@ export function DashboardPreferencesEditor({
       <button type="button" role="tab" aria-selected={tab === "metrics"} className={`btn-secondary ${tab === "metrics" ? "border-blue-500 bg-blue-950/30" : ""}`} onClick={() => setTab("metrics")}>Metric cards</button>
     </div>
     <ul className="mt-5 grid gap-3 md:grid-cols-2">
-      {[...activeItems, ...catalog.filter(key => !activeItems.includes(key))].map(key => {
+      {displayedItems.map(key => {
         const enabled = widgets.includes(key);
         const position = activeItems.indexOf(key);
         return <li key={key} draggable onDragStart={() => { (window as Window & { __dashboardDrag?: string }).__dashboardDrag = key; }} onDragOver={event => event.preventDefault()} onDrop={() => drop(key)} className="dashboard-widget-item rounded-xl border border-slate-200 p-3">
