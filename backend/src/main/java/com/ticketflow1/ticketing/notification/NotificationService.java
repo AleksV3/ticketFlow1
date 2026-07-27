@@ -21,7 +21,7 @@ public class NotificationService {
     public NotificationService(NotificationRepository notifications, AppUserRepository users, TicketRepository tickets, TicketFollowerRepository followers){this.notifications=notifications;this.users=users;this.tickets=tickets;this.followers=followers;}
 
     @Transactional(readOnly=true) public boolean isFollowing(String key, AuthPrincipal principal){return followers.existsByIdTicketIdAndIdUserId(visibleTicket(key,principal).getId(),principal.userId());}
-    @Transactional public void follow(String key, AuthPrincipal principal){Ticket ticket=visibleTicket(key,principal); if(!followers.existsByIdTicketIdAndIdUserId(ticket.getId(),principal.userId())) followers.save(new TicketFollower(ticket,users.getReferenceById(principal.userId())));}
+    @Transactional public void follow(String key, AuthPrincipal principal){Ticket ticket=visibleTicket(key,principal); AppUser actor=users.getReferenceById(principal.userId()); if(!followers.existsByIdTicketIdAndIdUserId(ticket.getId(),principal.userId())) { followers.save(new TicketFollower(ticket,actor)); notifications.save(new Notification(actor,ticket,actor,"TICKET_FOLLOWED","Following ticket",ticket.getTicketKey()+" — you are now following this ticket.")); }}
     @Transactional public void unfollow(String key, AuthPrincipal principal){Ticket ticket=visibleTicket(key,principal); followers.deleteByIdTicketIdAndIdUserId(ticket.getId(),principal.userId());}
 
     @Transactional(readOnly = true)
@@ -43,7 +43,8 @@ public class NotificationService {
         recipients.remove(actorId);
         if (recipients.isEmpty()) return;
         List<AppUser> assigned = users.findAllById(recipients);
-        List<Notification> created = assigned.stream().map(user -> new Notification(user, ticket, "TICKET_ASSIGNED",
+        AppUser actor = actorId == null ? null : users.findById(actorId).orElse(null);
+        List<Notification> created = assigned.stream().map(user -> new Notification(user, ticket, actor, "TICKET_ASSIGNED",
                 "Ticket assigned to you", ticket.getTicketKey()+" — "+ticket.getTitle()+" was assigned to you.")).toList();
         notifications.saveAll(created);
     }
@@ -53,7 +54,8 @@ public class NotificationService {
         Set<Long> recipients = recipientIds(ticket); recipients.remove(actorId);
         if (recipients.isEmpty()) return;
         String label = action.replace('_', ' ').toLowerCase(Locale.ROOT);
-        List<Notification> created = users.findAllById(recipients).stream().map(user -> new Notification(user, ticket, "TICKET_UPDATED",
+        AppUser actor = actorId == null ? null : users.findById(actorId).orElse(null);
+        List<Notification> created = users.findAllById(recipients).stream().map(user -> new Notification(user, ticket, actor, "TICKET_UPDATED",
                 "Ticket updated", ticket.getTicketKey()+" — "+label+".")).toList();
         notifications.saveAll(created);
     }
@@ -71,8 +73,8 @@ public class NotificationService {
         return tickets.findByTicketKey(key).orElseThrow(() -> com.ticketflow1.ticketing.common.ApiException.notFound("Ticket not found: "+key));
     }
     public record NotificationResponse(Long id, String eventType, String title, String message, String ticketKey,
-            String ticketTitle, boolean read, java.time.Instant createdAt){
+            String ticketTitle, Long actorId, String actorDisplayName, boolean read, java.time.Instant createdAt){
         static NotificationResponse from(Notification n){return new NotificationResponse(n.getId(),n.getEventType(),n.getTitle(),n.getMessage(),
-                n.getTicket()==null?null:n.getTicket().getTicketKey(),n.getTicket()==null?null:n.getTicket().getTitle(),n.getReadAt()!=null,n.getCreatedAt());}
+                n.getTicket()==null?null:n.getTicket().getTicketKey(),n.getTicket()==null?null:n.getTicket().getTitle(),n.getActor()==null?null:n.getActor().getId(),n.getActor()==null?null:n.getActor().getDisplayName(),n.getReadAt()!=null,n.getCreatedAt());}
     }
 }
