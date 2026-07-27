@@ -25,6 +25,7 @@ import com.ticketflow1.ticketing.workflow.TicketTransitionService;
 import com.ticketflow1.ticketing.workflow.WorkflowState;
 import com.ticketflow1.ticketing.workflow.WorkflowStateRepository;
 import com.ticketflow1.ticketing.ticketconfig.*;
+import com.ticketflow1.ticketing.notification.NotificationService;
 import com.ticketflow1.ticketing.team.DeveloperTeam;
 import com.ticketflow1.ticketing.team.DeveloperTeamRepository;
 import java.util.List;
@@ -85,6 +86,7 @@ public class TicketService {
     private final TicketFieldValueRepository fieldValueRepository;
     private final DynamicFieldValidator dynamicFieldValidator;
     private final com.ticketflow1.ticketing.ticketconfig.FieldAuthorizationService fieldAuthorization;
+    private final NotificationService notificationService;
 
     @Autowired
     public TicketService(TicketRepository ticketRepository,
@@ -103,7 +105,8 @@ public class TicketService {
             TicketSubtypeRepository subtypeRepository, SubtypeRoutingRuleRepository routingRuleRepository,
             SubtypeFieldDefinitionRepository fieldDefinitionRepository, SubtypeFieldOptionRepository fieldOptionRepository,
             TicketFieldValueRepository fieldValueRepository, DynamicFieldValidator dynamicFieldValidator,
-            com.ticketflow1.ticketing.ticketconfig.FieldAuthorizationService fieldAuthorization) {
+            com.ticketflow1.ticketing.ticketconfig.FieldAuthorizationService fieldAuthorization,
+            NotificationService notificationService) {
         this.ticketRepository = ticketRepository;
         this.ticketTypeRepository = ticketTypeRepository;
         this.workflowStateRepository = workflowStateRepository;
@@ -120,6 +123,7 @@ public class TicketService {
         this.developerTeamRepository = developerTeamRepository;
         this.subtypeRepository=subtypeRepository;this.routingRuleRepository=routingRuleRepository;this.fieldDefinitionRepository=fieldDefinitionRepository;
         this.fieldOptionRepository=fieldOptionRepository;this.fieldValueRepository=fieldValueRepository;this.dynamicFieldValidator=dynamicFieldValidator;this.fieldAuthorization=fieldAuthorization;
+        this.notificationService = notificationService;
     }
 
     public TicketService(TicketRepository a, TicketTypeRepository b, WorkflowStateRepository c, AppUserRepository d,
@@ -128,7 +132,7 @@ public class TicketService {
             DeveloperTeamRepository n, TicketSubtypeRepository o, SubtypeRoutingRuleRepository p,
             SubtypeFieldDefinitionRepository q, SubtypeFieldOptionRepository r, TicketFieldValueRepository s,
             DynamicFieldValidator t) {
-        this(a,b,c,d,e,f,g,h,i,j,k,l,m,n,o,p,q,r,s,t,null);
+        this(a,b,c,d,e,f,g,h,i,j,k,l,m,n,o,p,q,r,s,t,null,null);
     }
 
     /**
@@ -213,6 +217,7 @@ public class TicketService {
             applyDeadlines(saved, saved.getSeverity(), saved.getCreatedAt());
             saved = ticketRepository.saveAndFlush(saved);
         }
+        if (notificationService != null) notificationService.notifyNewAssignments(saved, actor.getId(), Set.of());
         auditService.record(saved, actor.getId(), AuditAction.TICKET_CREATED);
         if (subtype != null && request.dynamicValues() != null && !request.dynamicValues().isEmpty()) {
             // Never persist submitted values in the audit feed: dynamic fields may
@@ -239,6 +244,7 @@ public class TicketService {
     @Transactional
     public TicketDetailResponse updateTicket(String ticketKey, UpdateTicketRequest request, AuthPrincipal principal) {
         Ticket ticket = findVisibleTicket(ticketKey, principal);
+        Set<Long> previousRecipients = notificationService == null ? Set.of() : notificationService.recipientIds(ticket);
         AppUser actor = appUserRepository.findById(principal.userId())
                 .orElseThrow(() -> ApiException.notFound("Current user no longer exists."));
 
@@ -372,6 +378,7 @@ public class TicketService {
         }
 
         Ticket saved = changed ? ticketRepository.save(ticket) : ticket;
+        if (changed && notificationService != null) notificationService.notifyNewAssignments(saved, principal.userId(), previousRecipients);
         return detail(saved, principal);
     }
 
