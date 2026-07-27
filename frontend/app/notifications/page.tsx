@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import { AppShell } from "@/components/AppShell";
 import { get, patch, post } from "@/lib/api";
+import { useTicketEvents } from "@/lib/realtime";
 
 type Notification = { id: number; eventType: string; title: string; message: string; ticketKey: string | null; ticketTitle: string | null; actorId: number | null; actorDisplayName: string | null; read: boolean; createdAt: string };
 
@@ -17,6 +18,8 @@ function NotificationsContent() {
   const [error, setError] = useState("");
   const load = useCallback(async () => { try { setItems(await get<Notification[]>("/notifications")); setError(""); } catch (e) { setError(e instanceof Error ? e.message : "Could not load notifications."); } finally { setLoading(false); } }, []);
   useEffect(() => { void load(); }, [load]);
+  useTicketEvents(load);
+  useEffect(() => { const timer = window.setInterval(() => void load(), 30000); return () => window.clearInterval(timer); }, [load]);
   async function markRead(id: number) { await patch(`/notifications/${id}/read`, {}); setItems(current => current.map(item => item.id === id ? { ...item, read: true } : item)); }
   async function markAllRead() { await post("/notifications/read-all"); setItems(current => current.map(item => ({ ...item, read: true }))); }
   const unread = items.filter(item => !item.read).length;
