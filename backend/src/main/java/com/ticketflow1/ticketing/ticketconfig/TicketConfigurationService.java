@@ -84,7 +84,7 @@ public class TicketConfigurationService {
     }
 
     private long count(String table,String column,Long id){return ((Number)entityManager.createNativeQuery("select count(*) from "+table+" where "+column+" = :id").setParameter("id",id).getSingleResult()).longValue();}
-    private void requireManage(AuthPrincipal p){if(p.party()!=Responsibility.TICKETFLOW1||!p.hasPermission("TYPE_MANAGE"))throw ApiException.forbidden("TYPE_MANAGE permission is required.");}
+    private void requireManage(AuthPrincipal p){if(p.party()!=Responsibility.TICKETFLOW1||(!p.hasPermission("TYPE_MANAGE")&&!p.hasPermission("WORKFLOW_MANAGE")))throw ApiException.forbidden("TYPE_MANAGE or WORKFLOW_MANAGE permission is required.");}
     private TicketType type(Long id){return types.findById(id).orElseThrow(()->ApiException.notFound("Ticket type not found: "+id));}
     private TicketSubtype subtype(Long id){return subtypes.findById(id).orElseThrow(()->ApiException.notFound("Subtype not found: "+id));}
     private SubtypeFieldDefinition field(Long id){return fields.findById(id).orElseThrow(()->ApiException.notFound("Field not found: "+id));}
