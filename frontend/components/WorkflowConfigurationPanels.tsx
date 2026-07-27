@@ -170,8 +170,6 @@ function TypeAdministration({ organizationId, workflows, types, selectedTypeId, 
             </select></label>
           </div>
           <div className="mt-3 flex flex-wrap gap-2">
-            <button type="button" className="btn-secondary px-2 py-1 text-xs" onClick={() => void reorder(type, -1)}>Move up</button>
-            <button type="button" className="btn-secondary px-2 py-1 text-xs" onClick={() => void reorder(type, 1)}>Move down</button>
             <button type="button" className="btn-secondary px-2 py-1 text-xs" onClick={() => void setActive(type, type.active === false)}>{type.active === false ? "Activate" : "Deactivate"}</button>
             <button type="button" className="btn-secondary px-2 py-1 text-xs text-red-300" onClick={() => void deleteType(type)}>Delete</button>
           </div>
@@ -298,8 +296,6 @@ function SubtypeAdministration({ organizationId, type, reloadTypes, report }: {
               <span className="mt-1 block text-xs text-slate-500">{subtype.key} · {subtype.description || "No description"}</span>
             </button>
             <div className="mt-3 flex flex-wrap gap-2">
-              <button type="button" className="btn-secondary px-2 py-1 text-xs" disabled={index === 0} onClick={() => void reorderSubtypes(subtype.id, -1)}>Move up</button>
-              <button type="button" className="btn-secondary px-2 py-1 text-xs" disabled={index === subtypes.length - 1} onClick={() => void reorderSubtypes(subtype.id, 1)}>Move down</button>
               <button type="button" className="btn-secondary px-2 py-1 text-xs" onClick={() => void setSubtypeActive(subtype, !subtype.active)}>{subtype.active ? "Deactivate" : "Activate"}</button>
               <button type="button" className="btn-secondary px-2 py-1 text-xs text-red-300" onClick={() => void deleteSubtype(subtype)}>Delete</button>
             </div>
