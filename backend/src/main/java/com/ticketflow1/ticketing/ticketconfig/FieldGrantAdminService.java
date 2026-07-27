@@ -14,7 +14,7 @@ public class FieldGrantAdminService {
  private final SubtypeFieldDefinitionRepository fields; private final SubtypeFieldRoleGrantRepository grants; private final RoleRepository roles; private final ConfigurationAuditService audit;
  public FieldGrantAdminService(SubtypeFieldDefinitionRepository fields,SubtypeFieldRoleGrantRepository grants,RoleRepository roles,ConfigurationAuditService audit){this.fields=fields;this.grants=grants;this.roles=roles;this.audit=audit;}
  @Transactional public List<SubtypeFieldRoleGrant> replace(AuthPrincipal p,Long fieldId,Collection<Long> view,Collection<Long> edit,Collection<Long> create){
-  if(p.party()!=Responsibility.TICKETFLOW1||!p.hasPermission("TYPE_MANAGE"))throw ApiException.forbidden("TYPE_MANAGE permission is required.");
+  if(p.party()!=Responsibility.TICKETFLOW1||(!p.hasPermission("TYPE_MANAGE")&&!p.hasPermission("WORKFLOW_MANAGE")))throw ApiException.forbidden("TYPE_MANAGE or WORKFLOW_MANAGE permission is required.");
   SubtypeFieldDefinition f=fields.findById(fieldId).orElseThrow(()->ApiException.notFound("Field not found: "+fieldId));
   Set<Long> ids=new LinkedHashSet<>(); if(view!=null)ids.addAll(view);if(edit!=null)ids.addAll(edit);if(create!=null)ids.addAll(create);
   List<Role> rs=roles.findAllById(ids);if(rs.size()!=ids.size()||rs.stream().anyMatch(r->r.getOrganization()!=null&&f.getSubtype().getTicketType().getOrganization()!=null&&!r.getOrganization().getId().equals(f.getSubtype().getTicketType().getOrganization().getId())))throw ApiException.validation("Role is outside field configuration scope.");

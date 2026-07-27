@@ -8,7 +8,7 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
-@RestController @RequestMapping("/api/admin") @PreAuthorize("hasAuthority('TYPE_MANAGE')")
+@RestController @RequestMapping("/api/admin") @PreAuthorize("hasAnyAuthority('TYPE_MANAGE','WORKFLOW_MANAGE')")
 public class TicketConfigurationController {
     private final TicketConfigurationService service;
     private final FieldGrantAdminService grantService;
