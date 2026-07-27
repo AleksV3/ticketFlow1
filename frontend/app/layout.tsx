@@ -19,7 +19,7 @@ type RootLayoutProps = Readonly<{
 export default function RootLayout({ children }: RootLayoutProps) {
   return (
     <html lang="en">
-      <body className={manrope.variable}><script dangerouslySetInnerHTML={{__html:`(function(){try{var t=localStorage.getItem('ticketflow1-theme')||'SYSTEM';var l=t==='LIGHT'||(t==='SYSTEM'&&matchMedia('(prefers-color-scheme: light)').matches);document.documentElement.dataset.theme=l?'light':'dark';document.documentElement.style.colorScheme=l?'light':'dark'}catch(e){}})()`}} />{children}<DevLogPanel /></body>
+      <body className={manrope.variable}><script dangerouslySetInnerHTML={{__html:`(function(){document.documentElement.dataset.theme='dark';document.documentElement.style.colorScheme='dark';try{localStorage.removeItem('ticketflow1-theme')}catch(e){}})()`}} />{children}<DevLogPanel /></body>
     </html>
   );
 }
