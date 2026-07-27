@@ -167,9 +167,15 @@ function TicketForm({ user }: { user: CurrentUser }) {
     }
   }
 
-  return <div className="max-w-4xl">
+  const selectedOrganization = orgs.find(item => String(item.id) === org)?.name ?? (user.organizationName ?? "Not selected");
+  const selectedLead = people.find(person => String(person.id) === leadId)?.name;
+  const selectedDevelopers = people.filter(person => developerIds.includes(person.id)).map(person => person.name);
+  const selectedTeams = teams.filter(team => teamIds.includes(team.id)).map(team => team.name);
+  return <div className="max-w-7xl">
     <h1 className="text-3xl font-bold">Create ticket</h1>
-    <form className="card mt-6 space-y-5" onSubmit={submit}>
+    <div className="mt-6 grid gap-6 lg:grid-cols-[280px_minmax(0,1fr)] lg:items-start">
+      <CreateMetadataSidebar user={user} title={title} description={description} type={selectedType?.key ?? type} typeName={selectedType?.name} subtype={selectedSubtype?.name} organization={selectedOrganization} parent={parentTicketKey} priority={priority} severity={(selectedType?.key === "DEFECT" || selectedType?.key === "DFCT") ? severity : undefined} lead={selectedLead} developers={selectedDevelopers} teams={selectedTeams} attachments={attachments.length} dynamicFields={selectedSubtype?.fields.filter(field => dynamicValues[field.key] !== undefined && dynamicValues[field.key] !== "").map(field => field.label) ?? []} />
+      <form className="card space-y-5" onSubmit={submit}>
       <label className="block"><span>Title</span><input className="field mt-1" required maxLength={300} value={title} onChange={event => setTitle(event.target.value)}/></label>
       <label className="block"><span>Description</span><textarea className="field mt-1 min-h-32" required value={description} onChange={event => setDescription(event.target.value)}/></label>
       <fieldset className="rounded-lg border p-4"><legend className="px-2 font-bold">Ticket type</legend><label className="block"><span className="sr-only">Search ticket types</span><input aria-label="Ticket type" className="field mt-1" required value={type} onChange={event => { setType(event.target.value); setSelectedTypeId(null); setCreationForm(null); setSubtypeId(""); }} placeholder="Search standard or custom ticket types..." autoComplete="off"/><small className="text-slate-500">Select a configured ticket type to open its subtype form.</small></label>{!selectedType ? <div className="mt-3 grid gap-2 sm:grid-cols-2" role="listbox" aria-label="Available ticket types">{types.filter(item => !type.trim() || (item.key ?? item.name).toLowerCase().includes(type.trim().toLowerCase()) || item.name.toLowerCase().includes(type.trim().toLowerCase())).map(item => <button type="button" role="option" aria-selected={false} className="permission-option w-full text-left" key={item.id} onClick={() => { setType(item.key ?? item.name); setSelectedTypeId(item.id); }}><span><strong>{item.name}</strong><small>{item.key ?? item.name}</small></span></button>)}{type.trim() && !types.some(item => (item.key ?? item.name).toLowerCase().includes(type.trim().toLowerCase()) || item.name.toLowerCase().includes(type.trim().toLowerCase())) ? <p className="text-sm text-slate-500">No matching ticket types.</p> : null}</div> : null}{selectedType ? <p className="mt-3 rounded border border-blue-500/30 bg-blue-950/20 p-2 text-sm">Selected: <strong>{selectedType.name}</strong> ({selectedType.key ?? selectedType.name})</p> : null}</fieldset>
@@ -183,9 +189,18 @@ function TicketForm({ user }: { user: CurrentUser }) {
       {canAssign ? <fieldset className="rounded-lg border p-4"><legend className="px-2 font-bold">Assign ticket team now</legend><label className="block">Ticket team lead<select className="field mt-1" value={leadId} onChange={event => setLeadId(event.target.value)}><option value="">Assign later</option>{people.map(person => <option key={person.id} value={person.id}>{person.name}</option>)}</select></label><div className="mt-3"><span className="text-sm">Developer teams</span><div className="mt-2 grid gap-2 sm:grid-cols-2">{teams.map(team=><label className={`permission-option ${teamIds.includes(team.id)?"permission-option-selected":""}`} key={team.id}><input type="checkbox" checked={teamIds.includes(team.id)} onChange={()=>toggleTeam(team.id)}/><span><strong>{team.name}</strong><small>{teamIds.includes(team.id)?"Assigned team":"Assign team"}</small></span></label>)}</div></div><div className="mt-3"><span className="text-sm">Developers</span><div className="mt-2 grid gap-2 sm:grid-cols-2">{people.map(person => <label className={`permission-option ${developerIds.includes(person.id) ? "permission-option-selected" : ""}`} key={person.id}><input type="checkbox" checked={developerIds.includes(person.id)} onChange={() => toggleDeveloper(person.id)}/><span><strong>{person.name}</strong><small>Developer</small></span></label>)}</div></div></fieldset> : null}
       {error ? <p role="alert" className="text-red-400">{error}</p> : null}
       <button className="btn-primary">Create ticket</button>
-    </form>
+      </form>
+    </div>
   </div>;
 }
+
+function CreateMetadataSidebar({ user, title, description, type, typeName, subtype, organization, parent, priority, severity, lead, developers, teams, attachments, dynamicFields }: {
+  user: CurrentUser; title: string; description: string; type: string; typeName?: string; subtype?: string; organization: string; parent: string; priority: string; severity?: string; lead?: string; developers: string[]; teams: string[]; attachments: number; dynamicFields: string[];
+}) {
+  return <aside className="card sticky top-24 self-start lg:max-h-[calc(100vh-7rem)] lg:overflow-y-auto"><p className="eyebrow">Ticket metadata</p><h2 className="mt-1 text-xl font-bold">New ticket</h2><p className="mt-1 text-xs text-slate-500">Preview updates as you complete the form.</p><div className="my-4 border-t border-slate-700/50" /><div className="space-y-3"><Meta label="Title" value={title || "Not entered"} /><Meta label="Description" value={description || "Not entered"} /><Meta label="Created by" value={user.displayName} /><Meta label="Type" value={typeName ? `${typeName} (${type})` : type || "Not selected"} /><Meta label="Subtype" value={subtype || "None"} /><Meta label="Organization" value={organization} />{parent ? <Meta label="Parent ticket" value={parent} /> : null}<Meta label="Priority" value={priority || "Not selected"} />{severity ? <Meta label="Severity" value={severity} /> : null}<Meta label="Attachments" value={attachments ? `${attachments} selected` : "None"} />{lead || teams.length || developers.length ? <><div className="my-3 border-t border-slate-700/50" /><Meta label="Team lead" value={lead || "Assign later"} /><Meta label="Teams" value={teams.length ? teams.join(", ") : "None"} /><Meta label="Developers" value={developers.length ? developers.join(", ") : "None"} /></> : null}{dynamicFields.length ? <Meta label="Completed subtype fields" value={dynamicFields.join(", ")} /> : null}</div></aside>;
+}
+
+function Meta({ label, value }: { label: string; value: string }) { return <div><p className="text-[0.65rem] uppercase tracking-wide text-slate-500">{label}</p><p className="mt-0.5 break-words text-sm">{value}</p></div>; }
 
 function SubtypeAndFields({ subtypeId, setSubtypeId, selectedSubtype, form, values, setValue, people, teams }: {
   subtypeId: string;
