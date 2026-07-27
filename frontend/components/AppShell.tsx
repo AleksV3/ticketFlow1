@@ -11,7 +11,7 @@ import { fetchCurrentUser, logout, type CurrentUser } from "@/lib/auth";
  * navigation links by permission, and renders the active page inside the shared
  * header/layout chrome.
  */
-export const NAV_LINKS=[{href:"/dashboard",label:"Dashboard",permission:"TICKET_READ"},{href:"/tickets",label:"Tickets",permission:"TICKET_READ"},{href:"/teams",label:"Teams",permission:"TICKET_READ"},{href:"/tickets/new",label:"New ticket",permission:"TICKET_CREATE"},{href:"/admin/organizations",label:"Organizations",permission:"USER_MANAGE"},{href:"/admin/users",label:"Users",permission:"USER_MANAGE"},{href:"/admin/roles",label:"Roles",permission:"ROLE_MANAGE"},{href:"/admin/workflows",label:"Workflows",permission:"WORKFLOW_MANAGE"}];
+export const NAV_LINKS=[{href:"/dashboard",label:"Dashboard",permission:"TICKET_READ"},{href:"/tickets",label:"Tickets",permission:"TICKET_READ"},{href:"/teams",label:"Teams",permission:"TICKET_READ"},{href:"/tickets/new",label:"New ticket",permission:"TICKET_CREATE"},{href:"/admin/organizations",label:"Organizations",permission:"USER_MANAGE"},{href:"/admin/users",label:"Users",permission:"USER_MANAGE"},{href:"/admin/roles",label:"Roles",permission:"ROLE_MANAGE"},{href:"/admin/ticket-types",label:"Ticket types",permission:"WORKFLOW_MANAGE"},{href:"/admin/workflows",label:"Workflows",permission:"WORKFLOW_MANAGE"}];
 export const permittedLinks=(permissions:string[],_party?:string)=>NAV_LINKS.filter(link=>permissions.includes(link.permission));
 
 export function AppShell({ children, require }: { children: (user: CurrentUser) => ReactNode; require?: string }) {
