@@ -53,12 +53,21 @@ public class NotificationService {
         if (ticket == null) return;
         Set<Long> recipients = recipientIds(ticket); recipients.remove(actorId);
         if (recipients.isEmpty()) return;
-        String label = action.replace('_', ' ').toLowerCase(Locale.ROOT);
+        Event event = eventFor(action);
         AppUser actor = actorId == null ? null : users.findById(actorId).orElse(null);
-        List<Notification> created = users.findAllById(recipients).stream().map(user -> new Notification(user, ticket, actor, "TICKET_UPDATED",
-                "Ticket updated", ticket.getTicketKey()+" — "+label+".")).toList();
+        String actorName = actor == null ? "Someone" : actor.getDisplayName();
+        List<Notification> created = users.findAllById(recipients).stream().map(user -> new Notification(user, ticket, actor, event.type,
+                event.title, actorName+" — "+event.description+" on "+ticket.getTicketKey()+" — "+ticket.getTitle()+".")).toList();
         notifications.saveAll(created);
     }
+    private Event eventFor(String action){
+        if ("COMMENT_ADDED".equals(action)) return new Event("COMMENT_ADDED", "New comment", "added a comment");
+        if (action.contains("STATUS") || action.contains("WORKFLOW") || action.contains("CLIENT_ACCEPT") || action.contains("CLIENT_REJECT")) return new Event("WORKFLOW_UPDATED", "Workflow updated", "updated the workflow");
+        if (action.contains("PROPOSAL")) return new Event("PROPOSAL_UPDATED", "Proposal updated", "updated a proposal");
+        if (action.contains("ASSIGNEE") || action.contains("ASSIGN")) return new Event("ASSIGNMENT_CHANGED", "Assignment changed", "changed the assignment");
+        return new Event("TICKET_UPDATED", "Ticket details changed", "updated the ticket details");
+    }
+    private record Event(String type, String title, String description) {}
     public Set<Long> recipientIds(Ticket ticket){
         Set<Long> result = new LinkedHashSet<>();
         if(ticket.getTicketLead()!=null) result.add(ticket.getTicketLead().getId());
