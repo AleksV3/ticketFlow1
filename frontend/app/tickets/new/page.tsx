@@ -3,7 +3,7 @@
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { AppShell } from "@/components/AppShell";
-import { get, post } from "@/lib/api";
+import { api, get, post } from "@/lib/api";
 import type { CurrentUser } from "@/lib/auth";
 import type { TicketDetail } from "@/lib/types";
 
@@ -59,6 +59,7 @@ function TicketForm({ user }: { user: CurrentUser }) {
   const [leadId, setLeadId] = useState("");
   const [developerIds, setDeveloperIds] = useState<number[]>([]);
   const [teamIds, setTeamIds] = useState<number[]>([]);
+  const [attachments, setAttachments] = useState<File[]>([]);
   const [error, setError] = useState("");
 
   const selectedType = useMemo(() => types.find(item => item.id === selectedTypeId) ?? null, [selectedTypeId, types]);
@@ -155,6 +156,11 @@ function TicketForm({ user }: { user: CurrentUser }) {
         parentTicketKey: parentTicketKey.trim() || null,
         targetUserId: targetUser?.id ?? null,
       });
+      for (const file of attachments) {
+        const body = new FormData();
+        body.append("file", file);
+        await api(`/tickets/${ticket.ticketKey}/attachments/upload`, { method: "POST", body });
+      }
       router.push(`/tickets/${ticket.ticketKey}`);
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "Could not create ticket.");
@@ -164,13 +170,14 @@ function TicketForm({ user }: { user: CurrentUser }) {
   return <div className="max-w-4xl">
     <h1 className="text-3xl font-bold">Create ticket</h1>
     <form className="card mt-6 space-y-5" onSubmit={submit}>
-      {user.party === "TICKETFLOW1" ? <Select label="Organization" value={org} set={setOrg} disabled={isSubticket} options={orgs.map(item => [String(item.id), item.name])} help={isSubticket ? "Subtickets created by TicketFlow1 are internal work items. The parent can still be a client ticket." : "TASI and USR are saved under TicketFlow1 Internal automatically."}/> : null}
-      <fieldset className="rounded-lg border p-4"><legend className="px-2 font-bold">Ticket type</legend><label className="block"><span className="sr-only">Search ticket types</span><input aria-label="Ticket type" className="field mt-1" required value={type} onChange={event => { setType(event.target.value); setSelectedTypeId(null); setCreationForm(null); setSubtypeId(""); }} placeholder="Search standard or custom ticket types..." autoComplete="off"/><small className="text-slate-500">Select a configured ticket type to open its subtype form.</small></label>{!selectedType ? <div className="mt-3 grid gap-2 sm:grid-cols-2" role="listbox" aria-label="Available ticket types">{types.filter(item => !type.trim() || (item.key ?? item.name).toLowerCase().includes(type.trim().toLowerCase()) || item.name.toLowerCase().includes(type.trim().toLowerCase())).map(item => <button type="button" role="option" aria-selected={false} className="permission-option w-full text-left" key={item.id} onClick={() => { setType(item.key ?? item.name); setSelectedTypeId(item.id); }}><span><strong>{item.name}</strong><small>{item.key ?? item.name}</small></span></button>)}{type.trim() && !types.some(item => (item.key ?? item.name).toLowerCase().includes(type.trim().toLowerCase()) || item.name.toLowerCase().includes(type.trim().toLowerCase())) ? <p className="text-sm text-slate-500">No matching ticket types.</p> : null}</div> : null}{selectedType ? <p className="mt-3 rounded border border-blue-500/30 bg-blue-950/20 p-2 text-sm">Selected: <strong>{selectedType.name}</strong> ({selectedType.key ?? selectedType.name})</p> : null}</fieldset>
-      {creationForm?.subtypes.length ? <SubtypeAndFields subtypeId={subtypeId} setSubtypeId={setSubtypeId} selectedSubtype={selectedSubtype} form={creationForm} values={dynamicValues} setValue={setDynamic} people={people} teams={teams}/> : null}
-      {needsUsrTarget ? <TargetUserSearch query={targetQuery} setQuery={setTargetQuery} results={targetResults} selected={targetUser} setSelected={setTargetUser}/> : null}
-      <label className="block"><span>Parent ticket key</span><input className="field mt-1" value={parentTicketKey} onChange={event => setParentTicketKey(event.target.value.toUpperCase())} placeholder="Optional, e.g. TKT-1234"/><small className="text-slate-500">Use this when creating a subticket from an existing ticket.</small></label>
       <label className="block"><span>Title</span><input className="field mt-1" required maxLength={300} value={title} onChange={event => setTitle(event.target.value)}/></label>
       <label className="block"><span>Description</span><textarea className="field mt-1 min-h-32" required value={description} onChange={event => setDescription(event.target.value)}/></label>
+      <fieldset className="rounded-lg border p-4"><legend className="px-2 font-bold">Ticket type</legend><label className="block"><span className="sr-only">Search ticket types</span><input aria-label="Ticket type" className="field mt-1" required value={type} onChange={event => { setType(event.target.value); setSelectedTypeId(null); setCreationForm(null); setSubtypeId(""); }} placeholder="Search standard or custom ticket types..." autoComplete="off"/><small className="text-slate-500">Select a configured ticket type to open its subtype form.</small></label>{!selectedType ? <div className="mt-3 grid gap-2 sm:grid-cols-2" role="listbox" aria-label="Available ticket types">{types.filter(item => !type.trim() || (item.key ?? item.name).toLowerCase().includes(type.trim().toLowerCase()) || item.name.toLowerCase().includes(type.trim().toLowerCase())).map(item => <button type="button" role="option" aria-selected={false} className="permission-option w-full text-left" key={item.id} onClick={() => { setType(item.key ?? item.name); setSelectedTypeId(item.id); }}><span><strong>{item.name}</strong><small>{item.key ?? item.name}</small></span></button>)}{type.trim() && !types.some(item => (item.key ?? item.name).toLowerCase().includes(type.trim().toLowerCase()) || item.name.toLowerCase().includes(type.trim().toLowerCase())) ? <p className="text-sm text-slate-500">No matching ticket types.</p> : null}</div> : null}{selectedType ? <p className="mt-3 rounded border border-blue-500/30 bg-blue-950/20 p-2 text-sm">Selected: <strong>{selectedType.name}</strong> ({selectedType.key ?? selectedType.name})</p> : null}</fieldset>
+      {creationForm?.subtypes.length ? <SubtypeAndFields subtypeId={subtypeId} setSubtypeId={setSubtypeId} selectedSubtype={selectedSubtype} form={creationForm} values={dynamicValues} setValue={setDynamic} people={people} teams={teams}/> : null}
+      {user.party === "TICKETFLOW1" ? <Select label="Organization" value={org} set={setOrg} disabled={isSubticket} options={orgs.map(item => [String(item.id), item.name])} help={isSubticket ? "Subtickets created by TicketFlow1 are internal work items. The parent can still be a client ticket." : "TASI and USR are saved under TicketFlow1 Internal automatically."}/> : null}
+      {needsUsrTarget ? <TargetUserSearch query={targetQuery} setQuery={setTargetQuery} results={targetResults} selected={targetUser} setSelected={setTargetUser}/> : null}
+      <label className="block"><span>Parent ticket key</span><input className="field mt-1" value={parentTicketKey} onChange={event => setParentTicketKey(event.target.value.toUpperCase())} placeholder="Optional, e.g. TKT-1234"/><small className="text-slate-500">Use this when creating a subticket from an existing ticket.</small></label>
+      <label className="block"><span>Attachments</span><input className="field mt-1" type="file" multiple onChange={event => setAttachments(Array.from(event.target.files ?? []))}/>{attachments.length ? <small className="text-slate-500">{attachments.length} file{attachments.length === 1 ? "" : "s"} will be uploaded after the ticket is created.</small> : <small className="text-slate-500">Optional files to include with this ticket.</small>}</label>
       <Select label="Priority" value={priority} set={setPriority} options={["LOW","MEDIUM","HIGH","CRITICAL"].map(value => [value,value])}/>
       {selectedType?.key === "DEFECT" || selectedType?.key === "DFCT" ? <Select label="Severity" value={severity} set={setSeverity} options={["SEV_1","SEV_2","SEV_3","SEV_4"].map(value => [value,value])}/> : null}
       {canAssign ? <fieldset className="rounded-lg border p-4"><legend className="px-2 font-bold">Assign ticket team now</legend><label className="block">Ticket team lead<select className="field mt-1" value={leadId} onChange={event => setLeadId(event.target.value)}><option value="">Assign later</option>{people.map(person => <option key={person.id} value={person.id}>{person.name}</option>)}</select></label><div className="mt-3"><span className="text-sm">Developer teams</span><div className="mt-2 grid gap-2 sm:grid-cols-2">{teams.map(team=><label className={`permission-option ${teamIds.includes(team.id)?"permission-option-selected":""}`} key={team.id}><input type="checkbox" checked={teamIds.includes(team.id)} onChange={()=>toggleTeam(team.id)}/><span><strong>{team.name}</strong><small>{teamIds.includes(team.id)?"Assigned team":"Assign team"}</small></span></label>)}</div></div><div className="mt-3"><span className="text-sm">Developers</span><div className="mt-2 grid gap-2 sm:grid-cols-2">{people.map(person => <label className={`permission-option ${developerIds.includes(person.id) ? "permission-option-selected" : ""}`} key={person.id}><input type="checkbox" checked={developerIds.includes(person.id)} onChange={() => toggleDeveloper(person.id)}/><span><strong>{person.name}</strong><small>Developer</small></span></label>)}</div></div></fieldset> : null}
@@ -190,11 +197,11 @@ function SubtypeAndFields({ subtypeId, setSubtypeId, selectedSubtype, form, valu
   people: Ref[];
   teams: Team[];
 }) {
-  return <fieldset className="rounded-lg border p-4">
-    <legend className="px-2 font-bold">Subtype-specific fields</legend>
-    <label className="block">Subtype<select className="field mt-1" required value={subtypeId} onChange={event => setSubtypeId(event.target.value)}>
-      {form.subtypes.map(subtype => <option value={subtype.id} key={subtype.id}>{subtype.name}</option>)}
-    </select></label>
+  return <fieldset className="rounded-lg border border-blue-500/30 bg-blue-950/10 p-4">
+    <legend className="px-2 font-bold">Subtype</legend>
+    <div role="tablist" aria-label="Ticket subtypes" className="mt-1 flex flex-wrap gap-2">
+      {form.subtypes.map(subtype => <button type="button" role="tab" aria-selected={String(subtype.id) === subtypeId} className={`rounded-lg border px-3 py-2 text-sm ${String(subtype.id) === subtypeId ? "border-blue-500 bg-blue-600 text-white" : "border-slate-600 bg-slate-900/40 text-slate-300"}`} key={subtype.id} onClick={() => setSubtypeId(String(subtype.id))}>{subtype.name}</button>)}
+    </div>
     {selectedSubtype?.description ? <p className="mt-2 text-sm text-slate-500">{selectedSubtype.description}</p> : null}
     {selectedSubtype ? <p className="mt-2 text-xs text-slate-500">{selectedSubtype.fields.length} dynamic field{selectedSubtype.fields.length === 1 ? "" : "s"} configured for this subtype.</p> : null}
     <div className="mt-4 grid gap-4 sm:grid-cols-2">
