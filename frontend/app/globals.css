@@ -285,6 +285,19 @@ tbody tr:hover { background: rgb(0 84 166 / 10%); }
 .permission-option small { display: block; margin-top: .2rem; color: var(--muted); font-size: .68rem; line-height: 1.35; }
 .react-flow-shell .flow-edge-draft path { stroke: rgb(250 204 21); stroke-width: 4; stroke-dasharray: 6 4; }
 
+/* Keep every legacy dark utility readable when light mode is selected. These
+   rules intentionally live at the end so they win over component defaults. */
+[data-theme="light"] .permission-option { color: rgb(20 32 48) !important; background: rgb(255 255 255 / 96%) !important; border-color: rgb(148 163 184 / 55%) !important; }
+[data-theme="light"] .permission-option strong { color: rgb(20 32 48) !important; }
+[data-theme="light"] .permission-option small { color: rgb(71 85 105) !important; }
+[data-theme="light"] .app-frame main .rounded-lg.border:not(.permission-option) { background: rgb(248 250 252 / 96%) !important; color: rgb(20 32 48); }
+[data-theme="light"] .bg-slate-900\/60, [data-theme="light"] .bg-slate-900\/70, [data-theme="light"] .bg-slate-900\/40, [data-theme="light"] .bg-slate-950\/70, [data-theme="light"] .bg-blue-950\/30, [data-theme="light"] .bg-blue-950\/20 { background-color: rgb(248 250 252 / 96%) !important; }
+[data-theme="light"] .text-slate-300, [data-theme="light"] .text-slate-200 { color: rgb(51 65 85) !important; }
+[data-theme="light"] .dashboard-metric, [data-theme="light"] .dashboard-ticket-card { background: rgb(255 255 255 / 96%) !important; color: rgb(20 32 48) !important; border-color: rgb(148 163 184 / 55%); }
+[data-theme="light"] .dashboard-card-heading { background: rgb(241 245 249 / 95%) !important; }
+[data-theme="light"] .dashboard-metric p, [data-theme="light"] .dashboard-ticket-card small, [data-theme="light"] .dashboard-empty { color: rgb(71 85 105) !important; }
+[data-theme="light"] .dashboard-metric strong, [data-theme="light"] .dashboard-ticket-card strong { color: rgb(20 32 48) !important; }
+
 @media (max-width: 640px) {
   .card { padding: 1rem; border-radius: 1rem; }
   .btn-primary, .btn-secondary { width: 100%; }
