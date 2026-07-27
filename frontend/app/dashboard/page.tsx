@@ -208,19 +208,6 @@ export function DashboardPreferencesEditor({
       : [...widgets, key]);
   }
 
-  function move(key: string, direction: -1 | 1) {
-    const current = activeItems.indexOf(key);
-    const target = current + direction;
-    if (current < 0 || target < 0 || target >= activeItems.length) return;
-    const next = [...activeItems];
-    [next[current], next[target]] = [next[target], next[current]];
-    const order = [...orderRef.current];
-    const first = order.indexOf(key); const second = order.indexOf(next[current]);
-    if (first >= 0 && second >= 0) [order[first], order[second]] = [order[second], order[first]];
-    orderRef.current = order;
-    replaceActive(next);
-  }
-
   function drop(key: string) {
     const dragged = (window as Window & { __dashboardDrag?: string }).__dashboardDrag;
     if (!dragged || dragged === key) return;
@@ -260,23 +247,12 @@ export function DashboardPreferencesEditor({
     <ul className="mt-5 grid gap-3 md:grid-cols-2">
       {displayedItems.map(key => {
         const enabled = widgets.includes(key);
-        const position = activeItems.indexOf(key);
-        return <li key={key} draggable onDragStart={() => { (window as Window & { __dashboardDrag?: string }).__dashboardDrag = key; }} onDragOver={event => event.preventDefault()} onDrop={() => drop(key)} className="dashboard-widget-item rounded-xl border border-slate-200 p-3">
+        return <li key={key} draggable onDragStart={() => { (window as Window & { __dashboardDrag?: string }).__dashboardDrag = key; }} onDragOver={event => event.preventDefault()} onDrop={() => drop(key)} className={`dashboard-widget-item rounded-xl border p-3 ${enabled ? "dashboard-widget-item-selected" : ""}`}>
           <div className="flex items-center justify-between gap-3">
             <label className="flex cursor-pointer items-center gap-3 text-sm font-semibold">
               <input type="checkbox" aria-label={WIDGET_LABELS[key]} checked={enabled} onChange={() => toggle(key)} />
               <span aria-hidden="true" className="cursor-grab">⠿</span>{WIDGET_LABELS[key]}
             </label>
-            <div className="flex gap-1">
-              <button type="button" className="btn-secondary px-2 py-1 text-xs"
-                aria-label={`Move ${WIDGET_LABELS[key]} up`}
-                disabled={!enabled || position === 0}
-                onClick={() => move(key, -1)}>↑</button>
-              <button type="button" className="btn-secondary px-2 py-1 text-xs"
-                aria-label={`Move ${WIDGET_LABELS[key]} down`}
-                disabled={!enabled || position === activeItems.length - 1}
-                onClick={() => move(key, 1)}>↓</button>
-            </div>
           </div>
         </li>;
       })}
