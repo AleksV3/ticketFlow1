@@ -200,6 +200,20 @@ tbody tr:hover { background: rgb(0 84 166 / 10%); }
 [data-theme="light"] thead th { color: rgb(37 99 170) !important; }
 [data-theme="light"] tbody a { color: rgb(37 129 220) !important; }
 [data-theme="light"] .badge.bg-slate-100 { color: rgb(51 65 85) !important; background: rgb(226 232 240) !important; }
+[data-theme="light"] .dashboard-metric,
+[data-theme="light"] .dashboard-ticket-card { background: rgb(255 255 255 / 96%); color: rgb(20 32 48); border-color: rgb(148 163 184 / 55%); }
+[data-theme="light"] .dashboard-metric p,
+[data-theme="light"] .dashboard-ticket-card small,
+[data-theme="light"] .dashboard-empty { color: rgb(71 85 105); }
+[data-theme="light"] .dashboard-metric strong,
+[data-theme="light"] .dashboard-ticket-card strong,
+[data-theme="light"] .dashboard-card-heading strong { color: rgb(20 32 48); }
+[data-theme="light"] .dashboard-card-heading { background: rgb(241 245 249 / 95%); }
+[data-theme="light"] .app-frame main label,
+[data-theme="light"] .app-frame main legend { color: rgb(51 65 85); }
+[data-theme="light"] .app-frame main .rounded-lg.border:not(.permission-option) { background: rgb(248 250 252 / 96%); }
+[data-theme="light"] .permission-option { color: rgb(20 32 48); background: rgb(255 255 255 / 96%); }
+[data-theme="light"] .permission-option small { color: rgb(71 85 105); }
 
 /* The board uses pale status columns in light mode. In dark mode those same
    utility classes need dark surfaces and light card text to remain readable. */
