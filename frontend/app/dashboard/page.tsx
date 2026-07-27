@@ -41,6 +41,12 @@ export type Preferences = {
 };
 
 export const DASHBOARD_WIDGETS = [
+  "METRIC_ACTIVE",
+  "METRIC_CLOSED",
+  "METRIC_SEV_1",
+  "METRIC_SEV_2",
+  "METRIC_SEV_3",
+  "METRIC_SEV_4",
   "MY_OPEN_TICKETS",
   "MY_TEAM_TICKETS",
   "TICKETS_BY_STATUS",
@@ -58,6 +64,12 @@ const DEFAULT_PREFERENCES: Preferences = {
 };
 
 const WIDGET_LABELS: Record<string, string> = {
+  METRIC_ACTIVE: "Active tickets metric",
+  METRIC_CLOSED: "Closed tickets metric",
+  METRIC_SEV_1: "Sev 1 defects metric",
+  METRIC_SEV_2: "Sev 2 defects metric",
+  METRIC_SEV_3: "Sev 3 defects metric",
+  METRIC_SEV_4: "Sev 4 defects metric",
   MY_OPEN_TICKETS: "My open tickets",
   MY_TEAM_TICKETS: "My team’s tickets",
   TICKETS_BY_STATUS: "Tickets by status",
@@ -163,15 +175,7 @@ function DashboardContent() {
       onReset={() => void reset()}
     /> : null}
 
-    <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-      <Metric label="Active tickets" value={data.activeCount}
-        href="/tickets?lifecycle=active" tone="blue" />
-      <Metric label="Closed tickets" value={data.closedCount}
-        href="/tickets?lifecycle=closed" tone="green" />
-      {Object.entries(data.defectsBySeverity).map(([key, value]) =>
-        <Metric key={key} label={`${humanize(key)} defects`} value={value}
-          href={`/tickets?type=DFCT&severity=${key}`} tone="amber" />)}
-    </section>
+    <MetricGrid data={data} items={customizing ? draftWidgets : preferences.dashboardWidgets} />
 
     <DashboardWidgetGrid data={data} widgets={customizing ? draftWidgets : preferences.dashboardWidgets} />
   </div>;
@@ -253,17 +257,31 @@ export function DashboardPreferencesEditor({
   </section>;
 }
 
+function MetricGrid({ data, items }: { data: Dashboard; items: string[] }) {
+  const metrics = items.filter(item => item.startsWith("METRIC_"));
+  if (!metrics.length) return null;
+  return <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+    {metrics.map(key => {
+      if (key === "METRIC_ACTIVE") return <Metric key={key} label="Active tickets" value={data.activeCount} href="/tickets?lifecycle=active" tone="blue" />;
+      if (key === "METRIC_CLOSED") return <Metric key={key} label="Closed tickets" value={data.closedCount} href="/tickets?lifecycle=closed" tone="green" />;
+      const severity = key.replace("METRIC_", "");
+      return <Metric key={key} label={`${humanize(severity)} defects`} value={data.defectsBySeverity[severity] ?? 0} href={`/tickets?type=DFCT&severity=${severity}`} tone="amber" />;
+    })}
+  </section>;
+}
+
 export function DashboardWidgetGrid({ data, widgets }: {
   data: Dashboard;
   widgets: string[];
 }) {
-  if (widgets.length === 0) {
+  const visibleWidgets = widgets.filter(widget => !widget.startsWith("METRIC_"));
+  if (visibleWidgets.length === 0) {
     return <div className="card text-center text-slate-500">
       No dashboard widgets are visible. Use Customize dashboard to add one.
     </div>;
   }
   return <section className="grid gap-5 lg:grid-cols-2">
-    {widgets.map(widget => {
+    {visibleWidgets.map(widget => {
       switch (widget) {
         case "MY_OPEN_TICKETS":
           return <TicketCard key={widget} title="My open tickets"
