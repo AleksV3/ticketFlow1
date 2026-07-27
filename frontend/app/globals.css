@@ -111,6 +111,11 @@ option { color: var(--off-white); background: var(--dark-slate); }
 .nav-link:hover { color: white; background: rgb(0 84 166 / 24%); }
 .nav-link-active { color: white; background: linear-gradient(135deg, rgb(0 112 230 / 80%), rgb(0 75 160 / 85%)); box-shadow: 0 3px 12px rgb(0 112 230 / 25%); }
 .notification-dot { display: inline-block; width: .5rem; height: .5rem; margin-left: .45rem; vertical-align: middle; border-radius: 999px; background: rgb(248 113 113); box-shadow: 0 0 0 2px rgb(127 29 29 / 55%), 0 0 10px rgb(239 68 68 / 85%); }
+.notification-toast { position: fixed; right: 1.25rem; bottom: 1.25rem; z-index: 80; width: min(360px, calc(100vw - 2rem)); border: 1px solid rgb(96 165 250 / 70%); border-left: 4px solid rgb(239 68 68); border-radius: .8rem; padding: 1rem 2.5rem 1rem 1rem; background: rgb(11 19 37 / 97%); color: var(--off-white); box-shadow: 0 14px 40px rgb(0 0 0 / 38%), 0 0 18px rgb(37 99 235 / 25%); animation: notification-toast-in .22s ease-out; }
+.notification-toast strong { display: block; margin-top: .35rem; font-size: .9rem; }
+.notification-toast > p:last-child { margin-top: .35rem; color: var(--muted); font-size: .78rem; line-height: 1.4; }
+.notification-toast-close { position: absolute; top: .45rem; right: .65rem; color: var(--muted); font-size: 1.25rem; line-height: 1; }
+@keyframes notification-toast-in { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }
 .eyebrow { color: rgb(72 166 255); font-size: .75rem; font-weight: 800; letter-spacing: .18em; text-transform: uppercase; }
 .auth-panel { width: 100%; max-width: 28rem; border: 1px solid var(--line); border-top: 3px solid var(--accent-blue); border-radius: 1rem; padding: 2rem; background: rgb(26 35 50 / 94%); box-shadow: 0 28px 70px rgb(0 0 0 / 34%); }
 
@@ -310,6 +315,8 @@ tbody tr:hover { background: rgb(0 84 166 / 10%); }
 [data-theme="light"] .nav-link:hover, [data-theme="light"] .nav-link:focus-visible { color: rgb(15 59 130) !important; background: linear-gradient(135deg, rgb(191 219 254), rgb(147 197 253)) !important; box-shadow: 0 3px 10px rgb(37 99 235 / 22%); }
 [data-theme="light"] .nav-link-active { color: rgb(15 59 130) !important; background: linear-gradient(135deg, rgb(191 219 254), rgb(147 197 253)) !important; box-shadow: 0 0 0 1px rgb(59 130 246 / 55%), 0 3px 10px rgb(37 99 235 / 22%); }
 [data-theme="light"] .notification-dot { background: rgb(220 38 38); box-shadow: 0 0 0 2px white, 0 0 9px rgb(220 38 38 / 65%); }
+[data-theme="light"] .notification-toast { background: rgb(255 255 255 / 98%); color: rgb(15 23 42); border-color: rgb(59 130 246 / 65%); box-shadow: 0 14px 40px rgb(15 23 42 / 18%), 0 0 18px rgb(37 99 235 / 20%); }
+[data-theme="light"] .notification-toast > p:last-child { color: rgb(51 65 85); }
 [data-theme="light"] table { color: rgb(15 23 42) !important; background: rgb(255 255 255 / 96%) !important; }
 [data-theme="light"] thead { color: rgb(30 64 175) !important; background: linear-gradient(180deg, rgb(239 246 255), rgb(219 234 254)) !important; }
 [data-theme="light"] tbody tr { transition: background-color .16s ease, box-shadow .16s ease; }
