@@ -324,6 +324,8 @@ tbody tr:hover { background: rgb(0 84 166 / 10%); }
 [data-theme="light"] .dashboard-metric > span { background: rgb(219 234 254) !important; color: rgb(29 78 216) !important; }
 [data-theme="light"] .dashboard-card-heading b { background: rgb(191 219 254) !important; color: rgb(30 64 175) !important; }
 [data-theme="light"] .dashboard-ticket-card { border-top: 3px solid rgb(96 165 250); }
+[data-theme="light"] .app-frame main button.border-blue-500.bg-blue-950\/30 { background: linear-gradient(135deg, rgb(219 234 254), rgb(191 219 254)) !important; border-color: rgb(59 130 246) !important; color: rgb(15 59 130) !important; box-shadow: 0 0 0 2px rgb(147 197 253 / 45%), 0 5px 14px rgb(37 99 235 / 16%); }
+[data-theme="light"] .app-frame main button.border-blue-500.bg-blue-950\/30 strong, [data-theme="light"] .app-frame main button.border-blue-500.bg-blue-950\/30 span { color: rgb(15 59 130) !important; }
 
 @media (max-width: 640px) {
   .card { padding: 1rem; border-radius: 1rem; }
