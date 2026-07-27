@@ -2,7 +2,6 @@
 
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import { AppShell } from "@/components/AppShell";
-import { WorkflowConfigurationPanels } from "@/components/WorkflowConfigurationPanels";
 import { api, get, patch, post } from "@/lib/api";
 import type { CurrentUser } from "@/lib/auth";
 import { Background, BaseEdge, ConnectionLineType, Controls, Handle, MarkerType, MiniMap, Position, ReactFlow, useEdgesState, useNodesState, type Connection, type Edge, type EdgeProps, type Node } from "@xyflow/react";
@@ -10,7 +9,6 @@ import { Background, BaseEdge, ConnectionLineType, Controls, Handle, MarkerType,
 type State = { id: number; key: string; name?: string; isInitial: boolean; isTerminal: boolean; sortOrder: number };
 type Transition = { id: number; fromStateId: number; toStateId: number; requiredPermission: string; requiredParty: string | null; responsibilityAfter: string | null; operationKind: string };
 type Workflow = { id: number; name: string; organizationId: number | null; version: number; canvasLayout?: string | null; states: State[]; transitions: Transition[] };
-type TicketType = { id: number; key: string; name: string; workflowId: number; organizationId: number | null; requiresProposal: boolean; active?: boolean; sortOrder?: number; capability?: string; version?: number };
 type Organization = { id: number; name: string };
 
 export default function WorkflowsPage() {
@@ -21,13 +19,10 @@ function Editor({ user }: { user: CurrentUser }) {
   const [organizations, setOrganizations] = useState<Organization[]>([]);
   const [organizationId, setOrganizationId] = useState(user.organizationId?.toString() ?? "internal");
   const [workflows, setWorkflows] = useState<Workflow[]>([]);
-  const [types, setTypes] = useState<TicketType[]>([]);
   const [selected, setSelected] = useState<Workflow | null>(null);
   const [workflowName, setWorkflowName] = useState("");
   const [initialKey, setInitialKey] = useState("OPEN");
   const [terminalKey, setTerminalKey] = useState("DONE");
-  const [typeKey, setTypeKey] = useState("");
-  const [typeName, setTypeName] = useState("");
   const [message, setMessage] = useState("");
   const internalOrganization = useMemo(() => organizations.find(org => org.name.toLowerCase() === "ticketflow1 internal"), [organizations]);
   const selectedOrganizationId = organizationId === "internal" ? internalOrganization?.id ?? null : Number(organizationId);
@@ -44,11 +39,8 @@ function Editor({ user }: { user: CurrentUser }) {
     if (!selectedScopeReady) return;
     try {
       const query = selectedOrganizationId ? `?organizationId=${selectedOrganizationId}` : "";
-      const [workflowRows, typeRows] = await Promise.all([
-        get<Workflow[]>(`/admin/workflows${query}`),
-        get<TicketType[]>(`/admin/ticket-types${query}`),
-      ]);
-      setWorkflows(workflowRows); setTypes(typeRows);
+      const workflowRows = await get<Workflow[]>(`/admin/workflows${query}`);
+      setWorkflows(workflowRows);
       setSelected(previous => workflowRows.find(row => row.id === previous?.id) ?? null);
       setMessage("");
     } catch (error) {
@@ -93,20 +85,6 @@ function Editor({ user }: { user: CurrentUser }) {
     catch (error) { setMessage(error instanceof Error ? error.message : "Could not rename workflow state."); }
   }
 
-  async function addType(event: FormEvent) {
-    event.preventDefault(); if (!selected) return;
-    try {
-      await post("/admin/ticket-types", { key: normalize(typeKey), name: typeName, workflowId: selected.id,
-        organizationId: selectedOrganizationId, requiresProposal: false });
-      setTypeKey(""); setTypeName(""); setMessage("Custom ticket type created."); await load();
-    } catch (error) { setMessage(error instanceof Error ? error.message : "Could not create ticket type."); }
-  }
-
-  async function applyWorkflowToType(type: TicketType, workflowId: number) {
-    if (type.workflowId === workflowId) return;
-    try { await patch(`/admin/ticket-types/${type.id}`, { version: type.version, workflowId }); setMessage("Ticket type workflow updated."); await load(); }
-    catch (error) { setMessage(error instanceof Error ? error.message : "Could not update ticket type workflow."); }
-  }
 
   const editableTransitions = (workflow: Workflow) => workflow.transitions.filter(edge => edge.operationKind === "STANDARD");
   const transitionRequest = (workflow: Workflow, edges: Transition[]) => edges.map(edge => ({
@@ -160,15 +138,13 @@ function Editor({ user }: { user: CurrentUser }) {
   }
 
   return <div className="space-y-6">
-    <div><p className="eyebrow">Ticket configuration</p><h1 className="mt-1 text-3xl font-bold">Ticket types apply workflows</h1><p className="mt-2 max-w-3xl text-slate-600">A <strong>ticket type</strong> defines what kind of ticket is created. Each ticket type applies exactly one <strong>workflow</strong>: a branching map of states and allowed choices. Admins can add states and connect one state to multiple next states.</p></div>
+    <div><p className="eyebrow">Workflow configuration</p><h1 className="mt-1 text-3xl font-bold">Workflow maps</h1><p className="mt-2 max-w-3xl text-slate-600">Build branching workflow maps with states and allowed transitions. Ticket types and their forms are managed from the Ticket types page.</p></div>
     {user.party === "TICKETFLOW1" ? <label className="card block">Workflow owner<select className="field mt-1" value={organizationId} onChange={event => setOrganizationId(event.target.value)}><option value="internal">TicketFlow1 · Internal workflows</option>{organizations.map(org => <option key={org.id} value={org.id}>{org.name} · Client workflows</option>)}</select></label> : null}
     {!selectedScopeReady ? <div className="card">Loading TicketFlow1 Internal workflow scope…</div> : null}
     <div className="space-y-6">
-      <section className="card space-y-5"><div><h2 className="font-bold">1. Choose a workflow map</h2><div className="mt-2 grid gap-2 sm:grid-cols-3">{workflows.map(workflow => <button className="block w-full rounded border p-3 text-left hover:bg-slate-50" key={workflow.id} onClick={() => setSelected(workflow)}><strong>{workflow.name}</strong><span className="mt-1 block text-xs text-slate-500">{organizationId==="internal"?"Internal TicketFlow1 workflow":`Applied by: ${types.filter(type => type.workflowId === workflow.id).map(type => type.name).join(", ") || "No ticket type"}`}</span><span className="mt-1 block text-xs text-blue-400">{workflow.states.length} states · {workflow.transitions.length} choices</span></button>)}</div></div>{organizationId!=="internal"?<div><h2 className="font-bold">2. Select workflow for each ticket type</h2><div className="mt-2 grid gap-2">{types.map(type => <label className="block rounded-xl border p-3" key={type.id}><span className="flex flex-wrap items-center justify-between gap-3"><span><strong>{type.name}</strong><span className="block text-xs text-slate-500">{type.key}</span></span><select aria-label={`Workflow for ${type.name}`} className="field min-w-64" value={type.workflowId} onChange={event => void applyWorkflowToType(type, Number(event.target.value))}>{workflows.map(workflow => <option value={workflow.id} key={workflow.id}>{workflow.name}</option>)}</select></span></label>)}</div><p className="mt-2 text-xs text-slate-500">For safety, a ticket type can only switch workflows before its first ticket is created.</p></div>:null}</section>
+      <section className="card space-y-5"><div><h2 className="font-bold">Choose a workflow map</h2><div className="mt-2 grid gap-2 sm:grid-cols-3">{workflows.map(workflow => <button className="block w-full rounded border p-3 text-left hover:bg-slate-50" key={workflow.id} onClick={() => setSelected(workflow)}><strong>{workflow.name}</strong><span className="mt-1 block text-xs text-slate-500">{organizationId==="internal"?"Internal TicketFlow1 workflow":"Client workflow"}</span><span className="mt-1 block text-xs text-blue-400">{workflow.states.length} states · {workflow.transitions.length} choices</span></button>)}</div></div></section>
       <section className="space-y-6">
-        {selected ? <WorkflowMap workflow={selected} types={types.filter(type => type.workflowId === selected.id)} addState={addGraphState} renameState={renameGraphState} addTransition={addGraphTransition} updateTransition={updateTransition} removeTransition={removeTransition} removeState={removeState} saveCanvasLayout={saveCanvasLayout} /> : <div className="card">Select a workflow to view its branching map.</div>}
-        {selected ? <form className="card space-y-3" onSubmit={addType}><div><p className="eyebrow">Selected workflow</p><h2 className="font-bold">Create ticket type for {selected.name}</h2></div><p className="text-sm text-slate-500">{organizationId === "internal" ? "Creates a TicketFlow1 Internal ticket type used by internal ticket creation." : "Creates a client-organization ticket type."}</p><label className="block">Key<input required className="field mt-1" value={typeKey} onChange={event => setTypeKey(event.target.value)} /></label><label className="block">Display name<input required className="field mt-1" value={typeName} onChange={event => setTypeName(event.target.value)} /></label><button className="btn-primary">Create ticket type</button></form> : null}
-        {selectedScopeReady ? <WorkflowConfigurationPanels organizationId={selectedOrganizationId ? String(selectedOrganizationId) : "internal"} workflows={workflows} types={types} reload={load} report={setMessage} /> : null}
+        {selected ? <WorkflowMap workflow={selected} addState={addGraphState} renameState={renameGraphState} addTransition={addGraphTransition} updateTransition={updateTransition} removeTransition={removeTransition} removeState={removeState} saveCanvasLayout={saveCanvasLayout} /> : <div className="card">Select a workflow to view its branching map.</div>}
         <form className="card grid gap-3 sm:grid-cols-2" onSubmit={createWorkflow}><div className="sm:col-span-2"><p className="eyebrow">New map</p><h2 className="font-bold">Create custom workflow</h2><p className="text-sm text-slate-500">Start with two states, then arrange and connect everything directly in the canvas.</p></div><label className="sm:col-span-2">Workflow name<input className="field mt-1" required value={workflowName} onChange={event => setWorkflowName(event.target.value)} /></label><label>Starting state<input className="field mt-1" required value={initialKey} onChange={event => setInitialKey(event.target.value)} /></label><label>Ending state<input className="field mt-1" required value={terminalKey} onChange={event => setTerminalKey(event.target.value)} /></label><button className="btn-primary sm:col-span-2">Create workflow</button></form>
       </section>
     </div>
@@ -176,9 +152,8 @@ function Editor({ user }: { user: CurrentUser }) {
   </div>;
 }
 
-function WorkflowMap({ workflow, types, addState, renameState, addTransition, updateTransition, removeTransition, removeState, saveCanvasLayout }: {
+function WorkflowMap({ workflow, addState, renameState, addTransition, updateTransition, removeTransition, removeState, saveCanvasLayout }: {
   workflow: Workflow;
-  types: TicketType[];
   addState: (name: string, isTerminal: boolean) => Promise<void>;
   renameState: (state: State) => Promise<void>;
   addTransition: (from: string, to: string, party?: string | null, responsibility?: string | null) => Promise<void>;
@@ -285,7 +260,7 @@ function WorkflowMap({ workflow, types, addState, renameState, addTransition, up
   }
   function cancelConnection() { setPendingConnection(null); setEdges(current => current.filter(edge => edge.id !== "draft-connection")); }
   return <section className="card overflow-hidden">
-    <div className="flex flex-wrap items-start justify-between gap-3"><div><p className="eyebrow">Interactive workflow canvas</p><h2 className="mt-1 text-xl font-bold">{workflow.name}</h2><p className="mt-1 text-sm text-slate-500">Applied to: <strong className="text-slate-700">{types.map(type => type.name).join(", ") || "No ticket type"}</strong></p></div><div className="flex items-center gap-2"><span className={`badge ${layoutDirty ? "bg-yellow-900 text-yellow-100" : "bg-blue-900 text-blue-100"}`}>{layoutDirty ? "Unsaved layout changes" : "Layout saved"}</span><button type="button" className="btn-secondary" disabled={!layoutDirty || savingLayout} onClick={() => void persistCanvasLayout()}>{savingLayout ? "Saving…" : "Save layout"}</button><button type="button" className="btn-primary" onClick={() => setAddingState(value => !value)}>+ Add state</button></div></div>
+    <div className="flex flex-wrap items-start justify-between gap-3"><div><p className="eyebrow">Interactive workflow canvas</p><h2 className="mt-1 text-xl font-bold">{workflow.name}</h2><p className="mt-1 text-sm text-slate-500">Arrange states and connect allowed transitions.</p></div><div className="flex items-center gap-2"><span className={`badge ${layoutDirty ? "bg-yellow-900 text-yellow-100" : "bg-blue-900 text-blue-100"}`}>{layoutDirty ? "Unsaved layout changes" : "Layout saved"}</span><button type="button" className="btn-secondary" disabled={!layoutDirty || savingLayout} onClick={() => void persistCanvasLayout()}>{savingLayout ? "Saving…" : "Save layout"}</button><button type="button" className="btn-primary" onClick={() => setAddingState(value => !value)}>+ Add state</button></div></div>
     <div className="mt-3 flex flex-wrap gap-2">{workflow.states.filter(state => !state.isInitial).map(state => <span className="inline-flex gap-1" key={state.id}><button type="button" className="btn-secondary px-2 py-1 text-xs" onClick={() => void renameState(state)}>Rename {(state.name ?? state.key).replaceAll("_", " ")}</button><button type="button" className="btn-secondary px-2 py-1 text-xs text-red-300" onClick={() => void removeState(state)}>Remove</button></span>)}</div>
     {addingState ? <form className="graph-add-state mt-4" onSubmit={event => void submitState(event)}><label className="flex-1"><span className="sr-only">State name</span><input autoFocus required className="field" placeholder="State name, e.g. REQUEST CHANGES" value={newStateName} onChange={event => setNewStateName(event.target.value)} /></label><label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={newStateTerminal} onChange={event => setNewStateTerminal(event.target.checked)} /> End state</label><button className="btn-primary" disabled={savingState}>{savingState ? "Adding…" : "Add to canvas"}</button><button type="button" className="btn-secondary" onClick={() => setAddingState(false)}>Cancel</button></form> : null}
     {pendingConnection ? <form className="graph-connection-editor mt-4" onSubmit={event => void saveConnection(event)}><div className="min-w-48"><span className="eyebrow">New connection</span><strong className="block">{pendingConnection.from.replaceAll("_", " ")} → {pendingConnection.to.replaceAll("_", " ")}</strong></div><label className="flex-1">Who can choose?<select className="field mt-1" value={connectionParty} onChange={event => setConnectionParty(event.target.value)}><option value="">Any permitted party</option><option value="CLIENT">Client</option><option value="TICKETFLOW1">TicketFlow1</option></select></label><label className="flex-1">Responsibility after<select className="field mt-1" value={connectionResponsibility} onChange={event => setConnectionResponsibility(event.target.value)}><option value="">No change</option><option value="CLIENT">Client</option><option value="TICKETFLOW1">TicketFlow1</option></select></label><button className="btn-primary">Save connection</button><button type="button" className="btn-secondary" onClick={cancelConnection}>Cancel</button></form> : null}
