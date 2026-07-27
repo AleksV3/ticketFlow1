@@ -38,9 +38,9 @@ function Detail({ canEdit, canAssign, internal }: { canEdit: boolean; canAssign:
       </main>
       <TicketSidebar ticket={ticket} onTransition={async status => { await post(`/tickets/${ticketKey}/transition`, { toStatus: status }); await load(); }}/>
     </div>
+    <WorkflowDecisionPanel ticketKey={ticketKey} commands={ticket.workflowCommands ?? []} onDone={load}/>
     <TicketCommunication ticketKey={ticketKey} internal={internal}/>
     <ProcessMap ticket={ticket} history={history}/>
-    <WorkflowDecisionPanel ticketKey={ticketKey} commands={ticket.workflowCommands ?? []} onDone={load}/>
     <ProposalActions ticketKey={ticketKey} proposal={ticket.latestProposal} commands={ticket.proposalCommands ?? []} onDone={load}/>
     <details className="card"><summary className="cursor-pointer font-bold">Status history and audit log</summary><div className="mt-5"><TicketHistory ticketKey={ticketKey}/></div></details>
   </div>;
