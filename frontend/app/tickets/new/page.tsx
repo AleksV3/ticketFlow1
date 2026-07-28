@@ -56,9 +56,6 @@ function TicketForm({ user }: { user: CurrentUser }) {
   const [description, setDescription] = useState("");
   const [priority, setPriority] = useState("MEDIUM");
   const [severity, setSeverity] = useState("SEV_3");
-  const [leadId, setLeadId] = useState("");
-  const [developerIds, setDeveloperIds] = useState<number[]>([]);
-  const [teamIds, setTeamIds] = useState<number[]>([]);
   const [attachments, setAttachments] = useState<File[]>([]);
   const [error, setError] = useState("");
 
@@ -67,6 +64,7 @@ function TicketForm({ user }: { user: CurrentUser }) {
   const needsUsrTarget = selectedType?.key === "USR" && ["MODIFY", "DELETE"].includes(selectedSubtype?.key ?? "");
   const isSubticket = parentTicketKey.trim().length > 0;
   const internalOrganization = useMemo(() => orgs.find(item => item.name.toLowerCase() === "ticketflow1 internal"), [orgs]);
+  const selectedOrganization = orgs.find(item => String(item.id) === org)?.name ?? (user.organizationName ?? "Not selected");
 
   useEffect(() => {
     if (user.party !== "TICKETFLOW1") return;
@@ -130,8 +128,6 @@ function TicketForm({ user }: { user: CurrentUser }) {
     return () => window.clearTimeout(timeout);
   }, [needsUsrTarget, org, targetQuery]);
 
-  function toggleDeveloper(id: number) { setDeveloperIds(values => values.includes(id) ? values.filter(value => value !== id) : [...values, id]); }
-  function toggleTeam(id: number) { setTeamIds(values => values.includes(id) ? values.filter(value => value !== id) : [...values, id]); }
   function setDynamic(key: string, value: unknown) { setDynamicValues(values => ({ ...values, [key]: value })); }
   async function submit(event: FormEvent) {
     event.preventDefault();
@@ -148,9 +144,9 @@ function TicketForm({ user }: { user: CurrentUser }) {
         priority,
         severity: selectedTypeKey === "DEFECT" || selectedTypeKey === "DFCT" ? severity : null,
         organizationId: user.party === "TICKETFLOW1" ? Number(org) : null,
-        ticketLeadId: canAssign && leadId ? Number(leadId) : null,
-        developerIds: canAssign ? developerIds : null,
-        teamIds: canAssign ? teamIds : null,
+        ticketLeadId: null,
+        developerIds: null,
+        teamIds: null,
         subtypeId: selectedSubtype ? selectedSubtype.id : null,
         dynamicValues: selectedSubtype ? compactValues(dynamicValues, selectedSubtype.fields) : null,
         parentTicketKey: parentTicketKey.trim() || null,
@@ -167,14 +163,10 @@ function TicketForm({ user }: { user: CurrentUser }) {
     }
   }
 
-  const selectedOrganization = orgs.find(item => String(item.id) === org)?.name ?? (user.organizationName ?? "Not selected");
-  const selectedLead = people.find(person => String(person.id) === leadId)?.name;
-  const selectedDevelopers = people.filter(person => developerIds.includes(person.id)).map(person => person.name);
-  const selectedTeams = teams.filter(team => teamIds.includes(team.id)).map(team => team.name);
   return <div className="max-w-7xl">
     <h1 className="text-3xl font-bold">Create ticket</h1>
     <div className="mt-6 grid gap-6 lg:grid-cols-[280px_minmax(0,1fr)] lg:items-start">
-      <CreateMetadataSidebar user={user} title={title} description={description} type={selectedType?.key ?? type} typeName={selectedType?.name} subtype={selectedSubtype?.name} organization={selectedOrganization} parent={parentTicketKey} priority={priority} severity={(selectedType?.key === "DEFECT" || selectedType?.key === "DFCT") ? severity : undefined} lead={selectedLead} developers={selectedDevelopers} teams={selectedTeams} attachments={attachments.length} dynamicFields={selectedSubtype?.fields.filter(field => dynamicValues[field.key] !== undefined && dynamicValues[field.key] !== "").map(field => field.label) ?? []} />
+      <CreateMetadataSidebar user={user} title={title} description={description} type={selectedType?.key ?? type} typeName={selectedType?.name} subtype={selectedSubtype?.name} organization={selectedOrganization} parent={parentTicketKey} priority={priority} severity={(selectedType?.key === "DEFECT" || selectedType?.key === "DFCT") ? severity : undefined} attachments={attachments.length} dynamicFields={selectedSubtype?.fields.filter(field => dynamicValues[field.key] !== undefined && dynamicValues[field.key] !== "").map(field => field.label) ?? []} />
       <form className="card space-y-5" onSubmit={submit}>
       <label className="block"><span>Title</span><input className="field mt-1" required maxLength={300} value={title} onChange={event => setTitle(event.target.value)}/></label>
       <label className="block"><span>Description</span><textarea className="field mt-1 min-h-32" required value={description} onChange={event => setDescription(event.target.value)}/></label>
@@ -186,7 +178,6 @@ function TicketForm({ user }: { user: CurrentUser }) {
       <label className="block"><span>Attachments</span><input className="field mt-1" type="file" multiple onChange={event => setAttachments(Array.from(event.target.files ?? []))}/>{attachments.length ? <small className="text-slate-500">{attachments.length} file{attachments.length === 1 ? "" : "s"} will be uploaded after the ticket is created.</small> : <small className="text-slate-500">Optional files to include with this ticket.</small>}</label>
       <Select label="Priority" value={priority} set={setPriority} options={["LOW","MEDIUM","HIGH","CRITICAL"].map(value => [value,value])}/>
       {selectedType?.key === "DEFECT" || selectedType?.key === "DFCT" ? <Select label="Severity" value={severity} set={setSeverity} options={["SEV_1","SEV_2","SEV_3","SEV_4"].map(value => [value,value])}/> : null}
-      {canAssign ? <fieldset className="rounded-lg border p-4"><legend className="px-2 font-bold">Assign ticket team now</legend><label className="block">Ticket team lead<select className="field mt-1" value={leadId} onChange={event => setLeadId(event.target.value)}><option value="">Assign later</option>{people.map(person => <option key={person.id} value={person.id}>{person.name}</option>)}</select></label><div className="mt-3"><span className="text-sm">Developer teams</span><div className="mt-2 grid gap-2 sm:grid-cols-2">{teams.map(team=><label className={`permission-option ${teamIds.includes(team.id)?"permission-option-selected":""}`} key={team.id}><input type="checkbox" checked={teamIds.includes(team.id)} onChange={()=>toggleTeam(team.id)}/><span><strong>{team.name}</strong><small>{teamIds.includes(team.id)?"Assigned team":"Assign team"}</small></span></label>)}</div></div><div className="mt-3"><span className="text-sm">Developers</span><div className="mt-2 grid gap-2 sm:grid-cols-2">{people.map(person => <label className={`permission-option ${developerIds.includes(person.id) ? "permission-option-selected" : ""}`} key={person.id}><input type="checkbox" checked={developerIds.includes(person.id)} onChange={() => toggleDeveloper(person.id)}/><span><strong>{person.name}</strong><small>Developer</small></span></label>)}</div></div></fieldset> : null}
       {error ? <p role="alert" className="text-red-400">{error}</p> : null}
       <button className="btn-primary">Create ticket</button>
       </form>
@@ -194,10 +185,10 @@ function TicketForm({ user }: { user: CurrentUser }) {
   </div>;
 }
 
-function CreateMetadataSidebar({ user, title, description, type, typeName, subtype, organization, parent, priority, severity, lead, developers, teams, attachments, dynamicFields }: {
-  user: CurrentUser; title: string; description: string; type: string; typeName?: string; subtype?: string; organization: string; parent: string; priority: string; severity?: string; lead?: string; developers: string[]; teams: string[]; attachments: number; dynamicFields: string[];
+function CreateMetadataSidebar({ user, title, description, type, typeName, subtype, organization, parent, priority, severity, attachments, dynamicFields }: {
+  user: CurrentUser; title: string; description: string; type: string; typeName?: string; subtype?: string; organization: string; parent: string; priority: string; severity?: string; attachments: number; dynamicFields: string[];
 }) {
-  return <aside className="card sticky top-24 self-start lg:max-h-[calc(100vh-7rem)] lg:overflow-y-auto"><p className="eyebrow">Ticket metadata</p><h2 className="mt-1 text-xl font-bold">New ticket</h2><p className="mt-1 text-xs text-slate-500">Preview updates as you complete the form.</p><div className="my-4 border-t border-slate-700/50" /><div className="space-y-3"><Meta label="Title" value={title || "Not entered"} /><Meta label="Description" value={description || "Not entered"} /><Meta label="Created by" value={user.displayName} /><Meta label="Type" value={typeName ? `${typeName} (${type})` : type || "Not selected"} /><Meta label="Subtype" value={subtype || "None"} /><Meta label="Organization" value={organization} />{parent ? <Meta label="Parent ticket" value={parent} /> : null}<Meta label="Priority" value={priority || "Not selected"} />{severity ? <Meta label="Severity" value={severity} /> : null}<Meta label="Attachments" value={attachments ? `${attachments} selected` : "None"} />{lead || teams.length || developers.length ? <><div className="my-3 border-t border-slate-700/50" /><Meta label="Team lead" value={lead || "Assign later"} /><Meta label="Teams" value={teams.length ? teams.join(", ") : "None"} /><Meta label="Developers" value={developers.length ? developers.join(", ") : "None"} /></> : null}{dynamicFields.length ? <Meta label="Completed subtype fields" value={dynamicFields.join(", ")} /> : null}</div></aside>;
+  return <aside className="card sticky top-24 self-start lg:max-h-[calc(100vh-7rem)] lg:overflow-y-auto"><p className="eyebrow">Ticket metadata</p><h2 className="mt-1 text-xl font-bold">New ticket</h2><p className="mt-1 text-xs text-slate-500">Preview updates as you complete the form.</p><div className="my-4 border-t border-slate-700/50" /><div className="space-y-3"><Meta label="Title" value={title || "Not entered"} /><Meta label="Description" value={description || "Not entered"} /><Meta label="Created by" value={user.displayName} /><Meta label="Type" value={typeName ? `${typeName} (${type})` : type || "Not selected"} /><Meta label="Subtype" value={subtype || "None"} /><Meta label="Organization" value={organization} />{parent ? <Meta label="Parent ticket" value={parent} /> : null}<Meta label="Priority" value={priority || "Not selected"} />{severity ? <Meta label="Severity" value={severity} /> : null}<Meta label="Attachments" value={attachments ? `${attachments} selected` : "None"} />{dynamicFields.length ? <Meta label="Completed subtype fields" value={dynamicFields.join(", ")} /> : null}</div></aside>;
 }
 
 function Meta({ label, value }: { label: string; value: string }) { return <div><p className="text-[0.65rem] uppercase tracking-wide text-slate-500">{label}</p><p className="mt-0.5 break-words text-sm">{value}</p></div>; }
