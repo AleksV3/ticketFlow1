@@ -32,10 +32,20 @@ import org.springframework.orm.ObjectOptimisticLockingFailureException;
 @RestControllerAdvice
 public class ApiExceptionHandler {
 
+    private static final Logger log = LoggerFactory.getLogger(ApiExceptionHandler.class);
+
     @ExceptionHandler(ApiException.class)
     public ResponseEntity<ApiError> handleApiException(ApiException ex, HttpServletRequest request) {
         log.warn("api_exception method={} path={} status={} code={} message={}",
                 request.getMethod(), request.getRequestURI(), ex.getStatus().value(), ex.getErrorCode(), ex.getMessage());
+        if (ex.getStatus() == HttpStatus.TOO_MANY_REQUESTS) {
+            securityAlert("LOGIN_RATE_LIMITED", request, ex.getStatus());
+        } else if (ex.getStatus() == HttpStatus.FORBIDDEN) {
+            securityAlert("ACCESS_DENIED", request, ex.getStatus());
+        } else if (ex.getStatus() == HttpStatus.UNAUTHORIZED
+                && "/api/auth/login".equals(request.getRequestURI())) {
+            securityAlert("LOGIN_FAILURE", request, ex.getStatus());
+        }
         return ResponseEntity
                 .status(ex.getStatus())
                 .body(ApiError.of(ex.getStatus().value(), ex.getErrorCode(), ex.getMessage(),
@@ -87,16 +97,22 @@ public class ApiExceptionHandler {
                 "You do not have permission to perform this action.", request.getRequestURI()));
     }
 
-    private static final Logger log = LoggerFactory.getLogger(ApiExceptionHandler.class);
-
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ApiError> handleUnexpected(Exception ex, HttpServletRequest request) {
         // The client gets a generic body, but the real stack trace must land in
         // the log — a swallowed 500 is undebuggable.
         log.error("Unhandled exception on {} {}", request.getMethod(), request.getRequestURI(), ex);
+        securityAlert("SERVER_ERROR", request, HttpStatus.INTERNAL_SERVER_ERROR);
         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(ApiError.of(
                 HttpStatus.INTERNAL_SERVER_ERROR.value(), "INTERNAL_ERROR",
                 "An unexpected error occurred.", request.getRequestURI()));
+    }
+
+    private void securityAlert(String event, HttpServletRequest request, HttpStatus status) {
+        // Deliberately excludes request parameters, credentials, IP addresses,
+        // and user identifiers; Cloud Logging can alert on this stable marker.
+        log.warn("security_alert event={} method={} path={} status={}",
+                event, request.getMethod(), request.getRequestURI(), status.value());
     }
 
     @ExceptionHandler(ObjectOptimisticLockingFailureException.class)
