@@ -41,6 +41,10 @@ app:
   security:
     # HTTPS deployments keep this enabled. Plain-HTTP local development opts out.
     secure-cookies: ${COOKIE_SECURE:false}
+    login-rate-limit:
+      # Failed password attempts per email address before a temporary block.
+      max-failures: ${APP_LOGIN_MAX_FAILURES:5}
+      window-seconds: ${APP_LOGIN_RATE_LIMIT_WINDOW_SECONDS:900}
   dev-logging:
     enabled: ${APP_DEV_LOGGING_ENABLED:true}
     slow-request-ms: ${APP_DEV_LOGGING_SLOW_REQUEST_MS:1000}

@@ -5,8 +5,10 @@ import com.ticketflow1.ticketing.auth.dto.ChangePasswordRequest;
 import com.ticketflow1.ticketing.auth.dto.CsrfTokenResponse;
 import com.ticketflow1.ticketing.auth.dto.LoginRequest;
 import com.ticketflow1.ticketing.auth.dto.LoginResponse;
+import com.ticketflow1.ticketing.common.ApiException;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.web.csrf.CsrfToken;
@@ -21,17 +23,28 @@ import org.springframework.web.bind.annotation.RestController;
 public class AuthController {
 
     private final AuthService authService;
+    private final LoginAttemptRateLimiter loginAttemptRateLimiter;
 
-    public AuthController(AuthService authService) {
+    public AuthController(AuthService authService, LoginAttemptRateLimiter loginAttemptRateLimiter) {
         this.authService = authService;
+        this.loginAttemptRateLimiter = loginAttemptRateLimiter;
     }
 
     @PostMapping("/auth/login")
     public ResponseEntity<LoginResponse> login(@Valid @RequestBody LoginRequest request) {
-        var login = authService.login(request);
-        return ResponseEntity.ok()
-                .header(HttpHeaders.SET_COOKIE, login.cookie().toString())
-                .body(login.response());
+        loginAttemptRateLimiter.assertAllowed(request.email());
+        try {
+            var login = authService.login(request);
+            loginAttemptRateLimiter.recordSuccess(request.email());
+            return ResponseEntity.ok()
+                    .header(HttpHeaders.SET_COOKIE, login.cookie().toString())
+                    .body(login.response());
+        } catch (ApiException exception) {
+            if (exception.getStatus() == HttpStatus.UNAUTHORIZED) {
+                loginAttemptRateLimiter.recordFailure(request.email());
+            }
+            throw exception;
+        }
     }
 
     @PostMapping("/auth/logout")
