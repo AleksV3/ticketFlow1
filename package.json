@@ -1,0 +1,8 @@
+{
+  "name": "ticketflow1-deployment-root",
+  "private": true,
+  "description": "Lets Vercel detect the Next.js frontend in this monorepo. The app itself lives in frontend/.",
+  "dependencies": {
+    "next": "16.2.11"
+  }
+}
