@@ -87,6 +87,7 @@ public class TicketService {
     private final DynamicFieldValidator dynamicFieldValidator;
     private final com.ticketflow1.ticketing.ticketconfig.FieldAuthorizationService fieldAuthorization;
     private final NotificationService notificationService;
+    private final TicketEditLockService editLockService;
 
     @Autowired
     public TicketService(TicketRepository ticketRepository,
@@ -106,7 +107,7 @@ public class TicketService {
             SubtypeFieldDefinitionRepository fieldDefinitionRepository, SubtypeFieldOptionRepository fieldOptionRepository,
             TicketFieldValueRepository fieldValueRepository, DynamicFieldValidator dynamicFieldValidator,
             com.ticketflow1.ticketing.ticketconfig.FieldAuthorizationService fieldAuthorization,
-            NotificationService notificationService) {
+            NotificationService notificationService, TicketEditLockService editLockService) {
         this.ticketRepository = ticketRepository;
         this.ticketTypeRepository = ticketTypeRepository;
         this.workflowStateRepository = workflowStateRepository;
@@ -124,6 +125,7 @@ public class TicketService {
         this.subtypeRepository=subtypeRepository;this.routingRuleRepository=routingRuleRepository;this.fieldDefinitionRepository=fieldDefinitionRepository;
         this.fieldOptionRepository=fieldOptionRepository;this.fieldValueRepository=fieldValueRepository;this.dynamicFieldValidator=dynamicFieldValidator;this.fieldAuthorization=fieldAuthorization;
         this.notificationService = notificationService;
+        this.editLockService = editLockService;
     }
 
     public TicketService(TicketRepository a, TicketTypeRepository b, WorkflowStateRepository c, AppUserRepository d,
@@ -132,7 +134,7 @@ public class TicketService {
             DeveloperTeamRepository n, TicketSubtypeRepository o, SubtypeRoutingRuleRepository p,
             SubtypeFieldDefinitionRepository q, SubtypeFieldOptionRepository r, TicketFieldValueRepository s,
             DynamicFieldValidator t) {
-        this(a,b,c,d,e,f,g,h,i,j,k,l,m,n,o,p,q,r,s,t,null,null);
+        this(a,b,c,d,e,f,g,h,i,j,k,l,m,n,o,p,q,r,s,t,null,null,null);
     }
 
     /**
@@ -238,12 +240,36 @@ public class TicketService {
         return detail(ticket, principal);
     }
 
+    public Ticket findVisibleTicketForLock(String ticketKey, AuthPrincipal principal) {
+        return findVisibleTicket(ticketKey, principal);
+    }
+
+    @Transactional
+    public TicketEditLockService.Lock acquireEditLock(Ticket ticket, AuthPrincipal principal) {
+        if (!canEditTicket(ticket, principal)) {
+            throw ApiException.forbidden("You can edit this ticket only if you are its creator or have ticket edit permission.");
+        }
+        return editLockService.acquire(findVisibleTicket(ticket.getTicketKey(), principal), principal);
+    }
+
+    private boolean canEditTicket(Ticket ticket, AuthPrincipal principal) {
+        return principal.hasPermission("TICKET_UPDATE")
+                || principal.hasPermission("USER_MANAGE")
+                || ticket.getBusinessOwner().getId().equals(principal.userId());
+    }
+
+    @Transactional
+    public void releaseEditLock(String ticketKey, AuthPrincipal principal) {
+        editLockService.release(findVisibleTicket(ticketKey, principal), principal);
+    }
+
     /**
      * Applies editable ticket changes while enforcing field-specific rules.
      */
     @Transactional
     public TicketDetailResponse updateTicket(String ticketKey, UpdateTicketRequest request, AuthPrincipal principal) {
         Ticket ticket = findVisibleTicket(ticketKey, principal);
+        if (editLockService != null) editLockService.beforeMutation(ticket, principal);
         Set<Long> previousRecipients = notificationService == null ? Set.of() : notificationService.recipientIds(ticket);
         AppUser actor = appUserRepository.findById(principal.userId())
                 .orElseThrow(() -> ApiException.notFound("Current user no longer exists."));
@@ -251,14 +277,62 @@ public class TicketService {
         if (request.status() != null) {
             throw ApiException.validation("status must be changed via /transition.");
         }
-        boolean changesContent = request.title() != null || request.description() != null
-                || request.priority() != null || request.severity() != null || request.assignedTeam() != null
-                || request.teamIds() != null || request.dynamicValues() != null;
-        if (changesContent && !principal.hasPermission("TICKET_UPDATE")) {
-            throw ApiException.forbidden("TICKET_UPDATE permission is required.");
+        boolean fullEdit = principal.hasPermission("TICKET_UPDATE")
+                || principal.hasPermission("USER_MANAGE")
+                || ticket.getBusinessOwner().getId().equals(principal.userId());
+        boolean fullFieldRequested = request.priority() != null || request.severity() != null
+                || request.ticketTypeKey() != null
+                || request.subtypeId() != null
+                || request.assignedTeam() != null || request.teamIds() != null || request.dynamicValues() != null;
+        if (fullFieldRequested && !fullEdit) {
+            throw ApiException.forbidden("TICKET_UPDATE permission is required for full ticket edits.");
         }
 
         boolean changed = false;
+        boolean subtypeChanged = false;
+
+        TicketType targetType = ticket.getTicketType();
+        if (request.ticketTypeKey() != null) {
+            String key = request.ticketTypeKey().trim();
+            targetType = ticketTypeRepository.findByOrganizationIdAndKey(ticket.getOrganization().getId(), key)
+                    .filter(TicketType::isActive)
+                    .orElseThrow(() -> ApiException.validation("Ticket type is not active in this organization."));
+        }
+        TicketSubtype requestedSubtype = null;
+        if (request.subtypeId() != null) {
+            TicketType subtypeType = targetType;
+            requestedSubtype = subtypeRepository.findById(request.subtypeId())
+                    .filter(subtype -> subtype.isActive() && subtype.getTicketType().getId().equals(subtypeType.getId()))
+                    .orElseThrow(() -> ApiException.validation("subtypeId is not active for this ticket type."));
+        }
+
+        if (request.ticketTypeKey() != null) {
+            if (!fullEdit) throw ApiException.forbidden("Only the ticket creator or an administrator can change ticket type.");
+            if (!ticket.getCurrentState().isInitial()) {
+                throw ApiException.validation("Ticket type cannot be changed after the workflow has started.");
+            }
+            String key = request.ticketTypeKey().trim();
+            TicketType nextType = targetType;
+            if (!nextType.getId().equals(ticket.getTicketType().getId())) {
+                WorkflowState initial = workflowStateRepository.findByWorkflowIdAndInitialTrue(nextType.getWorkflow().getId())
+                        .orElseThrow(() -> ApiException.validation("The selected ticket type has no initial workflow state."));
+                auditService.record(ticket, actor.getId(), AuditAction.TICKET_UPDATED,
+                        "ticketType", ticket.getTicketType().getKey(), nextType.getKey());
+                ticket.setTicketType(nextType);
+                ticket.setCurrentState(initial);
+                subtypeChanged = ticket.getSubtype() != null;
+                ticket.setSubtype(null);
+                changed = true;
+            }
+        }
+
+        if (request.subtypeId() != null && (ticket.getSubtype() == null || !requestedSubtype.getId().equals(ticket.getSubtype().getId()))) {
+            auditService.record(ticket, actor.getId(), AuditAction.TICKET_UPDATED,
+                    "subtype", ticket.getSubtype() == null ? null : ticket.getSubtype().getKey(), requestedSubtype.getKey());
+            ticket.setSubtype(requestedSubtype);
+            subtypeChanged = true;
+            changed = true;
+        }
 
         if (request.title() != null) {
             String title = request.title().trim();
@@ -287,7 +361,7 @@ public class TicketService {
         }
 
         if (request.priority() != null) {
-            requireTicketflow1Party(principal, "priority");
+            if (!fullEdit) throw ApiException.forbidden("TICKET_UPDATE permission is required for priority.");
             if (ticket.getPriority() != request.priority()) {
                 auditService.record(ticket, actor.getId(), AuditAction.PRIORITY_CHANGED,
                         "priority", ticket.getPriority().name(), request.priority().name());
@@ -297,12 +371,9 @@ public class TicketService {
         }
 
         if (request.severity() != null) {
-            requireTicketflow1Party(principal, "severity");
+            if (!fullEdit) throw ApiException.forbidden("TICKET_UPDATE permission is required for severity.");
             if (ticket.getTicketType().getCapability() != com.ticketflow1.ticketing.workflow.TicketTypeCapability.DEFECT_SLA) {
                 throw ApiException.validation("severity is allowed only when type is DEFECT.");
-            }
-            if (!"ANALYSIS".equals(ticket.getCurrentState().getKey())) {
-                throw ApiException.validation("severity may be changed only while a Defect is in ANALYSIS.");
             }
             if (ticket.getSeverity() != request.severity()) {
                 auditService.record(ticket, actor.getId(), AuditAction.SEVERITY_CHANGED,
@@ -313,11 +384,17 @@ public class TicketService {
             }
         }
 
+        if (subtypeChanged) {
+            fieldValueRepository.deleteAll(fieldValueRepository.findByTicketId(ticket.getId()));
+        }
         if (request.dynamicValues() != null) {
+            if (!fullEdit) throw ApiException.forbidden("TICKET_UPDATE permission is required for subtype fields.");
             TicketSubtype subtype = ticket.getSubtype();
             if (subtype == null) throw ApiException.validation("dynamicValues requires a ticket subtype.");
             validateDynamicValuesForEdit(subtype, request.dynamicValues(), principal);
             persistDynamicValues(ticket, subtype, request.dynamicValues());
+            auditService.record(ticket, actor.getId(), AuditAction.TICKET_UPDATED,
+                    "dynamicFields", null, request.dynamicValues().keySet().stream().sorted().toList().toString());
             changed = true;
         }
 

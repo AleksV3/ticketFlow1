@@ -13,6 +13,7 @@ import com.ticketflow1.ticketing.sla.SlaStatusService;
 import com.ticketflow1.ticketing.ticket.Responsibility;
 import com.ticketflow1.ticketing.ticket.Ticket;
 import com.ticketflow1.ticketing.ticket.TicketRepository;
+import com.ticketflow1.ticketing.ticket.TicketEditLockService;
 import com.ticketflow1.ticketing.ticket.dto.TicketDetailResponse;
 import com.ticketflow1.ticketing.ticketconfig.TicketApproval;
 import com.ticketflow1.ticketing.ticketconfig.TicketApprovalRepository;
@@ -26,6 +27,7 @@ import com.ticketflow1.ticketing.user.AppUserRepository;
 import java.util.List;
 import java.time.Clock;
 import org.springframework.stereotype.Service;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
@@ -52,7 +54,9 @@ public class TicketTransitionService {
     private final Clock clock;
     private final TicketApprovalRepository ticketApprovalRepository;
     private final TicketDecisionRepository ticketDecisionRepository;
+    private final TicketEditLockService editLockService;
 
+    @Autowired
     public TicketTransitionService(TicketRepository ticketRepository,
             WorkflowStateRepository workflowStateRepository,
             WorkflowTransitionRepository workflowTransitionRepository,
@@ -64,7 +68,7 @@ public class TicketTransitionService {
             SlaStatusService slaStatusService,
             TicketApprovalRepository ticketApprovalRepository,
             TicketDecisionRepository ticketDecisionRepository,
-            Clock clock) {
+            Clock clock, TicketEditLockService editLockService) {
         this.ticketRepository = ticketRepository;
         this.workflowStateRepository = workflowStateRepository;
         this.workflowTransitionRepository = workflowTransitionRepository;
@@ -77,6 +81,20 @@ public class TicketTransitionService {
         this.ticketApprovalRepository = ticketApprovalRepository;
         this.ticketDecisionRepository = ticketDecisionRepository;
         this.clock = clock;
+        this.editLockService = editLockService;
+    }
+
+    public TicketTransitionService(TicketRepository ticketRepository,
+            WorkflowStateRepository workflowStateRepository,
+            WorkflowTransitionRepository workflowTransitionRepository,
+            AppUserRepository appUserRepository, AuditService auditService,
+            StatusHistoryService statusHistoryService, CommentService commentService,
+            ProposalDetailService proposalDetailService, SlaStatusService slaStatusService,
+            TicketApprovalRepository ticketApprovalRepository, TicketDecisionRepository ticketDecisionRepository,
+            Clock clock) {
+        this(ticketRepository, workflowStateRepository, workflowTransitionRepository, appUserRepository,
+                auditService, statusHistoryService, commentService, proposalDetailService, slaStatusService,
+                ticketApprovalRepository, ticketDecisionRepository, clock, null);
     }
 
     /**
@@ -86,6 +104,7 @@ public class TicketTransitionService {
     public TicketDetailResponse transition(String ticketKey, String toStateKey, String comment,
             AuthPrincipal principal) {
         Ticket ticket = findVisibleTicket(ticketKey, principal);
+        assertUnlocked(ticket, principal);
         Ticket saved = transitionToState(ticket, toStateKey, TransitionOperationKind.STANDARD, principal);
         if (comment != null && !comment.isBlank()) {
             commentService.createForTicket(saved, comment, CommentVisibility.PUBLIC, principal);
@@ -100,6 +119,7 @@ public class TicketTransitionService {
             throw ApiException.validation("A correction reason is required (maximum 10000 characters).");
         }
         Ticket ticket = findVisibleTicket(ticketKey, principal);
+        assertUnlocked(ticket, principal);
         AppUser actor = appUserRepository.findById(principal.userId())
                 .orElseThrow(() -> ApiException.notFound("Current user no longer exists."));
         Ticket saved = transitionOwned(ticket, TransitionOperationKind.CORRECTION_RETURN, principal);
@@ -119,6 +139,7 @@ public class TicketTransitionService {
             throw ApiException.validation("A rejection reason of at least 2 characters is required.");
         }
         Ticket ticket = findVisibleTicket(ticketKey, principal);
+        assertUnlocked(ticket, principal);
         if (operation == TransitionOperationKind.CLIENT_ACCEPT
                 || operation == TransitionOperationKind.CLIENT_REJECT) {
             Ticket saved = transitionOwned(ticket, operation, principal);
@@ -166,6 +187,10 @@ public class TicketTransitionService {
         }
         return TicketDetailResponse.from(saved, allowedTransitions(saved, principal),
                 proposalDetailService.detail(saved, principal), slaStatusService.status(saved));
+    }
+
+    private void assertUnlocked(Ticket ticket, AuthPrincipal principal) {
+        if (editLockService != null) editLockService.beforeMutation(ticket, principal);
     }
 
     /**

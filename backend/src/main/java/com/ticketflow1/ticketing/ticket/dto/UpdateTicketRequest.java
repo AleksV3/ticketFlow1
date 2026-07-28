@@ -15,9 +15,11 @@ public record UpdateTicketRequest(
         Set<Long> developerIds,
         String assignedTeam,
         Set<Long> teamIds,
-        Map<String,Object> dynamicValues) {
+        Map<String,Object> dynamicValues,
+        String ticketTypeKey,
+        Long subtypeId) {
     public UpdateTicketRequest(String status, String title, String description, Priority priority,
             Severity severity, Long ticketLeadId, Set<Long> developerIds, String assignedTeam, Set<Long> teamIds) {
-        this(status, title, description, priority, severity, ticketLeadId, developerIds, assignedTeam, teamIds, null);
+        this(status, title, description, priority, severity, ticketLeadId, developerIds, assignedTeam, teamIds, null, null, null);
     }
 }

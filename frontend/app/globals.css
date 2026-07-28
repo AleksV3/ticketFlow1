@@ -111,13 +111,17 @@ option { color: var(--off-white); background: var(--dark-slate); }
 .nav-link:hover { color: white; background: rgb(0 84 166 / 24%); }
 .nav-link-active { color: white; background: linear-gradient(135deg, rgb(0 112 230 / 80%), rgb(0 75 160 / 85%)); box-shadow: 0 3px 12px rgb(0 112 230 / 25%); }
 .notification-dot { display: inline-block; width: .5rem; height: .5rem; margin-left: .45rem; vertical-align: middle; border-radius: 999px; background: rgb(248 113 113); box-shadow: 0 0 0 2px rgb(127 29 29 / 55%), 0 0 10px rgb(239 68 68 / 85%); }
-.notification-toast { position: fixed; right: 1.25rem; bottom: 1.25rem; z-index: 80; width: min(360px, calc(100vw - 2rem)); border: 1px solid rgb(96 165 250 / 70%); border-left: 4px solid rgb(239 68 68); border-radius: .8rem; padding: 1rem 2.5rem 1rem 1rem; background: rgb(11 19 37 / 97%); color: var(--off-white); box-shadow: 0 14px 40px rgb(0 0 0 / 38%), 0 0 18px rgb(37 99 235 / 25%); animation: notification-toast-in .22s ease-out; }
+.notification-toast { position: fixed; right: 1.25rem; bottom: 1.25rem; z-index: 80; width: min(360px, calc(100vw - 2rem)); border: 1px solid rgb(96 165 250 / 70%); border-left: 4px solid rgb(239 68 68); border-radius: .8rem; padding: 1rem 2.5rem 1rem 1rem; background: rgb(11 19 37 / 97%); color: var(--off-white); box-shadow: 0 14px 40px rgb(0 0 0 / 38%), 0 0 18px rgb(37 99 235 / 25%); animation: notification-toast-in .22s ease-out, notification-toast-out 7s ease-in forwards; }
+.notification-stack { position: fixed; right: 1.25rem; bottom: 1.25rem; z-index: 80; display: flex; width: min(360px, calc(100vw - 2rem)); flex-direction: column-reverse; gap: .75rem; pointer-events: none; }
+.notification-stack .notification-toast { position: relative; right: auto; bottom: auto; width: 100%; pointer-events: auto; }
 .notification-toast strong { display: block; margin-top: .35rem; font-size: .9rem; }
 .notification-toast > p:last-child { margin-top: .35rem; color: var(--muted); font-size: .78rem; line-height: 1.4; }
 .notification-toast-close { position: absolute; top: .45rem; right: .65rem; color: var(--muted); font-size: 1.25rem; line-height: 1; }
 .notification-toast-clickable { cursor: pointer; }
+.lock-toast { border-left-color: rgb(245 158 11); }
 .notification-toast-clickable > a { display: block; color: inherit; text-decoration: none; }
 @keyframes notification-toast-in { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes notification-toast-out { 0%, 82% { opacity: 1; } 100% { opacity: 0; transform: translateY(8px); } }
 .eyebrow { color: rgb(72 166 255); font-size: .75rem; font-weight: 800; letter-spacing: .18em; text-transform: uppercase; }
 .auth-panel { width: 100%; max-width: 28rem; border: 1px solid var(--line); border-top: 3px solid var(--accent-blue); border-radius: 1rem; padding: 2rem; background: rgb(26 35 50 / 94%); box-shadow: 0 28px 70px rgb(0 0 0 / 34%); }
 
@@ -139,6 +143,19 @@ option { color: var(--off-white); background: var(--dark-slate); }
 .app-frame main .rounded-lg.border:not(.permission-option) { background: rgb(9 17 32 / 42%); }
 
 table { border-collapse: separate; border-spacing: 0; }
+/* Keep the ticket list dense enough to show all metadata without horizontal scrolling. */
+.app-frame table.min-w-\[1180px\] { min-width: 1280px !important; width: 100%; table-layout: auto; font-size: .68rem; }
+.app-frame table.min-w-\[1180px\] th, .app-frame table.min-w-\[1180px\] td { padding: .4rem .35rem !important; }
+.app-frame table.min-w-\[1180px\] th:nth-child(1), .app-frame table.min-w-\[1180px\] td:nth-child(1) { min-width: 150px; }
+.app-frame table.min-w-\[1180px\] th:nth-child(7), .app-frame table.min-w-\[1180px\] td:nth-child(7), .app-frame table.min-w-\[1180px\] th:nth-child(8), .app-frame table.min-w-\[1180px\] td:nth-child(8), .app-frame table.min-w-\[1180px\] th:nth-child(9), .app-frame table.min-w-\[1180px\] td:nth-child(9) { min-width: 145px; }
+.metadata-expander { position: relative; min-width: 0; }
+.metadata-expander summary { list-style: none; }
+.metadata-expander summary::-webkit-details-marker { display: none; }
+.metadata-expander-popover { position: absolute; z-index: 20; top: calc(100% + .25rem); right: 0; min-width: 12rem; max-width: 20rem; padding: .55rem; border: 1px solid rgb(96 165 250 / 65%); border-radius: .55rem; background: rgb(255 255 255 / 98%); box-shadow: 0 10px 24px rgb(15 23 42 / 22%); white-space: normal; }
+.metadata-expander-popover span { display: block; padding: .2rem .25rem; overflow-wrap: anywhere; }
+[data-theme="dark"] .metadata-expander-popover { color: var(--off-white); background: rgb(15 27 48 / 98%); }
+.app-frame main > div > div.mt-4.flex.justify-end { display: none; }
+[data-theme="dark"] .metadata-expander-popover { color: var(--off-white); background: rgb(15 27 48 / 98%); }
 thead th { border-bottom: 1px solid var(--line); color: rgb(139 183 235); font-size: .68rem; letter-spacing: .08em; text-transform: uppercase; }
 tbody td { color: rgb(219 229 243); }
 tbody tr:last-child td { border-bottom: 0; }
@@ -205,6 +222,16 @@ tbody tr:hover { background: rgb(0 84 166 / 10%); }
 [data-theme="light"] .text-slate-900, [data-theme="light"] .text-slate-800, [data-theme="light"] .text-slate-700 { color: rgb(20 32 48) !important; }
 [data-theme="light"] .text-slate-600, [data-theme="light"] .text-slate-500, [data-theme="light"] .text-slate-400 { color: rgb(71 85 105) !important; }
 [data-theme="light"] .app-frame main h1, [data-theme="light"] .app-frame main h2 { color: rgb(20 32 48) !important; text-shadow: none; }
+[data-theme="light"] .text-yellow-200, [data-theme="light"] .text-yellow-300, [data-theme="light"] .text-amber-200, [data-theme="light"] .text-amber-300 { color: rgb(161 98 7) !important; }
+[data-theme="light"] .react-flow-shell { background: linear-gradient(145deg, rgb(239 246 255), rgb(248 250 252)) !important; border-color: rgb(147 197 253) !important; }
+[data-theme="light"] .react-flow-shell .react-flow__node { color: rgb(20 32 48) !important; background: rgb(255 255 255 / 96%) !important; border-color: rgb(96 165 250) !important; box-shadow: 0 8px 20px rgb(30 64 175 / 12%); }
+[data-theme="light"] .react-flow-shell .flow-state-start { background: rgb(219 234 254) !important; }
+[data-theme="light"] .react-flow-shell .flow-state-end { background: rgb(220 252 231) !important; }
+[data-theme="light"] .react-flow-shell .process-current { background: rgb(254 243 199) !important; color: rgb(120 53 15) !important; border-color: rgb(217 119 6) !important; }
+[data-theme="light"] .react-flow-shell .react-flow__controls { border-color: rgb(148 163 184); box-shadow: 0 4px 12px rgb(15 23 42 / 12%); }
+[data-theme="light"] .react-flow-shell .react-flow__controls button { color: rgb(30 64 175); background: rgb(255 255 255 / 95%); border-color: rgb(203 213 225); }
+[data-theme="light"] .app-frame main details.card > summary { color: rgb(20 32 48) !important; }
+[data-theme="light"] .app-frame main details.card > summary:hover { color: rgb(29 78 216) !important; }
 [data-theme="light"] table, [data-theme="light"] thead, [data-theme="light"] tbody, [data-theme="light"] tbody td { color: rgb(51 65 85) !important; }
 [data-theme="light"] thead th { color: rgb(37 99 170) !important; }
 [data-theme="light"] tbody a { color: rgb(37 129 220) !important; }
@@ -328,8 +355,16 @@ tbody tr:hover { background: rgb(0 84 166 / 10%); }
 [data-theme="light"] tbody tr { transition: background-color .16s ease, box-shadow .16s ease; }
 [data-theme="light"] tbody tr:nth-child(even) { background: rgb(248 250 252 / 88%); }
 [data-theme="light"] tbody tr:hover { background: linear-gradient(90deg, rgb(191 219 254 / 95%), rgb(219 234 254 / 88%)) !important; box-shadow: inset 4px 0 0 rgb(37 99 235); }
+[data-theme="light"] .app-frame main aside.card { background: linear-gradient(145deg, rgb(255 255 255 / 98%), rgb(239 246 255 / 96%)) !important; border-color: rgb(96 165 250 / 60%) !important; box-shadow: 0 10px 28px rgb(30 64 175 / 10%); }
 [data-theme="light"] .app-frame main .rounded-lg.border:not(.permission-option) { background: rgb(248 250 252 / 96%) !important; color: rgb(20 32 48); }
 [data-theme="light"] .bg-slate-900\/60, [data-theme="light"] .bg-slate-900\/70, [data-theme="light"] .bg-slate-900\/40, [data-theme="light"] .bg-slate-950\/70, [data-theme="light"] .bg-blue-950\/30, [data-theme="light"] .bg-blue-950\/20 { background-color: rgb(248 250 252 / 96%) !important; }
+[data-theme="light"] .bg-slate-950\/30 { background: linear-gradient(145deg, rgb(219 234 254 / 78%), rgb(239 246 255 / 92%)) !important; }
+
+/* Give the user role-assignment picker the full content width. */
+@media (min-width: 768px) {
+  .app-frame section.card > .grid.max-w-3xl { max-width: none; grid-template-columns: minmax(280px, 1fr) minmax(0, 3fr); }
+  .app-frame section.card > .grid.max-w-3xl fieldset > div[role="listbox"] { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+}
 [data-theme="light"] .text-slate-300, [data-theme="light"] .text-slate-200 { color: rgb(51 65 85) !important; }
 [data-theme="light"] .dashboard-metric, [data-theme="light"] .dashboard-ticket-card { background: rgb(255 255 255 / 96%) !important; color: rgb(20 32 48) !important; border-color: rgb(148 163 184 / 55%); }
 [data-theme="light"] .dashboard-card-heading { background: rgb(241 245 249 / 95%) !important; }

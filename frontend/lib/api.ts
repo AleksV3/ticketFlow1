@@ -56,6 +56,7 @@ export async function api<T>(path: string, init: RequestInit = {}): Promise<T> {
         cache: "no-store"
       });
     } catch (error) {
+      if (typeof window !== "undefined") window.dispatchEvent(new CustomEvent("ticketflow:toast", { detail: { title: "Request failed", message: error instanceof Error ? error.message : `${method} ${path} could not be completed.` } }));
       recordDevLog("error", "api", `${method} ${path} network failure`, {
         apiBase: API_BASE,
         durationMs: elapsed(started),
@@ -82,6 +83,7 @@ export async function api<T>(path: string, init: RequestInit = {}): Promise<T> {
         requestId,
         durationMs: elapsed(started),
       });
+      if (typeof window !== "undefined") window.dispatchEvent(new CustomEvent("ticketflow:toast", { detail: { title: "Request failed", message: body.message ?? `Request failed with status ${response.status}.` } }));
       throw new ApiError(response.status, body.error ?? "HTTP_ERROR",
         body.message ?? `Request failed with status ${response.status}.`, body.fieldErrors ?? []);
     }

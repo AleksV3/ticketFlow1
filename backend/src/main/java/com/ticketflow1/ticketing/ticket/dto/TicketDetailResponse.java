@@ -59,7 +59,8 @@ public record TicketDetailResponse(
                 ticket.getTicketType().getKey(),
                 ticket.getCurrentState().getKey(),
                 ticket.getPriority().name(),
-                ticket.getSeverity() == null ? null : ticket.getSeverity().name(),
+                ticket.getTicketType().getCapability() == com.ticketflow1.ticketing.workflow.TicketTypeCapability.DEFECT_SLA
+                        && ticket.getSeverity() != null ? ticket.getSeverity().name() : null,
                 ticket.getTitle(),
                 ticket.getDescription(),
                 OrganizationRef.from(ticket.getOrganization()),

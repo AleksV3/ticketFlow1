@@ -155,6 +155,7 @@ public class Ticket extends Auditable {
     public TicketType getTicketType() {
         return ticketType;
     }
+    public void setTicketType(TicketType ticketType) { this.ticketType = ticketType; }
 
     public WorkflowState getCurrentState() {
         return currentState;

@@ -18,7 +18,7 @@ type RootLayoutProps = Readonly<{
 
 export default function RootLayout({ children }: RootLayoutProps) {
   return (
-    <html lang="en">
+    <html lang="en" suppressHydrationWarning>
       <body className={manrope.variable}><script dangerouslySetInnerHTML={{__html:`(function(){try{var p=localStorage.getItem('ticketflow1-theme')||'DARK';var t=p==='LIGHT'?'light':p==='SYSTEM'&&window.matchMedia('(prefers-color-scheme: light)').matches?'light':'dark';document.documentElement.dataset.theme=t;document.documentElement.style.colorScheme=t}catch(e){document.documentElement.dataset.theme='dark';document.documentElement.style.colorScheme='dark'}})()`}} />{children}<DevLogPanel /></body>
     </html>
   );
