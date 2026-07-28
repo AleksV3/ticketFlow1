@@ -193,6 +193,31 @@ class TicketServiceTest {
                 "severity", "SEV_1", "SEV_3");
     }
 
+    @Test
+    void updateTicket_rejectsTitleChangeByReadOnlyNonOwner() {
+        Organization organization = organization(7L, "Client A");
+        AppUser owner = appUser(11L, "owner@client-a.demo", "Owner", Responsibility.CLIENT, organization);
+        AppUser reader = appUser(12L, "reader@client-a.demo", "Reader", Responsibility.CLIENT, organization);
+        Workflow workflow = workflow(21L, "Request workflow");
+        TicketType type = ticketType(31L, "REQ", workflow, organization, false);
+        WorkflowState initial = workflowState(41L, workflow, "NEW", true);
+        Ticket ticket = new Ticket("TF-1003", type, initial, Priority.MEDIUM, null,
+                "Original title", "Description", organization, owner, Responsibility.CLIENT);
+        AuthPrincipal readOnlyPrincipal = new AuthPrincipal(reader.getId(), Responsibility.CLIENT,
+                organization.getId(), Set.of("TICKET_READ"));
+
+        when(ticketRepository.findByTicketKeyAndOrganizationId("TF-1003", organization.getId()))
+                .thenReturn(java.util.Optional.of(ticket));
+        when(appUserRepository.findById(reader.getId())).thenReturn(java.util.Optional.of(reader));
+
+        assertThatThrownBy(() -> ticketService.updateTicket("TF-1003",
+                new com.ticketflow1.ticketing.ticket.dto.UpdateTicketRequest(
+                        null, "Changed title", null, null, null, null, null, null, null),
+                readOnlyPrincipal))
+                .hasMessageContaining("ticket creator");
+        assertThat(ticket.getTitle()).isEqualTo("Original title");
+    }
+
     private static Organization organization(Long id, String name) {
         Organization organization = new Organization(name);
         ReflectionTestUtils.setField(organization, "id", id);

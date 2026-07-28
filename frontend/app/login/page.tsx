@@ -26,7 +26,7 @@ export default function LoginPage() {
     fetchCurrentUser()
       .then((currentUser) => {
         if (isActive && currentUser) {
-          router.replace("/dashboard");
+          router.replace(currentUser.passwordChangeRequired ? "/change-password" : "/dashboard");
         }
       })
       .catch(() => undefined);
@@ -57,9 +57,8 @@ export default function LoginPage() {
         throw new Error(payload.message ?? "Login failed.");
       }
 
-      await loginResponse.json() as LoginResponse;
-
-      router.replace("/dashboard");
+      const payload = await loginResponse.json() as LoginResponse;
+      router.replace(payload.passwordChangeRequired ? "/change-password" : "/dashboard");
     } catch (caughtError) {
       setError(
         caughtError instanceof Error ? caughtError.message : "Unexpected login error."

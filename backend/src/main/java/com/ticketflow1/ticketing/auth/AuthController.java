@@ -1,6 +1,7 @@
 package com.ticketflow1.ticketing.auth;
 
 import com.ticketflow1.ticketing.auth.dto.CurrentUserResponse;
+import com.ticketflow1.ticketing.auth.dto.ChangePasswordRequest;
 import com.ticketflow1.ticketing.auth.dto.CsrfTokenResponse;
 import com.ticketflow1.ticketing.auth.dto.LoginRequest;
 import com.ticketflow1.ticketing.auth.dto.LoginResponse;
@@ -38,6 +39,15 @@ public class AuthController {
         return ResponseEntity.noContent()
                 .header(HttpHeaders.SET_COOKIE, authService.clearLoginCookie().toString())
                 .build();
+    }
+
+    @PostMapping("/auth/change-password")
+    public ResponseEntity<LoginResponse> changePassword(@Valid @RequestBody ChangePasswordRequest request,
+            @AuthenticationPrincipal AuthPrincipal principal) {
+        var login = authService.changePassword(principal, request);
+        return ResponseEntity.ok()
+                .header(HttpHeaders.SET_COOKIE, login.cookie().toString())
+                .body(login.response());
     }
 
     @GetMapping("/auth/csrf")

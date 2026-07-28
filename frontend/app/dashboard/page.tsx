@@ -194,7 +194,7 @@ export function DashboardPreferencesEditor({
   const orderRef = useRef<string[]>([...DASHBOARD_WIDGETS]);
   const metricKeys = DASHBOARD_WIDGETS.filter(key => key.startsWith("METRIC_"));
   const widgetKeys = DASHBOARD_WIDGETS.filter(key => !key.startsWith("METRIC_"));
-  const catalog = tab === "metrics" ? metricKeys : widgetKeys;
+  const catalog: readonly string[] = tab === "metrics" ? metricKeys : widgetKeys;
   const activeItems = orderRef.current.filter(key => catalog.includes(key) && widgets.includes(key));
   const displayedItems = orderRef.current.filter(key => catalog.includes(key));
   function replaceActive(next: string[]) {

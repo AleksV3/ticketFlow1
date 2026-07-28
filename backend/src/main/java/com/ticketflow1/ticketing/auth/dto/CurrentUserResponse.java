@@ -11,5 +11,6 @@ public record CurrentUserResponse(
         Responsibility party,
         Long organizationId,
         String organizationName,
-        Set<String> permissions) {
+        Set<String> permissions,
+        boolean passwordChangeRequired) {
 }

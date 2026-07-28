@@ -36,17 +36,19 @@ class SecurityConfig {
     };
 
     private final JwtAuthFilter jwtAuthFilter;
+    private final PasswordChangeRequiredFilter passwordChangeRequiredFilter;
     private final RestAuthenticationEntryPoint authenticationEntryPoint;
     private final RestAccessDeniedHandler accessDeniedHandler;
     private final List<String> allowedOrigins;
     private final boolean secureCookies;
 
-    SecurityConfig(JwtAuthFilter jwtAuthFilter,
+    SecurityConfig(JwtAuthFilter jwtAuthFilter, PasswordChangeRequiredFilter passwordChangeRequiredFilter,
             RestAuthenticationEntryPoint authenticationEntryPoint,
             RestAccessDeniedHandler accessDeniedHandler,
             @Value("${app.cors.allowed-origins}") String allowedOrigins,
             @Value("${app.security.secure-cookies}") boolean secureCookies) {
         this.jwtAuthFilter = jwtAuthFilter;
+        this.passwordChangeRequiredFilter = passwordChangeRequiredFilter;
         this.authenticationEntryPoint = authenticationEntryPoint;
         this.accessDeniedHandler = accessDeniedHandler;
         this.secureCookies = secureCookies;
@@ -80,7 +82,8 @@ class SecurityConfig {
                 .accessDeniedHandler(accessDeniedHandler))
             // Our JWT filter runs before the username/password filter so the
             // SecurityContext is populated before authorization is checked.
-            .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class);
+            .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class)
+            .addFilterAfter(passwordChangeRequiredFilter, JwtAuthFilter.class);
         return http.build();
     }
 

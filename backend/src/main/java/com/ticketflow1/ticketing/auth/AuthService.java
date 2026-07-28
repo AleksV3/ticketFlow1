@@ -1,6 +1,7 @@
 package com.ticketflow1.ticketing.auth;
 
 import com.ticketflow1.ticketing.auth.dto.CurrentUserResponse;
+import com.ticketflow1.ticketing.auth.dto.ChangePasswordRequest;
 import com.ticketflow1.ticketing.auth.dto.LoginRequest;
 import com.ticketflow1.ticketing.auth.dto.LoginResponse;
 import com.ticketflow1.ticketing.common.ApiException;
@@ -51,7 +52,7 @@ public class AuthService {
                 user.getId(), user.getEmail(), user.getDisplayName(),
                 user.getRole().getName(), user.getParty(), orgId);
         return new LoginResult(
-                new LoginResponse(issued.expiresAt(), summary),
+                new LoginResponse(issued.expiresAt(), summary, user.isMustChangePassword()),
                 jwtService.buildAuthCookie(issued.token()));
     }
 
@@ -72,13 +73,34 @@ public class AuthService {
                 user.getRole().getName(), user.getParty(),
                 org == null ? null : org.getId(),
                 org == null ? null : org.getName(),
-                permissions);
+                permissions, user.isMustChangePassword());
         ResponseCookie refreshedCookie = null;
-        if (!permissions.equals(principal.permissions())) {
+        if (!permissions.equals(principal.permissions())
+                || principal.passwordChangeRequired() != user.isMustChangePassword()) {
             JwtService.IssuedToken issued = jwtService.issue(user);
             refreshedCookie = jwtService.buildAuthCookie(issued.token());
         }
         return new CurrentUserResult(response, refreshedCookie);
+    }
+
+    @Transactional
+    public LoginResult changePassword(AuthPrincipal principal, ChangePasswordRequest request) {
+        AppUser user = userRepository.findById(principal.userId())
+                .orElseThrow(() -> ApiException.notFound("Current user no longer exists."));
+        if (!passwordEncoder.matches(request.currentPassword(), user.getPasswordHash())) {
+            throw invalidCredentials();
+        }
+        if (passwordEncoder.matches(request.newPassword(), user.getPasswordHash())) {
+            throw ApiException.validation("Choose a new password that is different from the current password.");
+        }
+        user.changePassword(passwordEncoder.encode(request.newPassword()));
+        AppUser saved = userRepository.saveAndFlush(user);
+        JwtService.IssuedToken issued = jwtService.issue(saved);
+        Organization org = saved.getOrganization();
+        var summary = new LoginResponse.UserSummary(saved.getId(), saved.getEmail(), saved.getDisplayName(),
+                saved.getRole().getName(), saved.getParty(), org == null ? null : org.getId());
+        return new LoginResult(new LoginResponse(issued.expiresAt(), summary, false),
+                jwtService.buildAuthCookie(issued.token()));
     }
 
     private static ApiException invalidCredentials() {

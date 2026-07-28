@@ -5,6 +5,7 @@ export type LoginRequest = {
 
 export type LoginResponse = {
   expiresAt: string;
+  passwordChangeRequired: boolean;
   user: {
     id: number;
     email: string;
@@ -24,6 +25,7 @@ export type CurrentUser = {
   organizationId: number | null;
   organizationName: string | null;
   permissions: string[];
+  passwordChangeRequired: boolean;
 };
 
 export function getApiBaseUrl(): string {

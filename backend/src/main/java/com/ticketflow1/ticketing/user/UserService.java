@@ -89,6 +89,7 @@ public class UserService {
                 role.getParty(),
                 role,
                 org);
+        user.requirePasswordChange();
         // saveAndFlush so @CreationTimestamp is set before mapping the response.
         return UserResponse.from(userRepository.saveAndFlush(user));
     }

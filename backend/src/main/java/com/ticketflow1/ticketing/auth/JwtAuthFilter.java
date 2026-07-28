@@ -104,6 +104,8 @@ public class JwtAuthFilter extends OncePerRequestFilter {
                 : Arrays.stream(permissionsClaim.split(","))
                         .filter(permission -> !permission.isBlank())
                         .collect(Collectors.toSet());
-        return new AuthPrincipal(userId, party, organizationId, permissions);
+        Boolean passwordChangeRequired = claims.get("passwordChangeRequired", Boolean.class);
+        return new AuthPrincipal(userId, party, organizationId, permissions,
+                Boolean.TRUE.equals(passwordChangeRequired));
     }
 }

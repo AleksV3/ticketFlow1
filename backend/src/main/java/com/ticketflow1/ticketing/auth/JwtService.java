@@ -55,6 +55,7 @@ public class JwtService {
                 .claim("orgId", user.getOrganization() == null
                         ? null : user.getOrganization().getId().toString())
                 .claim("permissions", permissions)
+                .claim("passwordChangeRequired", user.isMustChangePassword())
                 .issuedAt(Date.from(now))
                 .expiration(Date.from(expiresAt))
                 .signWith(key)

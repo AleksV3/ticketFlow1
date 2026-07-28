@@ -280,12 +280,8 @@ public class TicketService {
         boolean fullEdit = principal.hasPermission("TICKET_UPDATE")
                 || principal.hasPermission("USER_MANAGE")
                 || ticket.getBusinessOwner().getId().equals(principal.userId());
-        boolean fullFieldRequested = request.priority() != null || request.severity() != null
-                || request.ticketTypeKey() != null
-                || request.subtypeId() != null
-                || request.assignedTeam() != null || request.teamIds() != null || request.dynamicValues() != null;
-        if (fullFieldRequested && !fullEdit) {
-            throw ApiException.forbidden("TICKET_UPDATE permission is required for full ticket edits.");
+        if (!fullEdit) {
+            throw ApiException.forbidden("Only the ticket creator or a user with ticket edit permission may edit this ticket.");
         }
 
         boolean changed = false;

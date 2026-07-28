@@ -13,7 +13,7 @@ import jakarta.validation.constraints.Size;
  */
 public record CreateUserRequest(
         @NotBlank @Email @Size(max = 255) String email,
-        @NotBlank @Size(min = 6, max = 100) String password,
+        @NotBlank @Size(min = 12, max = 100) String password,
         @NotBlank @Size(max = 200) String displayName,
         @NotNull Long roleId,
         // Required for CLIENT-party roles, forbidden otherwise — checked in UserService.

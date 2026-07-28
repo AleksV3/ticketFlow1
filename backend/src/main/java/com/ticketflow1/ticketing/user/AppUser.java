@@ -62,6 +62,9 @@ public class AppUser extends Auditable {
     @Column(nullable = false)
     private boolean active = true;
 
+    @Column(name = "must_change_password", nullable = false)
+    private boolean mustChangePassword;
+
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
@@ -127,6 +130,20 @@ public class AppUser extends Auditable {
 
     public boolean isActive() {
         return active;
+    }
+
+    public boolean isMustChangePassword() {
+        return mustChangePassword;
+    }
+
+    /** Administrator-created accounts start with a one-time password. */
+    public void requirePasswordChange() {
+        this.mustChangePassword = true;
+    }
+
+    public void changePassword(String passwordHash) {
+        this.passwordHash = passwordHash;
+        this.mustChangePassword = false;
     }
 
     public void setActive(boolean active) {

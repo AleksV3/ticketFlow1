@@ -9,7 +9,13 @@ import java.util.Set;
  * TicketFlow1-side users. Authorization checks test {@code permissions}
  * (and, where relevant, {@code party}) — never a role name.
  */
-public record AuthPrincipal(Long userId, Responsibility party, Long organizationId, Set<String> permissions) {
+public record AuthPrincipal(Long userId, Responsibility party, Long organizationId, Set<String> permissions,
+        boolean passwordChangeRequired) {
+
+    /** Backwards-compatible principal for tests and trusted server-side callers. */
+    public AuthPrincipal(Long userId, Responsibility party, Long organizationId, Set<String> permissions) {
+        this(userId, party, organizationId, permissions, false);
+    }
 
     public boolean hasPermission(String permissionKey) {
         return permissions.contains(permissionKey);
