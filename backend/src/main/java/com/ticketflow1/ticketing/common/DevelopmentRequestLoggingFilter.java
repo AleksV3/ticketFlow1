@@ -51,8 +51,6 @@ public class DevelopmentRequestLoggingFilter extends OncePerRequestFilter {
             long durationMs = (System.nanoTime() - started) / 1_000_000;
             String method = request.getMethod();
             String path = request.getRequestURI();
-            String query = request.getQueryString();
-            String fullPath = query == null ? path : path + "?" + query;
             int status = response.getStatus();
             String remote = request.getHeader("X-Forwarded-For");
             if (remote == null || remote.isBlank()) remote = request.getRemoteAddr();
@@ -60,13 +58,13 @@ public class DevelopmentRequestLoggingFilter extends OncePerRequestFilter {
 
             if (status >= 500) {
                 log.error("api_request_failed requestId={} method={} path={} status={} durationMs={} remote={} userAgent={}",
-                        requestId, method, fullPath, status, durationMs, remote, safe(userAgent));
+                        requestId, method, path, status, durationMs, remote, safe(userAgent));
             } else if (status >= 400 || durationMs >= slowRequestMs) {
                 log.warn("api_request_attention requestId={} method={} path={} status={} durationMs={} remote={} userAgent={}",
-                        requestId, method, fullPath, status, durationMs, remote, safe(userAgent));
+                        requestId, method, path, status, durationMs, remote, safe(userAgent));
             } else {
                 log.info("api_request requestId={} method={} path={} status={} durationMs={} remote={}",
-                        requestId, method, fullPath, status, durationMs, remote);
+                        requestId, method, path, status, durationMs, remote);
             }
             MDC.remove("requestId");
         }

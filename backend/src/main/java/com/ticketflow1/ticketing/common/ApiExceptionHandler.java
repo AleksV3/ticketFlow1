@@ -11,6 +11,7 @@ import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
+import org.springframework.web.servlet.resource.NoResourceFoundException;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
 
 /**
@@ -66,6 +67,14 @@ public class ApiExceptionHandler {
         return ResponseEntity.badRequest().body(ApiError.of(
                 HttpStatus.BAD_REQUEST.value(), "VALIDATION_FAILED", message,
                 request.getRequestURI()));
+    }
+
+    /** Disabled documentation/static paths must be a normal 404, never a 500. */
+    @ExceptionHandler(NoResourceFoundException.class)
+    public ResponseEntity<ApiError> handleMissingResource(NoResourceFoundException ex,
+            HttpServletRequest request) {
+        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(ApiError.of(
+                HttpStatus.NOT_FOUND.value(), "NOT_FOUND", "Resource not found.", request.getRequestURI()));
     }
 
     @ExceptionHandler(AuthorizationDeniedException.class)

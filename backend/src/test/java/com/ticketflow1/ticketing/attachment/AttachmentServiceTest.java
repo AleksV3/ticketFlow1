@@ -44,7 +44,8 @@ class AttachmentServiceTest {
     @BeforeEach
     void setUp() {
         attachmentService = new AttachmentService(attachmentRepository, ticketRepository,
-                appUserRepository, auditService, MAX_SIZE, "./target/test-attachments");
+                appUserRepository, auditService, MAX_SIZE, "./target/test-attachments",
+                "application/pdf,text/plain,text/csv,image/png,image/jpeg,image/gif,image/webp");
         principal = new AuthPrincipal(7L, Responsibility.CLIENT, 3L, Set.of("TICKET_UPDATE"));
         ticket = mock(Ticket.class);
     }

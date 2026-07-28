@@ -12,6 +12,8 @@ import com.ticketflow1.ticketing.ticket.TicketRepository;
 import com.ticketflow1.ticketing.user.AppUser;
 import com.ticketflow1.ticketing.user.AppUserRepository;
 import java.util.List;
+import java.util.Set;
+import java.util.Arrays;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -43,17 +45,21 @@ public class AttachmentService {
     private final AuditService auditService;
     private final long maxSizeBytes;
     private final Path storageRoot;
+    private final Set<String> allowedContentTypes;
 
     public AttachmentService(AttachmentRepository attachmentRepository, TicketRepository ticketRepository,
             AppUserRepository appUserRepository, AuditService auditService,
             @Value("${app.attachments.max-size-bytes:104857600}") long maxSizeBytes,
-            @Value("${app.attachments.storage-directory:./data/attachments}") String storageDirectory) {
+            @Value("${app.attachments.storage-directory:./data/attachments}") String storageDirectory,
+            @Value("${app.attachments.allowed-content-types}") String allowedContentTypes) {
         this.attachmentRepository = attachmentRepository;
         this.ticketRepository = ticketRepository;
         this.appUserRepository = appUserRepository;
         this.auditService = auditService;
         this.maxSizeBytes = maxSizeBytes;
         this.storageRoot = Path.of(storageDirectory).toAbsolutePath().normalize();
+        this.allowedContentTypes = Arrays.stream(allowedContentTypes.split(","))
+                .map(String::trim).map(String::toLowerCase).filter(value -> !value.isBlank()).collect(java.util.stream.Collectors.toUnmodifiableSet());
     }
 
     /**
@@ -68,7 +74,7 @@ public class AttachmentService {
         Ticket ticket = findVisibleTicket(ticketKey, principal);
         AppUser uploader = appUserRepository.findById(principal.userId()).orElseThrow(() -> ApiException.notFound("Current user no longer exists."));
         String fileName = Path.of(file.getOriginalFilename()).getFileName().toString();
-        String contentType = file.getContentType() == null || !file.getContentType().contains("/") ? "application/octet-stream" : file.getContentType();
+        String contentType = normalizeAndValidateContentType(file.getContentType());
         String storedName = UUID.randomUUID() + "-" + fileName.replaceAll("[^A-Za-z0-9._-]", "_");
         Path target = storageRoot.resolve(storedName).normalize();
         if (!target.startsWith(storageRoot)) throw ApiException.validation("Invalid file name.");
@@ -124,10 +130,11 @@ public class AttachmentService {
         }
         AppUser uploader = appUserRepository.findById(principal.userId())
                 .orElseThrow(() -> ApiException.notFound("Current user no longer exists."));
+        String contentType = normalizeAndValidateContentType(request.contentType());
         Attachment saved = attachmentRepository.saveAndFlush(new Attachment(ticket, uploader,
-                request.fileName().trim(), request.contentType().trim(), request.sizeBytes()));
+                request.fileName().trim(), contentType, request.sizeBytes()));
         auditService.record(ticket, uploader.getId(), AuditAction.ATTACHMENT_ADDED,
-                "attachment", request.contentType().trim(), saved.getId().toString());
+                "attachment", contentType, saved.getId().toString());
         return AttachmentResponse.from(saved);
     }
 
@@ -157,5 +164,21 @@ public class AttachmentService {
         }
         return ticketRepository.findByTicketKey(ticketKey)
                 .orElseThrow(() -> ApiException.notFound("Ticket not found: " + ticketKey));
+    }
+
+    private String normalizeAndValidateContentType(String value) {
+        if (value == null || value.isBlank()) {
+            throw ApiException.validation("A supported file content type is required.");
+        }
+        try {
+            MediaType parsed = MediaType.parseMediaType(value);
+            String normalized = parsed.getType().toLowerCase() + "/" + parsed.getSubtype().toLowerCase();
+            if (!allowedContentTypes.contains(normalized)) {
+                throw ApiException.validation("This file type is not allowed.");
+            }
+            return normalized;
+        } catch (org.springframework.http.InvalidMediaTypeException exception) {
+            throw ApiException.validation("This file type is not allowed.");
+        }
     }
 }
