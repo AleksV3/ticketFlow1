@@ -1407,7 +1407,7 @@ class TicketControllerIntegrationTest {
 
         mockMvc.perform(get("/api/preferences").cookie(clientA))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.dashboardWidgets.length()").value(6))
+                .andExpect(jsonPath("$.dashboardWidgets.length()").value(12))
                 .andExpect(jsonPath("$.version").value(0));
 
         String savedBody = """
@@ -1432,11 +1432,11 @@ class TicketControllerIntegrationTest {
                 .andExpect(jsonPath("$.dashboardWidgets.length()").value(2));
         mockMvc.perform(get("/api/preferences").cookie(approverA))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.dashboardWidgets.length()").value(6))
+                .andExpect(jsonPath("$.dashboardWidgets.length()").value(12))
                 .andExpect(jsonPath("$.version").value(0));
         mockMvc.perform(get("/api/preferences").cookie(clientB))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.dashboardWidgets.length()").value(6))
+                .andExpect(jsonPath("$.dashboardWidgets.length()").value(12))
                 .andExpect(jsonPath("$.version").value(0));
 
         String updatedBody = """
@@ -1495,14 +1495,14 @@ class TicketControllerIntegrationTest {
                 .andExpect(status().isConflict());
 
         mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders
-                        .delete("/api/preferences").with(csrf()).cookie(clientA))
+                .delete("/api/preferences").with(csrf()).cookie(clientA))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.dashboardWidgets.length()").value(6))
+                .andExpect(jsonPath("$.dashboardWidgets.length()").value(12))
                 .andExpect(jsonPath("$.version").value(0));
         mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders
-                        .delete("/api/preferences").with(csrf()).cookie(clientA))
+                .delete("/api/preferences").with(csrf()).cookie(clientA))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.dashboardWidgets.length()").value(6));
+                .andExpect(jsonPath("$.dashboardWidgets.length()").value(12));
         assertThat(jdbcTemplate.queryForObject(
                 "select count(*) from user_organization_preference where user_id=?",
                 Long.class, clientAUserId)).isZero();

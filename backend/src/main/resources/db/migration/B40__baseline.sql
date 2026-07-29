@@ -1020,6 +1020,63 @@ $$;
 
 SELECT clone_org_templates(id) FROM organization;
 
+-- Runtime fields supplied with the internal service-request templates.
+-- Keep these here (after cloning) so a fresh database has the same forms as
+-- an installation that ran the historical V22_1 migration.
+INSERT INTO subtype_field_definition (
+    subtype_id, key, label, help_text, field_kind, required, visibility,
+    sort_order, min_length, max_length
+)
+SELECT subtype.id, field.key, field.label, field.help_text, field.kind,
+       field.required, 'INTERNAL', field.sort_order, field.min_length,
+       field.max_length
+FROM organization org
+JOIN ticket_type type ON type.organization_id = org.id AND type.key = 'TASI'
+JOIN ticket_subtype subtype ON subtype.ticket_type_id = type.id
+JOIN (VALUES
+    ('FIREWALL','source_cidr','Source CIDR','Source network or host that needs access.','SHORT_TEXT',true,10,3,120),
+    ('FIREWALL','destination','Destination','Target host, service, or system.','SHORT_TEXT',true,20,3,120),
+    ('FIREWALL','service_ports','Service ports','Protocol and port list, for example TCP/443.','SHORT_TEXT',true,30,3,120),
+    ('FIREWALL','environment','Environment','Target environment.','SINGLE_SELECT',true,40,NULL,NULL),
+    ('FIREWALL','business_justification','Business justification','Why this access is needed.','LONG_TEXT',true,50,10,1000)
+) AS field(subtype_key, key, label, help_text, kind, required, sort_order, min_length, max_length)
+  ON field.subtype_key = subtype.key
+WHERE org.name = 'TicketFlow1 Internal'
+  AND NOT EXISTS (
+      SELECT 1 FROM subtype_field_definition existing
+      WHERE existing.subtype_id = subtype.id AND existing.key = field.key
+  );
+
+INSERT INTO subtype_field_option (field_definition_id, key, label, sort_order)
+SELECT field.id, option.key, option.label, option.sort_order
+FROM organization org
+JOIN ticket_type type ON type.organization_id = org.id AND type.key = 'TASI'
+JOIN ticket_subtype subtype ON subtype.ticket_type_id = type.id AND subtype.key = 'FIREWALL'
+JOIN subtype_field_definition field ON field.subtype_id = subtype.id AND field.key = 'environment'
+JOIN (VALUES ('PRODUCTION','Production',10), ('NON_PRODUCTION','Non-production',20))
+    AS option(key, label, sort_order) ON TRUE
+WHERE org.name = 'TicketFlow1 Internal'
+  AND NOT EXISTS (
+      SELECT 1 FROM subtype_field_option existing
+      WHERE existing.field_definition_id = field.id AND existing.key = option.key
+  );
+
+INSERT INTO subtype_field_definition (
+    subtype_id, key, label, help_text, field_kind, required, visibility,
+    sort_order, min_length, max_length
+)
+SELECT subtype.id, 'change_summary', 'Change summary',
+       'Describe what should change for the selected user.',
+       'LONG_TEXT', true, 'INTERNAL', 10, 10, 1000
+FROM organization org
+JOIN ticket_type type ON type.organization_id = org.id AND type.key = 'USR'
+JOIN ticket_subtype subtype ON subtype.ticket_type_id = type.id AND subtype.key = 'MODIFY'
+WHERE org.name = 'TicketFlow1 Internal'
+  AND NOT EXISTS (
+      SELECT 1 FROM subtype_field_definition existing
+      WHERE existing.subtype_id = subtype.id AND existing.key = 'change_summary'
+  );
+
 -- Source migration: V25__seed_public_test_scenario.sql
 -- Public test scenario for the internet-hosted app.
 --
