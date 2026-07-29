@@ -12,7 +12,7 @@ type Team={id:number;name:string;description:string|null;leader:Person;members:P
 type Options={people:Person[];tickets:TicketRef[]};
 type GroupField="status"|"type"|"severity"|"priority"|"responsibility";
 
-export default function TeamsPage(){return <AppShell require="TICKET_READ">{user=>user.organizationName==="TicketFlow1 Internal"?<Teams currentUserId={user.id} internal/>:<section className="card max-w-xl"><h1 className="text-xl font-bold">Teams are internal only</h1><p className="mt-2 text-slate-500">Teams and internal assignment are available only to TicketFlow1 Internal users.</p></section>}</AppShell>}
+export default function TeamsPage(){return <AppShell require="TICKET_READ">{user=>user.party==="TICKETFLOW1"?<Teams currentUserId={user.id} internal/>:<section className="card max-w-xl"><h1 className="text-xl font-bold">Teams are available to internal users</h1><p className="mt-2 text-slate-500">Your account does not have access to the internal Teams workspace.</p></section>}</AppShell>}
 function Teams({currentUserId,internal}:{currentUserId:number;internal:boolean}){
   const [teams,setTeams]=useState<Team[]>([]),[options,setOptions]=useState<Options>({people:[],tickets:[]}),[selectedId,setSelectedId]=useState<number|null>(null),[editingTeamId,setEditingTeamId]=useState<number|null>(null),[preference,setPreference]=useState<{dashboardWidgets:string[];enabledTicketFilters:string[];theme:string;version:number}|null>(null),[creating,setCreating]=useState(false),[error,setError]=useState("");
   const preferenceSaveQueue = useRef(Promise.resolve());
