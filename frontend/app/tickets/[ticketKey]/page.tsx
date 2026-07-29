@@ -20,7 +20,7 @@ type Audit = { id: number; actor: { id: number; displayName: string }; action: s
  * and transition actions, then switches into edit mode when the user has the
  * right permissions.
  */
-export default function TicketPage() { return <AppShell require="TICKET_READ">{user => <Detail currentUserId={user.id} canEdit={user.permissions.includes("TICKET_UPDATE")} canAssign={user.permissions.includes("TICKET_ASSIGN")} admin={user.permissions.includes("USER_MANAGE")} internal={user.party === "TICKETFLOW1"} />}</AppShell>; }
+export default function TicketPage() { return <AppShell require="TICKET_READ">{user => <Detail currentUserId={user.id} canEdit={user.permissions.includes("TICKET_UPDATE")} canAssign={user.party === "TICKETFLOW1" && user.permissions.includes("TICKET_ASSIGN")} admin={user.permissions.includes("USER_MANAGE")} internal={user.party === "TICKETFLOW1"} />}</AppShell>; }
 
 function Detail({ currentUserId, canEdit, canAssign, admin, internal }: { currentUserId: number; canEdit: boolean; canAssign: boolean; admin: boolean; internal: boolean }) {
   const { ticketKey } = useParams<{ ticketKey: string }>();

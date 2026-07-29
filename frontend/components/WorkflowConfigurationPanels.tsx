@@ -57,23 +57,25 @@ export function WorkflowConfigurationPanels({
   reload: () => Promise<void>;
   report: (message: string) => void;
 }) {
-  const [selectedTypeId, setSelectedTypeId] = useState<number | null>(types[0]?.id ?? null);
+  const scopedTypes = useMemo(() => types.filter(type => String(type.organizationId) === organizationId), [organizationId, types]);
+  const [selectedTypeId, setSelectedTypeId] = useState<number | null>(scopedTypes[0]?.id ?? null);
   useEffect(() => {
-    setSelectedTypeId(current => current && types.some(type => type.id === current) ? current : types[0]?.id ?? null);
-  }, [types]);
-  const selectedType = types.find(type => type.id === selectedTypeId) ?? null;
+    setSelectedTypeId(current => current && scopedTypes.some(type => type.id === current) ? current : scopedTypes[0]?.id ?? null);
+  }, [scopedTypes]);
+  const selectedType = scopedTypes.find(type => type.id === selectedTypeId) ?? null;
 
   return <section className="space-y-6">
     <TypeAdministration
       organizationId={organizationId}
       workflows={workflows}
-      types={types}
+      types={scopedTypes}
       selectedTypeId={selectedTypeId}
       selectType={setSelectedTypeId}
       reload={reload}
       report={report}
     />
     {selectedType ? <SubtypeAdministration
+      key={`${organizationId}-${selectedType.id}`}
       organizationId={organizationId}
       type={selectedType}
       reloadTypes={reload}
