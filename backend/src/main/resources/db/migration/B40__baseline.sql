@@ -28,6 +28,7 @@ CREATE TABLE role (
     party           VARCHAR(12)  NOT NULL CHECK (party IN ('CLIENT', 'TICKETFLOW1')),
     organization_id BIGINT,
     is_template     BOOLEAN      NOT NULL DEFAULT FALSE,
+    version         BIGINT       NOT NULL DEFAULT 0,
     updated_at      TIMESTAMPTZ  NOT NULL DEFAULT now(),
     updated_by_id   BIGINT,
     UNIQUE (organization_id, name)
@@ -62,6 +63,7 @@ CREATE TABLE app_user (
     role_id         BIGINT       NOT NULL REFERENCES role (id),
     organization_id BIGINT       REFERENCES organization (id),
     active          BOOLEAN      NOT NULL DEFAULT TRUE,
+    must_change_password BOOLEAN NOT NULL DEFAULT FALSE,
     created_at      TIMESTAMPTZ  NOT NULL DEFAULT now(),
     updated_at      TIMESTAMPTZ  NOT NULL DEFAULT now(),
     updated_by_id   BIGINT       REFERENCES app_user (id)
@@ -150,6 +152,8 @@ CREATE TABLE workflow (
     id              BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
     name            VARCHAR(100) NOT NULL,
     organization_id BIGINT REFERENCES organization (id),
+    canvas_layout   TEXT,
+    version         BIGINT       NOT NULL DEFAULT 0,
     updated_at      TIMESTAMPTZ  NOT NULL DEFAULT now(),
     updated_by_id   BIGINT REFERENCES app_user (id),
     UNIQUE (organization_id, name)
@@ -159,6 +163,7 @@ CREATE TABLE workflow_state (
     id            BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
     workflow_id   BIGINT       NOT NULL REFERENCES workflow (id) ON DELETE CASCADE,
     key           VARCHAR(40)  NOT NULL,
+    name          VARCHAR(100),
     is_initial    BOOLEAN      NOT NULL DEFAULT FALSE,
     is_terminal   BOOLEAN      NOT NULL DEFAULT FALSE,
     sort_order    INTEGER      NOT NULL,
@@ -179,6 +184,9 @@ CREATE TABLE workflow_transition (
     required_permission_id BIGINT       NOT NULL REFERENCES permission (id),
     required_party         VARCHAR(12)  CHECK (required_party IN ('CLIENT', 'TICKETFLOW1')),
     responsibility_after   VARCHAR(12)  CHECK (responsibility_after IN ('CLIENT', 'TICKETFLOW1')),
+    operation_kind         VARCHAR(24)  NOT NULL DEFAULT 'STANDARD'
+        CHECK (operation_kind IN ('STANDARD','PROPOSAL_CREATE','PROPOSAL_APPROVE','PROPOSAL_REJECT',
+                                 'WORKFLOW_APPROVE','WORKFLOW_REJECT','CORRECTION_RETURN','CLIENT_ACCEPT','CLIENT_REJECT')),
     updated_at             TIMESTAMPTZ  NOT NULL DEFAULT now(),
     updated_by_id          BIGINT       REFERENCES app_user (id),
     UNIQUE (workflow_id, from_state_id, to_state_id)
@@ -192,6 +200,11 @@ CREATE TABLE ticket_type (
     organization_id   BIGINT       REFERENCES organization (id),
     is_template       BOOLEAN      NOT NULL DEFAULT FALSE,
     requires_proposal BOOLEAN      NOT NULL DEFAULT FALSE,
+    active            BOOLEAN      NOT NULL DEFAULT TRUE,
+    sort_order        INTEGER      NOT NULL DEFAULT 0 CHECK (sort_order >= 0),
+    capability        VARCHAR(20)  NOT NULL DEFAULT 'STANDARD'
+        CHECK (capability IN ('STANDARD', 'DEFECT_SLA')),
+    version           BIGINT       NOT NULL DEFAULT 0,
     updated_at        TIMESTAMPTZ  NOT NULL DEFAULT now(),
     updated_by_id     BIGINT       REFERENCES app_user (id),
     UNIQUE (organization_id, key)
@@ -440,7 +453,9 @@ CREATE TABLE ticket (
     closed_at              TIMESTAMPTZ,
     response_due_at        TIMESTAMPTZ,
     first_info_due_at      TIMESTAMPTZ,
-    next_update_due_at     TIMESTAMPTZ
+    next_update_due_at     TIMESTAMPTZ,
+    responded_at           TIMESTAMPTZ,
+    first_info_at          TIMESTAMPTZ
 );
 
 CREATE INDEX idx_ticket_organization_id ON ticket (organization_id);
@@ -465,6 +480,10 @@ CREATE TABLE audit_log (
             'SEVERITY_CHANGED',
             'PRIORITY_CHANGED',
             'ATTACHMENT_ADDED',
+            'DYNAMIC_FIELDS_CAPTURED',
+            'CORRECTION_RETURN',
+            'WORKFLOW_APPROVED',
+            'WORKFLOW_REJECTED',
             'TICKET_UPDATED',
             'CONFIG_CHANGED'
         )
@@ -571,11 +590,7 @@ CREATE UNIQUE INDEX uq_change_proposal_one_pending_per_ticket
     ON change_proposal (ticket_id)
     WHERE status = 'PENDING';
 
--- Source migration: V6_1__protect_proposal_transitions.sql
-ALTER TABLE workflow_transition
-    ADD COLUMN operation_kind VARCHAR(20) NOT NULL DEFAULT 'STANDARD'
-    CHECK (operation_kind IN ('STANDARD', 'PROPOSAL_CREATE', 'PROPOSAL_APPROVE', 'PROPOSAL_REJECT'));
-
+-- Final operation-kind values for the original workflow transitions.
 UPDATE workflow_transition wt
 SET operation_kind = CASE
     WHEN fs.key = 'ANALYSIS' AND ts.key = 'PROPOSAL' THEN 'PROPOSAL_CREATE'
@@ -607,12 +622,6 @@ CREATE TRIGGER trg_workflow_transition_operation_kind
 BEFORE INSERT ON workflow_transition
 FOR EACH ROW EXECUTE FUNCTION assign_proposal_operation_kind();
 
--- Source migration: V7__add_defect_sla_events.sql
--- V7: completion events used to evaluate Defect SLA obligations at read time.
-ALTER TABLE ticket
-    ADD COLUMN responded_at TIMESTAMPTZ,
-    ADD COLUMN first_info_at TIMESTAMPTZ;
-
 -- Partial indexes keep the moving SLA queries focused on unfinished obligations.
 CREATE INDEX idx_ticket_sla_response_unmet
     ON ticket (response_due_at, organization_id)
@@ -626,9 +635,7 @@ CREATE INDEX idx_ticket_sla_next_update
     ON ticket (next_update_due_at, organization_id)
     WHERE next_update_due_at IS NOT NULL;
 
--- Source migration: V7_1__add_admin_hardening.sql
-ALTER TABLE workflow ADD COLUMN version BIGINT NOT NULL DEFAULT 0;
-
+-- Configuration auditing is part of the final schema.
 CREATE TABLE configuration_audit_log (
     id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
     organization_id BIGINT REFERENCES organization(id),
@@ -712,33 +719,9 @@ CREATE TABLE developer_team_member (
 CREATE TABLE developer_team_ticket (
     team_id BIGINT NOT NULL REFERENCES developer_team (id) ON DELETE CASCADE,
     ticket_id BIGINT NOT NULL REFERENCES ticket (id) ON DELETE CASCADE,
-    PRIMARY KEY (team_id, ticket_id)
+    sort_order INTEGER NOT NULL,
+    PRIMARY KEY (team_id, sort_order)
 );
-
--- Source migration: V14__add_team_ticket_order.sql
-ALTER TABLE developer_team_ticket
-    ADD COLUMN sort_order INTEGER;
-
-WITH ranked AS (
-    SELECT team_id, ticket_id,
-           ROW_NUMBER() OVER (PARTITION BY team_id ORDER BY ticket_id) - 1 AS position
-    FROM developer_team_ticket
-)
-UPDATE developer_team_ticket relation
-SET sort_order = ranked.position
-FROM ranked
-WHERE relation.team_id = ranked.team_id
-  AND relation.ticket_id = ranked.ticket_id;
-
-ALTER TABLE developer_team_ticket
-    ALTER COLUMN sort_order SET NOT NULL;
-
--- Source migration: V15__use_team_queue_position_key.sql
-ALTER TABLE developer_team_ticket
-    DROP CONSTRAINT developer_team_ticket_pkey;
-
-ALTER TABLE developer_team_ticket
-    ADD CONSTRAINT developer_team_ticket_pkey PRIMARY KEY (team_id, sort_order);
 
 -- Source migration: V16__create_subtype_forms.sql
 -- V16: bounded configurable subtype forms. Definitions are data in a fixed schema;
@@ -931,16 +914,7 @@ CREATE INDEX idx_ticket_client_acceptance_approver
 CREATE INDEX idx_ticket_target_user ON ticket (target_user_id);
 
 
--- Source migration: V19__add_type_availability_and_capability.sql
--- V19: type availability is data; capability remains a fixed code-owned set.
-
-ALTER TABLE ticket_type
-    ADD COLUMN active BOOLEAN NOT NULL DEFAULT TRUE,
-    ADD COLUMN sort_order INTEGER NOT NULL DEFAULT 0 CHECK (sort_order >= 0),
-    ADD COLUMN capability VARCHAR(20) NOT NULL DEFAULT 'STANDARD'
-        CHECK (capability IN ('STANDARD', 'DEFECT_SLA')),
-    ADD COLUMN version BIGINT NOT NULL DEFAULT 0;
-
+-- Final capability value for the legacy Defect template.
 UPDATE ticket_type SET capability = 'DEFECT_SLA' WHERE key = 'DEFECT';
 
 CREATE INDEX idx_ticket_type_org_active_order
@@ -948,18 +922,8 @@ CREATE INDEX idx_ticket_type_org_active_order
 CREATE INDEX idx_ticket_type_capability ON ticket_type (capability);
 
 
--- Source migration: V20__seed_service_request_workflows.sql
 -- Approved service-request workflow templates.  These are templates so the
 -- existing clone_org_templates function creates organization-owned copies.
-ALTER TABLE workflow_transition DROP CONSTRAINT IF EXISTS workflow_transition_operation_kind_check;
-ALTER TABLE workflow_transition ADD CONSTRAINT workflow_transition_operation_kind_check
-    CHECK (operation_kind IN ('STANDARD','PROPOSAL_CREATE','PROPOSAL_APPROVE','PROPOSAL_REJECT',
-                              'WORKFLOW_APPROVE','WORKFLOW_REJECT','CORRECTION_RETURN','CLIENT_ACCEPT','CLIENT_REJECT'));
-ALTER TABLE audit_log DROP CONSTRAINT IF EXISTS audit_log_action_check;
-ALTER TABLE audit_log ADD CONSTRAINT audit_log_action_check CHECK (action IN (
-    'TICKET_CREATED','STATUS_CHANGED','ASSIGNEE_CHANGED','COMMENT_ADDED','PROPOSAL_CREATED',
-    'PROPOSAL_APPROVED','PROPOSAL_REJECTED','SEVERITY_CHANGED','PRIORITY_CHANGED',
-    'ATTACHMENT_ADDED','DYNAMIC_FIELDS_CAPTURED','CORRECTION_RETURN','TICKET_UPDATED','CONFIG_CHANGED'));
 
 INSERT INTO workflow(name, organization_id)
 SELECT x.name, NULL FROM (VALUES ('TASI Workflow'),('USR Workflow'),('REQ Workflow')) x(name)
@@ -1596,9 +1560,6 @@ WHERE internal_org.name = 'TicketFlow1 Internal'
         AND existing.key = field.key
   );
 
--- Source migration: V24__add_workflow_canvas_layout.sql
-ALTER TABLE workflow ADD COLUMN canvas_layout TEXT;
-
 -- Source migration: V25__seed_public_test_scenario.sql
 -- Public test scenario for the internet-hosted app.
 --
@@ -1847,14 +1808,6 @@ WHERE COALESCE(ticket.resolved_approver_id, routing.approver_id) IS NOT NULL
    OR routing.team_id IS NOT NULL
 ON CONFLICT DO NOTHING;
 
-ALTER TABLE audit_log DROP CONSTRAINT IF EXISTS audit_log_action_check;
-ALTER TABLE audit_log ADD CONSTRAINT audit_log_action_check CHECK (action IN (
-    'TICKET_CREATED','STATUS_CHANGED','ASSIGNEE_CHANGED','COMMENT_ADDED','PROPOSAL_CREATED',
-    'PROPOSAL_APPROVED','PROPOSAL_REJECTED','SEVERITY_CHANGED','PRIORITY_CHANGED',
-    'ATTACHMENT_ADDED','DYNAMIC_FIELDS_CAPTURED','CORRECTION_RETURN',
-    'WORKFLOW_APPROVED','WORKFLOW_REJECTED','TICKET_UPDATED','CONFIG_CHANGED'
-));
-
 -- Source migration: V27__add_approve_all_tickets_permission.sql
 -- Feature 003 Phase 2: fixed, developer-owned global approval override.
 --
@@ -1875,11 +1828,6 @@ WHERE role.name = 'Admin'
   AND role.organization_id IS NULL
 ON CONFLICT DO NOTHING;
 
-
--- Source migration: V28__add_role_version.sql
--- Optimistic concurrency for authoritative role permission-set replacement.
-ALTER TABLE role
-    ADD COLUMN version BIGINT NOT NULL DEFAULT 0;
 
 
 -- Source migration: V29__restore_template_clone_metadata.sql
@@ -2019,13 +1967,9 @@ CREATE TABLE subtype_field_role_grant (
 CREATE INDEX idx_field_role_grant_field ON subtype_field_role_grant(field_id);
 CREATE INDEX idx_field_role_grant_role ON subtype_field_role_grant(role_id);
 
--- Source migration: V33__add_workflow_state_display_name.sql
-ALTER TABLE workflow_state ADD COLUMN name VARCHAR(100);
+-- Final display names for the initial workflow states.
 UPDATE workflow_state SET name = key WHERE name IS NULL;
 CREATE UNIQUE INDEX ux_workflow_state_workflow_name ON workflow_state (workflow_id, name);
-
--- Source migration: V34__allow_teamless_subtype_routing.sql
-ALTER TABLE subtype_routing_rule ALTER COLUMN team_id DROP NOT NULL;
 
 -- Source migration: V35__create_notifications.sql
 CREATE TABLE notification (
@@ -2035,6 +1979,7 @@ CREATE TABLE notification (
     event_type VARCHAR(60) NOT NULL,
     title VARCHAR(255) NOT NULL,
     message TEXT NOT NULL,
+    actor_id BIGINT REFERENCES app_user(id),
     read_at TIMESTAMPTZ,
     created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
@@ -2046,21 +1991,10 @@ CREATE INDEX idx_notification_recipient_unread ON notification(recipient_id) WHE
 CREATE TABLE ticket_follower (
     ticket_id BIGINT NOT NULL REFERENCES ticket(id) ON DELETE CASCADE,
     user_id BIGINT NOT NULL REFERENCES app_user(id) ON DELETE CASCADE,
+    muted BOOLEAN NOT NULL DEFAULT FALSE,
     created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
     PRIMARY KEY (ticket_id, user_id)
 );
-
--- Source migration: V37__add_notification_actor.sql
-ALTER TABLE notification ADD COLUMN actor_id BIGINT REFERENCES app_user(id);
-
--- Source migration: V38__allow_ticket_notification_opt_out.sql
-ALTER TABLE ticket_follower ADD COLUMN muted BOOLEAN NOT NULL DEFAULT FALSE;
-
--- Source migration: V39__require_initial_password_change.sql
--- Accounts created by an administrator begin with an administrator-provided
--- one-time password. Existing accounts keep their current login experience.
-ALTER TABLE app_user
-    ADD COLUMN must_change_password BOOLEAN NOT NULL DEFAULT FALSE;
 
 -- Source migration: V40__create_login_rate_limit.sql
 CREATE TABLE login_rate_limit (
@@ -2069,4 +2003,3 @@ CREATE TABLE login_rate_limit (
     failures INTEGER NOT NULL,
     updated_at TIMESTAMPTZ NOT NULL
 );
-
