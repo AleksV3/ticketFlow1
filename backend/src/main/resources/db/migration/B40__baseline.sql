@@ -307,122 +307,6 @@ FROM (
 ) AS tt(key, name, workflow_name, requires_proposal)
 JOIN workflow w ON w.name = tt.workflow_name;
 
-CREATE OR REPLACE FUNCTION clone_org_templates(target_org_id BIGINT)
-RETURNS VOID
-LANGUAGE plpgsql
-AS $$
-BEGIN
-    DROP TABLE IF EXISTS workflow_clone_map;
-    DROP TABLE IF EXISTS state_clone_map;
-
-    INSERT INTO role (name, party, organization_id, is_template)
-    SELECT r.name, r.party, target_org_id, FALSE
-    FROM role r
-    WHERE r.is_template = TRUE
-      AND r.party = 'CLIENT'
-      AND NOT EXISTS (
-          SELECT 1
-          FROM role existing
-          WHERE existing.organization_id = target_org_id
-            AND existing.name = r.name
-      );
-
-    INSERT INTO role_permission (role_id, permission_id)
-    SELECT cloned.id, rp.permission_id
-    FROM role template
-    JOIN role_permission rp ON rp.role_id = template.id
-    JOIN role cloned
-        ON cloned.organization_id = target_org_id
-       AND cloned.name = template.name
-       AND cloned.party = template.party
-    WHERE template.is_template = TRUE
-      AND template.party = 'CLIENT'
-    ON CONFLICT DO NOTHING;
-
-    CREATE TEMP TABLE workflow_clone_map (
-        template_id BIGINT PRIMARY KEY,
-        cloned_id   BIGINT NOT NULL
-    ) ON COMMIT DROP;
-
-    INSERT INTO workflow (name, organization_id)
-    SELECT w.name, target_org_id
-    FROM workflow w
-    WHERE w.organization_id IS NULL
-      AND NOT EXISTS (
-          SELECT 1
-          FROM workflow existing
-          WHERE existing.organization_id = target_org_id
-            AND existing.name = w.name
-      );
-
-    INSERT INTO workflow_clone_map (template_id, cloned_id)
-    SELECT template.id, cloned.id
-    FROM workflow template
-    JOIN workflow cloned
-        ON cloned.organization_id = target_org_id
-       AND cloned.name = template.name
-    WHERE template.organization_id IS NULL;
-
-    CREATE TEMP TABLE state_clone_map (
-        template_id BIGINT PRIMARY KEY,
-        cloned_id   BIGINT NOT NULL
-    ) ON COMMIT DROP;
-
-    INSERT INTO workflow_state (workflow_id, key, is_initial, is_terminal, sort_order)
-    SELECT map.cloned_id, ws.key, ws.is_initial, ws.is_terminal, ws.sort_order
-    FROM workflow_state ws
-    JOIN workflow_clone_map map ON map.template_id = ws.workflow_id
-    LEFT JOIN workflow_state existing
-        ON existing.workflow_id = map.cloned_id
-       AND existing.key = ws.key
-    WHERE existing.id IS NULL;
-
-    INSERT INTO state_clone_map (template_id, cloned_id)
-    SELECT template.id, cloned.id
-    FROM workflow_state template
-    JOIN workflow_clone_map map ON map.template_id = template.workflow_id
-    JOIN workflow_state cloned
-        ON cloned.workflow_id = map.cloned_id
-       AND cloned.key = template.key;
-
-    INSERT INTO workflow_transition (
-        workflow_id, from_state_id, to_state_id, required_permission_id, required_party, responsibility_after
-    )
-    SELECT map.cloned_id,
-           from_map.cloned_id,
-           to_map.cloned_id,
-           wt.required_permission_id,
-           wt.required_party,
-           wt.responsibility_after
-    FROM workflow_transition wt
-    JOIN workflow_clone_map map ON map.template_id = wt.workflow_id
-    JOIN state_clone_map from_map ON from_map.template_id = wt.from_state_id
-    JOIN state_clone_map to_map ON to_map.template_id = wt.to_state_id
-    LEFT JOIN workflow_transition existing
-        ON existing.workflow_id = map.cloned_id
-       AND existing.from_state_id = from_map.cloned_id
-       AND existing.to_state_id = to_map.cloned_id
-    WHERE existing.id IS NULL;
-
-    INSERT INTO ticket_type (key, name, workflow_id, organization_id, is_template, requires_proposal)
-    SELECT tt.key,
-           tt.name,
-           map.cloned_id,
-           target_org_id,
-           FALSE,
-           tt.requires_proposal
-    FROM ticket_type tt
-    JOIN workflow_clone_map map ON map.template_id = tt.workflow_id
-    LEFT JOIN ticket_type existing
-        ON existing.organization_id = target_org_id
-       AND existing.key = tt.key
-    WHERE tt.organization_id IS NULL
-      AND existing.id IS NULL;
-END;
-$$;
-
-SELECT clone_org_templates(id) FROM organization;
-
 -- Source migration: V3__create_ticket.sql
 -- V3: operational ticket core. ticket is mutable/audited; status_history and
 -- audit_log are append-only event tables and intentionally do not carry
@@ -676,29 +560,10 @@ CREATE TABLE ticket_developer (
     PRIMARY KEY (ticket_id, user_id)
 );
 
--- Source migration: V11__backfill_editable_organization_templates.sql
--- Ensure organizations created before template cloning was wired into the API
--- receive any missing starter configuration. clone_org_templates is
--- idempotent: existing roles, permissions, workflows and ticket types are
--- preserved, while missing copies are added. Organization-owned role copies
--- use is_template = FALSE so administrators can edit them normally.
-SELECT clone_org_templates(id)
-FROM organization;
-
--- Guard against older/manual data that may have incorrectly marked an
--- organization-owned role as a locked template.
-UPDATE role
-SET is_template = FALSE
-WHERE organization_id IS NOT NULL
-  AND is_template = TRUE;
-
 -- Source migration: V12__create_internal_organization.sql
 INSERT INTO organization (name)
 SELECT 'TicketFlow1 Internal'
 WHERE NOT EXISTS (SELECT 1 FROM organization WHERE lower(name) = lower('TicketFlow1 Internal'));
-
-SELECT clone_org_templates(id) FROM organization
-WHERE lower(name) = lower('TicketFlow1 Internal');
 
 -- Source migration: V13__create_developer_teams.sql
 CREATE TABLE developer_team (
@@ -976,337 +841,6 @@ JOIN (VALUES
 WHERE t.organization_id IS NULL
   AND NOT EXISTS (SELECT 1 FROM ticket_subtype e WHERE e.ticket_type_id=t.id AND e.key=s.key);
 
-SELECT clone_org_templates(id) FROM organization;
-
--- The legacy clone function predates protected operations/capabilities. Restore
--- those template attributes on each organization-owned copy after cloning.
-UPDATE ticket_type copy
-SET capability = template.capability
-FROM ticket_type template
-WHERE template.organization_id IS NULL
-  AND copy.organization_id IS NOT NULL
-  AND copy.key = template.key;
-
-UPDATE workflow_transition copy
-SET operation_kind = template.operation_kind
-FROM workflow_transition template
-JOIN workflow template_workflow ON template_workflow.id = template.workflow_id
-JOIN workflow copy_workflow ON copy_workflow.organization_id IS NOT NULL
-    AND copy_workflow.name = template_workflow.name
-JOIN workflow_state copy_from ON copy_from.workflow_id = copy_workflow.id
-    AND copy_from.key = (SELECT key FROM workflow_state WHERE id = template.from_state_id)
-JOIN workflow_state copy_to ON copy_to.workflow_id = copy_workflow.id
-    AND copy_to.key = (SELECT key FROM workflow_state WHERE id = template.to_state_id)
-WHERE template_workflow.organization_id IS NULL
-  AND copy.workflow_id = copy_workflow.id
-  AND copy.from_state_id = copy_from.id
-  AND copy.to_state_id = copy_to.id;
-
-INSERT INTO ticket_subtype(ticket_type_id,key,name,description,sort_order)
-SELECT t.id,s_template.key,s_template.name,s_template.description,s_template.sort_order
-FROM ticket_type t
-JOIN ticket_type template ON template.organization_id IS NULL AND template.key=t.key
-JOIN ticket_subtype s_template ON s_template.ticket_type_id=template.id
-WHERE t.organization_id IS NOT NULL
-  AND NOT EXISTS (SELECT 1 FROM ticket_subtype e WHERE e.ticket_type_id=t.id AND e.key=s_template.key);
-
--- Source migration: V21__backfill_service_request_subtypes.sql
--- Backfill service-request subtype choices and preserve the workflow metadata
--- for organizations that already ran V20 before subtype cloning was added.
-
-UPDATE ticket_type
-SET capability = 'DEFECT_SLA'
-WHERE organization_id IS NULL AND key = 'DFCT';
-
-INSERT INTO ticket_subtype(ticket_type_id, key, name, description, sort_order)
-SELECT t.id, s.key, s.name, s.description, s.sort_order
-FROM ticket_type t
-JOIN (VALUES
-    ('TASI','FIREWALL','Firewall','Firewall service action',10),
-    ('TASI','NETWORK','Network','Network service action',20),
-    ('TASI','APPLICATION','Application','Application service action',30),
-    ('TASI','HARDWARE','Hardware','Hardware service action',40),
-    ('USR','NEW','New user','Create a user',10),
-    ('USR','MODIFY','Modify user','Change an existing user',20),
-    ('USR','DELETE','Delete user','Remove an existing user',30)
-) s(type_key, key, name, description, sort_order) ON s.type_key = t.key
-WHERE t.organization_id IS NULL
-  AND NOT EXISTS (
-      SELECT 1 FROM ticket_subtype existing
-      WHERE existing.ticket_type_id = t.id AND existing.key = s.key
-  );
-
-ALTER FUNCTION clone_org_templates(BIGINT)
-    RENAME TO clone_org_templates_base;
-
-CREATE OR REPLACE FUNCTION clone_org_templates(target_org_id BIGINT)
-RETURNS VOID
-LANGUAGE plpgsql
-AS $$
-BEGIN
-    PERFORM clone_org_templates_base(target_org_id);
-
-    INSERT INTO ticket_subtype(ticket_type_id, key, name, description, sort_order)
-    SELECT org_type.id, template_subtype.key, template_subtype.name,
-           template_subtype.description, template_subtype.sort_order
-    FROM ticket_type org_type
-    JOIN ticket_type template_type
-      ON template_type.organization_id IS NULL
-     AND template_type.key = org_type.key
-    JOIN ticket_subtype template_subtype
-      ON template_subtype.ticket_type_id = template_type.id
-    WHERE org_type.organization_id = target_org_id
-      AND NOT EXISTS (
-          SELECT 1 FROM ticket_subtype existing
-          WHERE existing.ticket_type_id = org_type.id
-            AND existing.key = template_subtype.key
-      );
-
-    UPDATE ticket_type org_type
-    SET capability = template_type.capability
-    FROM ticket_type template_type
-    WHERE template_type.organization_id IS NULL
-      AND org_type.organization_id = target_org_id
-      AND org_type.key = template_type.key;
-
-    UPDATE workflow_transition org_transition
-    SET operation_kind = template_transition.operation_kind
-    FROM workflow_transition template_transition
-    JOIN workflow template_workflow ON template_workflow.id = template_transition.workflow_id
-    JOIN workflow org_workflow
-      ON org_workflow.organization_id = target_org_id
-     AND org_workflow.name = template_workflow.name
-    JOIN workflow_state template_from ON template_from.id = template_transition.from_state_id
-    JOIN workflow_state template_to ON template_to.id = template_transition.to_state_id
-    JOIN workflow_state org_from
-      ON org_from.workflow_id = org_workflow.id
-     AND org_from.key = template_from.key
-    JOIN workflow_state org_to
-      ON org_to.workflow_id = org_workflow.id
-     AND org_to.key = template_to.key
-    WHERE template_workflow.organization_id IS NULL
-      AND org_transition.workflow_id = org_workflow.id
-      AND org_transition.from_state_id = org_from.id
-      AND org_transition.to_state_id = org_to.id;
-END;
-$$;
-
-SELECT clone_org_templates(id) FROM organization;
-
--- Source migration: V22_1__normalize_internal_service_workflow_data.sql
--- Normalize ordered team tickets and ensure internal TASI/USR work uses the
--- TicketFlow1 Internal organization. This is intentionally idempotent so it
--- repairs demo/local databases that already received the first service-workflow
--- seed, while remaining harmless for production databases without demo tickets.
-
-WITH ranked AS (
-    SELECT team_id, ticket_id,
-           row_number() OVER (PARTITION BY team_id ORDER BY sort_order, ticket_id) - 1 AS new_sort_order
-    FROM developer_team_ticket
-)
-UPDATE developer_team_ticket target
-SET sort_order = ranked.new_sort_order
-FROM ranked
-WHERE target.team_id = ranked.team_id
-  AND target.ticket_id = ranked.ticket_id
-  AND target.sort_order <> ranked.new_sort_order;
-
--- Internal runtime-configured fields for TASI/FIREWALL.
-INSERT INTO subtype_field_definition (
-    subtype_id, key, label, help_text, field_kind, required, visibility,
-    sort_order, min_length, max_length
-)
-SELECT subtype.id, field.key, field.label, field.help_text, field.kind,
-       field.required, 'INTERNAL', field.sort_order, field.min_length,
-       field.max_length
-FROM organization org
-JOIN ticket_type type ON type.organization_id = org.id AND type.key = 'TASI'
-JOIN ticket_subtype subtype ON subtype.ticket_type_id = type.id
-JOIN (VALUES
-    ('FIREWALL','source_cidr','Source CIDR','Source network or host that needs access.','SHORT_TEXT',true,10,3,120),
-    ('FIREWALL','destination','Destination','Target host, service, or system.','SHORT_TEXT',true,20,3,120),
-    ('FIREWALL','service_ports','Service ports','Protocol and port list, for example TCP/443.','SHORT_TEXT',true,30,3,120),
-    ('FIREWALL','environment','Environment','Target environment.','SINGLE_SELECT',true,40,NULL,NULL),
-    ('FIREWALL','business_justification','Business justification','Why this access is needed.','LONG_TEXT',true,50,10,1000)
-) AS field(subtype_key, key, label, help_text, kind, required, sort_order, min_length, max_length)
-  ON field.subtype_key = subtype.key
-WHERE org.name = 'TicketFlow1 Internal'
-  AND NOT EXISTS (
-      SELECT 1 FROM subtype_field_definition existing
-      WHERE existing.subtype_id = subtype.id AND existing.key = field.key
-  );
-
-INSERT INTO subtype_field_option (field_definition_id, key, label, sort_order)
-SELECT field.id, option.key, option.label, option.sort_order
-FROM organization org
-JOIN ticket_type type ON type.organization_id = org.id AND type.key = 'TASI'
-JOIN ticket_subtype subtype ON subtype.ticket_type_id = type.id AND subtype.key = 'FIREWALL'
-JOIN subtype_field_definition field ON field.subtype_id = subtype.id AND field.key = 'environment'
-JOIN (VALUES
-    ('PRODUCTION','Production',10),
-    ('NON_PRODUCTION','Non-production',20)
-) AS option(key, label, sort_order) ON TRUE
-WHERE org.name = 'TicketFlow1 Internal'
-  AND NOT EXISTS (
-      SELECT 1 FROM subtype_field_option existing
-      WHERE existing.field_definition_id = field.id AND existing.key = option.key
-  );
-
--- Internal runtime-configured field for USR/MODIFY.
-INSERT INTO subtype_field_definition (
-    subtype_id, key, label, help_text, field_kind, required, visibility,
-    sort_order, min_length, max_length
-)
-SELECT subtype.id, 'change_summary', 'Change summary',
-       'Describe what should change for the selected user.',
-       'LONG_TEXT', true, 'INTERNAL', 10, 10, 1000
-FROM organization org
-JOIN ticket_type type ON type.organization_id = org.id AND type.key = 'USR'
-JOIN ticket_subtype subtype ON subtype.ticket_type_id = type.id AND subtype.key = 'MODIFY'
-WHERE org.name = 'TicketFlow1 Internal'
-  AND NOT EXISTS (
-      SELECT 1 FROM subtype_field_definition existing
-      WHERE existing.subtype_id = subtype.id AND existing.key = 'change_summary'
-  );
-
--- Internal automatic routing examples for TASI/FIREWALL and USR/MODIFY.
-INSERT INTO subtype_routing_rule (
-    subtype_id, organization_id, team_id, primary_developer_id,
-    fallback_developer_id, approver_id, active
-)
-SELECT subtype.id, org.id, team.id, agent.id, manager.id, manager.id, true
-FROM organization org
-JOIN ticket_type type ON type.organization_id = org.id AND type.key = 'TASI'
-JOIN ticket_subtype subtype ON subtype.ticket_type_id = type.id AND subtype.key = 'FIREWALL'
-JOIN developer_team team ON team.name = 'Service Workflow Demo Team'
-JOIN app_user agent ON agent.email = 'agent@ticketflow1.demo'
-JOIN app_user manager ON manager.email = 'manager@ticketflow1.demo'
-WHERE org.name = 'TicketFlow1 Internal'
-  AND NOT EXISTS (
-      SELECT 1 FROM subtype_routing_rule existing
-      WHERE existing.subtype_id = subtype.id
-        AND existing.organization_id = org.id
-        AND existing.active
-  );
-
-INSERT INTO subtype_routing_rule (
-    subtype_id, organization_id, team_id, primary_developer_id,
-    fallback_developer_id, approver_id, active
-)
-SELECT subtype.id, org.id, team.id, agent.id, manager.id, manager.id, true
-FROM organization org
-JOIN ticket_type type ON type.organization_id = org.id AND type.key = 'USR'
-JOIN ticket_subtype subtype ON subtype.ticket_type_id = type.id AND subtype.key = 'MODIFY'
-JOIN developer_team team ON team.name = 'Service Workflow Demo Team'
-JOIN app_user agent ON agent.email = 'agent@ticketflow1.demo'
-JOIN app_user manager ON manager.email = 'manager@ticketflow1.demo'
-WHERE org.name = 'TicketFlow1 Internal'
-  AND NOT EXISTS (
-      SELECT 1 FROM subtype_routing_rule existing
-      WHERE existing.subtype_id = subtype.id
-        AND existing.organization_id = org.id
-        AND existing.active
-  );
-
--- Move existing demo internal workflow tickets from the Alpine clone to the
--- internal clone. Parent links remain cross-organization-safe.
-UPDATE ticket ticket_row
-SET organization_id = org.id,
-    business_owner_id = admin.id,
-    ticket_type_id = type.id,
-    current_state_id = state.id,
-    subtype_id = subtype.id,
-    routing_rule_id = routing.id,
-    resolved_approver_id = manager.id,
-    ticket_lead_id = agent.id,
-    assigned_team = team.name
-FROM organization org
-JOIN ticket_type type ON type.organization_id = org.id AND type.key = 'TASI'
-JOIN workflow_state state ON state.workflow_id = type.workflow_id AND state.key = 'PENDING_APPROVAL'
-JOIN ticket_subtype subtype ON subtype.ticket_type_id = type.id AND subtype.key = 'FIREWALL'
-JOIN subtype_routing_rule routing ON routing.subtype_id = subtype.id
-    AND routing.organization_id = org.id AND routing.active
-JOIN developer_team team ON team.id = routing.team_id
-JOIN app_user admin ON admin.email = 'admin@ticketflow1.demo'
-JOIN app_user agent ON agent.email = 'agent@ticketflow1.demo'
-JOIN app_user manager ON manager.email = 'manager@ticketflow1.demo'
-WHERE org.name = 'TicketFlow1 Internal'
-  AND ticket_row.ticket_key = 'TF-2100';
-
-UPDATE ticket ticket_row
-SET organization_id = org.id,
-    business_owner_id = admin.id,
-    ticket_type_id = type.id,
-    current_state_id = state.id,
-    subtype_id = subtype.id,
-    ticket_lead_id = agent.id,
-    assigned_team = 'Service Workflow Demo Team'
-FROM organization org
-JOIN ticket_type type ON type.organization_id = org.id AND type.key = 'TASI'
-JOIN workflow_state state ON state.workflow_id = type.workflow_id AND state.key = 'ANALYSIS'
-JOIN ticket_subtype subtype ON subtype.ticket_type_id = type.id AND subtype.key = 'NETWORK'
-JOIN app_user admin ON admin.email = 'admin@ticketflow1.demo'
-JOIN app_user agent ON agent.email = 'agent@ticketflow1.demo'
-WHERE org.name = 'TicketFlow1 Internal'
-  AND ticket_row.ticket_key = 'TF-2101';
-
-UPDATE ticket ticket_row
-SET organization_id = org.id,
-    business_owner_id = admin.id,
-    ticket_type_id = type.id,
-    current_state_id = state.id,
-    subtype_id = subtype.id,
-    routing_rule_id = routing.id,
-    resolved_approver_id = manager.id,
-    ticket_lead_id = agent.id,
-    assigned_team = team.name
-FROM organization org
-JOIN ticket_type type ON type.organization_id = org.id AND type.key = 'USR'
-JOIN workflow_state state ON state.workflow_id = type.workflow_id AND state.key = 'ANALYSIS'
-JOIN ticket_subtype subtype ON subtype.ticket_type_id = type.id AND subtype.key = 'MODIFY'
-JOIN subtype_routing_rule routing ON routing.subtype_id = subtype.id
-    AND routing.organization_id = org.id AND routing.active
-JOIN developer_team team ON team.id = routing.team_id
-JOIN app_user admin ON admin.email = 'admin@ticketflow1.demo'
-JOIN app_user agent ON agent.email = 'agent@ticketflow1.demo'
-JOIN app_user manager ON manager.email = 'manager@ticketflow1.demo'
-WHERE org.name = 'TicketFlow1 Internal'
-  AND ticket_row.ticket_key = 'TF-2103';
-
-DELETE FROM ticket_field_value
-WHERE ticket_id IN (
-    SELECT id FROM ticket WHERE ticket_key IN ('TF-2100', 'TF-2103')
-);
-
-INSERT INTO ticket_field_value (ticket_id, field_definition_id, text_value)
-SELECT ticket.id, field.id, value.text_value
-FROM ticket
-JOIN subtype_field_definition field ON field.subtype_id = ticket.subtype_id
-JOIN (VALUES
-    ('source_cidr','10.20.0.0/24'),
-    ('destination','payroll.internal'),
-    ('service_ports','TCP/443'),
-    ('business_justification','Payroll integration must reach the internal API before month-end close.')
-) AS value(field_key, text_value) ON value.field_key = field.key
-WHERE ticket.ticket_key = 'TF-2100';
-
-INSERT INTO ticket_field_value (ticket_id, field_definition_id, selected_option_id)
-SELECT ticket.id, field.id, option.id
-FROM ticket
-JOIN subtype_field_definition field ON field.subtype_id = ticket.subtype_id
-    AND field.key = 'environment'
-JOIN subtype_field_option option ON option.field_definition_id = field.id
-    AND option.key = 'PRODUCTION'
-WHERE ticket.ticket_key = 'TF-2100';
-
-INSERT INTO ticket_field_value (ticket_id, field_definition_id, text_value)
-SELECT ticket.id, field.id,
-       'Add reporting dashboard access and remove obsolete staging access.'
-FROM ticket
-JOIN subtype_field_definition field ON field.subtype_id = ticket.subtype_id
-    AND field.key = 'change_summary'
-WHERE ticket.ticket_key = 'TF-2103';
-
 -- Source migration: V22_2__harden_template_workflow_cloning.sql
 -- Harden template cloning against stale/partial data where duplicate template
 -- workflows exist with organization_id NULL. PostgreSQL unique constraints do
@@ -1436,130 +970,55 @@ BEGIN
     WHERE tt.organization_id IS NULL
       AND existing.id IS NULL
     ON CONFLICT DO NOTHING;
+
+    UPDATE ticket_type org_type
+    SET active = template_type.active,
+        sort_order = template_type.sort_order,
+        capability = template_type.capability
+    FROM ticket_type template_type
+    WHERE template_type.organization_id IS NULL
+      AND org_type.organization_id = target_org_id
+      AND org_type.key = template_type.key;
+
+    INSERT INTO ticket_subtype (ticket_type_id, key, name, description, active, sort_order)
+    SELECT org_type.id, template_subtype.key, template_subtype.name,
+           template_subtype.description, template_subtype.active, template_subtype.sort_order
+    FROM ticket_type org_type
+    JOIN ticket_type template_type
+      ON template_type.organization_id IS NULL
+     AND template_type.key = org_type.key
+    JOIN ticket_subtype template_subtype
+      ON template_subtype.ticket_type_id = template_type.id
+    WHERE org_type.organization_id = target_org_id
+      AND NOT EXISTS (
+          SELECT 1 FROM ticket_subtype existing
+          WHERE existing.ticket_type_id = org_type.id
+            AND existing.key = template_subtype.key
+      );
+
+    UPDATE workflow_transition org_transition
+    SET operation_kind = template_transition.operation_kind
+    FROM workflow_transition template_transition
+    JOIN workflow template_workflow ON template_workflow.id = template_transition.workflow_id
+    JOIN workflow org_workflow
+      ON org_workflow.organization_id = target_org_id
+     AND org_workflow.name = template_workflow.name
+    JOIN workflow_state template_from ON template_from.id = template_transition.from_state_id
+    JOIN workflow_state template_to ON template_to.id = template_transition.to_state_id
+    JOIN workflow_state org_from
+      ON org_from.workflow_id = org_workflow.id
+     AND org_from.key = template_from.key
+    JOIN workflow_state org_to
+      ON org_to.workflow_id = org_workflow.id
+     AND org_to.key = template_to.key
+    WHERE template_workflow.organization_id IS NULL
+      AND org_transition.workflow_id = org_workflow.id
+      AND org_transition.from_state_id = org_from.id
+      AND org_transition.to_state_id = org_to.id;
 END;
 $$;
 
 SELECT clone_org_templates(id) FROM organization;
-
--- Source migration: V23__copy_template_subtype_config_to_internal.sql
--- Previous versions of the workflow admin page edited organization_id NULL
--- template ticket types when "TicketFlow1 Internal" was selected. Runtime
--- ticket creation uses the real TicketFlow1 Internal organization clone, so
--- subtype form fields and routing saved on the template were invisible. Copy
--- any template-side subtype configuration into the internal organization clone.
-
-INSERT INTO ticket_subtype (ticket_type_id, key, name, description, active, sort_order)
-SELECT internal_type.id, template_subtype.key, template_subtype.name,
-       template_subtype.description, template_subtype.active, template_subtype.sort_order
-FROM organization internal_org
-JOIN ticket_type internal_type ON internal_type.organization_id = internal_org.id
-JOIN ticket_type template_type ON template_type.organization_id IS NULL
-    AND template_type.key = internal_type.key
-JOIN ticket_subtype template_subtype ON template_subtype.ticket_type_id = template_type.id
-WHERE internal_org.name = 'TicketFlow1 Internal'
-  AND NOT EXISTS (
-      SELECT 1 FROM ticket_subtype existing
-      WHERE existing.ticket_type_id = internal_type.id
-        AND existing.key = template_subtype.key
-  );
-
-INSERT INTO subtype_field_definition (
-    subtype_id, key, label, help_text, field_kind, required, visibility,
-    active, sort_order, min_length, max_length, min_number, max_number
-)
-SELECT internal_subtype.id, template_field.key, template_field.label,
-       template_field.help_text, template_field.field_kind, template_field.required,
-       template_field.visibility, template_field.active, template_field.sort_order,
-       template_field.min_length, template_field.max_length,
-       template_field.min_number, template_field.max_number
-FROM organization internal_org
-JOIN ticket_type internal_type ON internal_type.organization_id = internal_org.id
-JOIN ticket_type template_type ON template_type.organization_id IS NULL
-    AND template_type.key = internal_type.key
-JOIN ticket_subtype template_subtype ON template_subtype.ticket_type_id = template_type.id
-JOIN ticket_subtype internal_subtype ON internal_subtype.ticket_type_id = internal_type.id
-    AND internal_subtype.key = template_subtype.key
-JOIN subtype_field_definition template_field ON template_field.subtype_id = template_subtype.id
-WHERE internal_org.name = 'TicketFlow1 Internal'
-  AND NOT EXISTS (
-      SELECT 1 FROM subtype_field_definition existing
-      WHERE existing.subtype_id = internal_subtype.id
-        AND existing.key = template_field.key
-  );
-
-INSERT INTO subtype_field_option (
-    field_definition_id, key, label, active, sort_order
-)
-SELECT internal_field.id, template_option.key, template_option.label,
-       template_option.active, template_option.sort_order
-FROM organization internal_org
-JOIN ticket_type internal_type ON internal_type.organization_id = internal_org.id
-JOIN ticket_type template_type ON template_type.organization_id IS NULL
-    AND template_type.key = internal_type.key
-JOIN ticket_subtype template_subtype ON template_subtype.ticket_type_id = template_type.id
-JOIN ticket_subtype internal_subtype ON internal_subtype.ticket_type_id = internal_type.id
-    AND internal_subtype.key = template_subtype.key
-JOIN subtype_field_definition template_field ON template_field.subtype_id = template_subtype.id
-JOIN subtype_field_definition internal_field ON internal_field.subtype_id = internal_subtype.id
-    AND internal_field.key = template_field.key
-JOIN subtype_field_option template_option ON template_option.field_definition_id = template_field.id
-WHERE internal_org.name = 'TicketFlow1 Internal'
-  AND NOT EXISTS (
-      SELECT 1 FROM subtype_field_option existing
-      WHERE existing.field_definition_id = internal_field.id
-        AND existing.key = template_option.key
-  );
-
-INSERT INTO subtype_routing_rule (
-    subtype_id, organization_id, team_id, primary_developer_id,
-    fallback_developer_id, approver_id, active
-)
-SELECT internal_subtype.id, internal_org.id, template_routing.team_id,
-       template_routing.primary_developer_id, template_routing.fallback_developer_id,
-       template_routing.approver_id, template_routing.active
-FROM organization internal_org
-JOIN ticket_type internal_type ON internal_type.organization_id = internal_org.id
-JOIN ticket_type template_type ON template_type.organization_id IS NULL
-    AND template_type.key = internal_type.key
-JOIN ticket_subtype template_subtype ON template_subtype.ticket_type_id = template_type.id
-JOIN ticket_subtype internal_subtype ON internal_subtype.ticket_type_id = internal_type.id
-    AND internal_subtype.key = template_subtype.key
-JOIN subtype_routing_rule template_routing ON template_routing.subtype_id = template_subtype.id
-    AND template_routing.organization_id IS NULL
-WHERE internal_org.name = 'TicketFlow1 Internal'
-  AND template_routing.active
-  AND NOT EXISTS (
-      SELECT 1 FROM subtype_routing_rule existing
-      WHERE existing.subtype_id = internal_subtype.id
-        AND existing.organization_id = internal_org.id
-        AND existing.active
-  );
-
--- NETWORK existed as a starter subtype, but had no starter dynamic form.
--- These fields are ordinary editable dynamic fields, seeded only when missing.
-INSERT INTO subtype_field_definition (
-    subtype_id, key, label, help_text, field_kind, required, visibility,
-    sort_order, min_length, max_length
-)
-SELECT subtype.id, field.key, field.label, field.help_text, field.kind,
-       field.required, 'INTERNAL', field.sort_order, field.min_length,
-       field.max_length
-FROM organization internal_org
-JOIN ticket_type type ON type.organization_id = internal_org.id AND type.key = 'TASI'
-JOIN ticket_subtype subtype ON subtype.ticket_type_id = type.id AND subtype.key = 'NETWORK'
-JOIN (VALUES
-    ('network_area','Network area','VLAN, subnet, site, device, or network segment affected by this task.','SHORT_TEXT',true,10,2,120),
-    ('requested_change','Requested change','Describe the network change or investigation needed.','LONG_TEXT',true,20,10,1000),
-    ('affected_service','Affected service','Business service or system that depends on this network work.','SHORT_TEXT',false,30,2,120),
-    ('maintenance_window','Maintenance window','Preferred date/time window for implementation.','SHORT_TEXT',false,40,2,120),
-    ('rollback_plan','Rollback plan','How to revert the change if implementation fails.','LONG_TEXT',false,50,10,1000)
-) AS field(key, label, help_text, kind, required, sort_order, min_length, max_length) ON TRUE
-WHERE internal_org.name = 'TicketFlow1 Internal'
-  AND NOT EXISTS (
-      SELECT 1 FROM subtype_field_definition existing
-      WHERE existing.subtype_id = subtype.id
-        AND existing.key = field.key
-  );
 
 -- Source migration: V25__seed_public_test_scenario.sql
 -- Public test scenario for the internet-hosted app.
@@ -1831,79 +1290,6 @@ ON CONFLICT DO NOTHING;
 
 
 
--- Source migration: V29__restore_template_clone_metadata.sql
--- V22_2 hardened the base template clone, but replaced the V21 wrapper that
--- propagated service subtypes, ticket-type capabilities, and protected
--- transition metadata. Restore that propagation for new organizations and
--- backfill organizations created after the replacement.
-
-ALTER FUNCTION clone_org_templates(BIGINT)
-    RENAME TO clone_org_templates_base_v29;
-
-CREATE OR REPLACE FUNCTION clone_org_templates(target_org_id BIGINT)
-RETURNS VOID
-LANGUAGE plpgsql
-AS $$
-BEGIN
-    PERFORM clone_org_templates_base_v29(target_org_id);
-
-    UPDATE ticket_type org_type
-    SET active = template_type.active,
-        sort_order = template_type.sort_order,
-        capability = template_type.capability
-    FROM ticket_type template_type
-    WHERE template_type.organization_id IS NULL
-      AND org_type.organization_id = target_org_id
-      AND org_type.key = template_type.key;
-
-    INSERT INTO ticket_subtype (
-        ticket_type_id, key, name, description, active, sort_order
-    )
-    SELECT org_type.id, template_subtype.key, template_subtype.name,
-           template_subtype.description, template_subtype.active,
-           template_subtype.sort_order
-    FROM ticket_type org_type
-    JOIN ticket_type template_type
-      ON template_type.organization_id IS NULL
-     AND template_type.key = org_type.key
-    JOIN ticket_subtype template_subtype
-      ON template_subtype.ticket_type_id = template_type.id
-    WHERE org_type.organization_id = target_org_id
-      AND NOT EXISTS (
-          SELECT 1
-          FROM ticket_subtype existing
-          WHERE existing.ticket_type_id = org_type.id
-            AND existing.key = template_subtype.key
-      );
-
-    UPDATE workflow_transition org_transition
-    SET operation_kind = template_transition.operation_kind
-    FROM workflow_transition template_transition
-    JOIN workflow template_workflow
-      ON template_workflow.id = template_transition.workflow_id
-    JOIN workflow org_workflow
-      ON org_workflow.organization_id = target_org_id
-     AND org_workflow.name = template_workflow.name
-    JOIN workflow_state template_from
-      ON template_from.id = template_transition.from_state_id
-    JOIN workflow_state template_to
-      ON template_to.id = template_transition.to_state_id
-    JOIN workflow_state org_from
-      ON org_from.workflow_id = org_workflow.id
-     AND org_from.key = template_from.key
-    JOIN workflow_state org_to
-      ON org_to.workflow_id = org_workflow.id
-     AND org_to.key = template_to.key
-    WHERE template_workflow.organization_id IS NULL
-      AND org_transition.workflow_id = org_workflow.id
-      AND org_transition.from_state_id = org_from.id
-      AND org_transition.to_state_id = org_to.id;
-END;
-$$;
-
-SELECT clone_org_templates(id)
-FROM organization;
-
 -- Source migration: V30__create_user_organization_preferences.sql
 CREATE TABLE user_organization_preference (
     id                      BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
@@ -1931,31 +1317,6 @@ CREATE UNIQUE INDEX uq_user_preference_internal_scope
 
 CREATE INDEX idx_user_preference_organization
     ON user_organization_preference (organization_id);
-
--- Source migration: V31__repair_pending_approval_seed_data.sql
--- V31: repair tickets seeded directly into approval states after V26 ran.
--- Runtime transitions create ticket_approval in the service; additive seed
--- migrations must establish the same invariant for already-existing tickets.
-
-INSERT INTO ticket_approval (
-    ticket_id, pending_state_id, assigned_approver_id, assigned_team_id
-)
-SELECT ticket.id,
-       ticket.current_state_id,
-       COALESCE(ticket.resolved_approver_id, routing.approver_id),
-       routing.team_id
-FROM ticket
-JOIN ticket_type type ON type.id = ticket.ticket_type_id
-JOIN workflow_transition approve_edge
-  ON approve_edge.workflow_id = type.workflow_id
- AND approve_edge.from_state_id = ticket.current_state_id
- AND approve_edge.operation_kind = 'WORKFLOW_APPROVE'
-LEFT JOIN subtype_routing_rule routing
-  ON routing.subtype_id = ticket.subtype_id
- AND routing.active
- AND routing.organization_id IS NOT DISTINCT FROM ticket.organization_id
-WHERE (ticket.resolved_approver_id IS NOT NULL OR routing.team_id IS NOT NULL)
-ON CONFLICT DO NOTHING;
 
 -- Source migration: V32__create_subtype_field_role_grant.sql
 CREATE TABLE subtype_field_role_grant (
