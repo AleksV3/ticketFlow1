@@ -1036,8 +1036,6 @@ WHERE t.organization_id IS NULL
       WHERE existing.ticket_type_id = t.id AND existing.key = s.key
   );
 
-ALTER FUNCTION clone_org_templates(BIGINT) RENAME TO clone_org_templates_base;
-
 CREATE OR REPLACE FUNCTION clone_org_templates(target_org_id BIGINT)
 RETURNS VOID
 LANGUAGE plpgsql
@@ -1835,9 +1833,6 @@ ON CONFLICT DO NOTHING;
 -- propagated service subtypes, ticket-type capabilities, and protected
 -- transition metadata. Restore that propagation for new organizations and
 -- backfill organizations created after the replacement.
-
-ALTER FUNCTION clone_org_templates(BIGINT)
-    RENAME TO clone_org_templates_base_v29;
 
 CREATE OR REPLACE FUNCTION clone_org_templates(target_org_id BIGINT)
 RETURNS VOID
