@@ -1,198 +1,422 @@
 # TicketFlow1
 
-TicketFlow1 is a multi-organization ticketing application for service-request
-workflows. It supports legacy Change Requests, Tasks, and Defects, plus the
-new configurable workflow model for TASI, USR, DFCT, and REQ tickets. It
-includes runtime subtype forms, automatic routing to teams/developers,
-relationship-aware approvals, comments, attachments, audit history, defect
-SLAs, dashboards, and a Next.js frontend.
+TicketFlow1 is a full-stack, multi-organization ticketing and service-workflow
+application. It combines configurable ticket forms, controlled workflows,
+team routing, approvals, notifications, SLAs, permissions, and an auditable
+history in one system.
 
-The current UI includes per-user light/dark/system theme preferences, responsive
-full-width ticket and team workspaces, explicit ticket-type selection, and
-versioned workflow-state renaming that preserves connected transitions.
+The project is functional and deployable, but it is currently undergoing the
+production-readiness work documented in
+[`specs/004-production-readiness-hardening`](specs/004-production-readiness-hardening).
+It should be treated as a controlled pilot rather than a finished
+enterprise-production release.
 
-## Public demo on Render
+## What the application does
 
-The repository includes [`render.yaml`](render.yaml), which provisions a
-Next.js web service, a Dockerized Spring Boot API, and PostgreSQL as one Render
-Blueprint.
+- Creates and manages tickets for multiple organizations.
+- Keeps client organizations isolated from each other.
+- Supports internal `TASI` and `USR` service requests.
+- Supports client `DFCT` defects and `REQ` requests.
+- Preserves legacy Change Request, Task, and Defect records.
+- Builds subtype-specific forms from database configuration.
+- Routes work to teams, team leads, developers, fallback developers, and
+  approvers.
+- Enforces workflow transitions, approvals, proposals, client acceptance, and
+  correction paths in the backend.
+- Tracks defect severity and SLA state.
+- Provides searchable ticket lists with configurable columns and metadata
+  filters.
+- Provides configurable dashboards, internal team boards, comments,
+  notifications, following, status history, and audit history.
+- Provides administration pages for organizations, users, roles, ticket types,
+  subtype forms, routing rules, and workflows.
+- Supports light and dark themes.
 
-1. Push the branch you want to deploy to GitHub.
-2. In Render, choose **New > Blueprint** and connect this repository.
-3. Keep the Blueprint name and service settings, then choose **Deploy
-   Blueprint**.
-4. Open `https://ticketflow1-web.onrender.com` after both services finish.
+Navigation and controls are filtered for the current user, but frontend hiding
+is not considered authorization. The Spring backend remains authoritative for
+permissions, organization scope, workflow rules, and validation.
 
-The Blueprint deliberately uses the `demo` Spring profile. Every demo account
-uses password `admin123`; useful starting accounts are:
+## Architecture
 
-| Persona | Email |
-|---|---|
-| Client contributor | `contributor@alpine.demo` |
-| Ticket agent | `agent@ticketflow1.demo` |
-| Administrator | `admin@ticketflow1.demo` |
+```text
+Browser
+  |
+  v
+Next.js frontend
+  |
+  | REST API + HttpOnly authentication cookie + CSRF
+  v
+Spring Boot backend
+  |
+  v
+PostgreSQL
+```
 
-The free API sleeps when idle, so the first request can take about a minute.
-Render's free PostgreSQL database expires after 30 days and must not be used for
-important data. Before using this as a real production service, switch the API
-to the `default` profile, use paid persistent infrastructure, provision real
-accounts, and configure a durable attachment store.
+The current hosted architecture is:
 
-## Prerequisites
+- Frontend: Vercel
+- Backend: Google Cloud Run
+- Database: Neon PostgreSQL
+
+Render configuration remains in the repository for historical/alternative
+deployment use, but Render is not the current primary deployment target.
+
+## Technology versions
+
+| Component | Version |
+|---|---:|
+| Java | 21 |
+| Spring Boot | 3.5.16 |
+| Spring Framework | 6.2.19 |
+| Next.js | 16.2.11 |
+| React | 19.2.7 |
+| PostgreSQL | 16 |
+| Documented Neon PostgreSQL instance | 16.14 |
+
+The Maven parent controls Spring dependency versions. Exact installed frontend
+versions are recorded in `frontend/package-lock.json`.
+
+## How the project was developed
+
+The project uses a SpecKit-style workflow:
+
+1. `spec.md` defines user requirements and acceptance criteria.
+2. `plan.md` records architecture and implementation decisions.
+3. `tasks.md` breaks the plan into small, verifiable tasks and phases.
+4. Contracts, threat models, and data-model documents define expected
+   boundaries before implementation.
+5. Code is implemented phase by phase.
+6. Each phase is tested, reviewed, and committed before the next phase starts.
+
+The main specifications are:
+
+- [`specs/001-ticketing-mvp`](specs/001-ticketing-mvp) — original application
+  and core ticketing behavior.
+- [`specs/002-service-request-workflows`](specs/002-service-request-workflows) —
+  TASI, USR, DFCT, REQ, subtype forms, routing, and workflow rules.
+- [`specs/003-priority-fixes-and-ux`](specs/003-priority-fixes-and-ux) —
+  dashboard, filtering, theme, roles, notifications, and UX improvements.
+- [`specs/004-production-readiness-hardening`](specs/004-production-readiness-hardening) —
+  authorization, database edit leases, cross-instance behavior, release gates,
+  validation, observability, and final security work.
+
+AI was used as a development assistant for specification refinement, code,
+tests, debugging, and documentation. Requirements, priorities, visual
+acceptance, and phase approval remained human decisions.
+
+## Repository layout
+
+```text
+backend/    Spring Boot API, security, domain logic, Flyway migrations, tests
+frontend/   Next.js application, React components, browser tests
+specs/      Specifications, plans, contracts, threat models, and task lists
+docs/       Architecture, deployment, demo, presentation, and operations guides
+```
+
+## Local development
+
+### Prerequisites
 
 - Docker Engine with Docker Compose v2
-- Java 21 for running the backend outside Docker
-- Node.js 20+ and npm for the frontend
+- Java 21
+- Node.js 20 or newer
+- npm
 
-## Configuration and secrets
+Backend integration tests also require the current user to have access to the
+Docker socket.
 
-Copy the example environment file before starting services:
+### 1. Prepare local configuration
 
 ```bash
 cp .env.example .env
 ```
 
-Replace `JWT_SECRET` with at least 32 random bytes. For example:
+Replace `JWT_SECRET` in `.env` with a random secret of at least 32 bytes:
 
 ```bash
 openssl rand -base64 48
 ```
 
-Never commit `.env`, production database passwords, or JWT secrets. The normal
-profile contains no user accounts or fixed credentials.
+Never commit `.env`, `.env.local`, database credentials, or JWT secrets.
 
-The supported Spring profiles are:
-
-- `default`: production migrations only; no demo users or sample records.
-- `demo`: adds the isolated V8 demo migration with fixed local-only accounts.
-
-## Workflow model
-
-The current configurable workflow slice adds four service-request types:
-
-| Type | Who creates it | Main approval point |
-|---|---|---|
-| `TASI` | TicketFlow1/internal users | Team lead or configured approver approves implementation |
-| `USR` | TicketFlow1/internal users | Team lead or configured approver approves user changes |
-| `DFCT` | Client users | TicketFlow1 handles analysis/development/deployment and keeps defect SLA capability |
-| `REQ` | Client users | Client business owner or explicit delegate accepts before deployment |
-
-TASI and USR require a subtype such as `FIREWALL`, `NETWORK`, `APPLICATION`,
-`HARDWARE`, `NEW`, `MODIFY`, or `DELETE`. Admins can add/edit/deactivate
-subtypes, dynamic fields, options, routing rules, and type availability without
-adding physical ticket columns or editing source code. Existing legacy tickets
-remain readable on their original workflow after migration.
-
-## Run with Docker and local frontend
-
-Start PostgreSQL and the backend:
-
-```bash
-docker compose up -d --build postgres backend
-```
-
-Then start the frontend:
-
-```bash
-cd frontend
-cp ../.env.example .env.reference
-npm install
-NEXT_PUBLIC_API_BASE_URL=http://localhost:8081/api npm run dev
-```
-
-Open <http://localhost:3000/login>. The API and Swagger UI run on
-<http://localhost:8081> and <http://localhost:8081/swagger-ui.html>.
-
-For demo data, set `SPRING_PROFILES_ACTIVE=demo` in `.env` before the first
-start. Demo credentials and the presentation walkthrough are documented in
-[`docs/demo-script.md`](docs/demo-script.md).
-
-## Run entirely from source
-
-Start only PostgreSQL:
+### 2. Start PostgreSQL
 
 ```bash
 docker compose up -d postgres
 ```
 
-Start the backend:
+The default local database is exposed on port `5433` to avoid colliding with a
+PostgreSQL installation on port `5432`.
+
+### 3. Start the backend
+
+From a second terminal:
 
 ```bash
 cd backend
-JWT_SECRET='replace-with-32-or-more-random-bytes' ./mvnw spring-boot:run
+JWT_SECRET='replace-with-your-generated-secret' ./mvnw spring-boot:run
 ```
 
-In another terminal, start the frontend:
+The backend starts on <http://localhost:8081>. Its health endpoint is:
+
+```text
+http://localhost:8081/api/health
+```
+
+OpenAPI and Swagger are disabled by default. For trusted local development,
+enable them explicitly with:
+
+```bash
+APP_API_DOCS_ENABLED=true \
+JWT_SECRET='replace-with-your-generated-secret' \
+./mvnw spring-boot:run
+```
+
+Swagger is then available at <http://localhost:8081/swagger-ui.html>.
+
+### 4. Start the frontend
+
+Create `frontend/.env.local`:
+
+```text
+NEXT_PUBLIC_API_BASE_URL=http://localhost:8081/api
+NEXT_PUBLIC_ENABLE_DEV_LOGS=true
+```
+
+Then run:
 
 ```bash
 cd frontend
-npm install
+npm ci
 npm run dev
 ```
 
-The defaults use PostgreSQL port `5433`, API port `8081`, and frontend port
-`3000`. Override them through `.env` and `frontend/.env.local`.
+Open <http://localhost:3000/login>.
+
+### Demo profile
+
+For an isolated local demonstration, start the backend with:
+
+```bash
+SPRING_PROFILES_ACTIVE=demo \
+JWT_SECRET='replace-with-your-generated-secret' \
+./mvnw spring-boot:run
+```
+
+Demo-only accounts in `db/demo-migration` use password `admin123`. Never enable
+the `demo` profile in a real deployment.
+
+The normal migration history also currently contains the V25 public test
+scenario. Before a real production launch, its test accounts and seed data must
+be removed or disabled through a new reviewed migration, and all related
+credentials must be rotated. Do not edit an already applied migration.
+
+## Ticket and workflow model
+
+| Type | Audience | Main behavior |
+|---|---|---|
+| `TASI` | Internal | Technical service action with required subtype and optional approval |
+| `USR` | Internal | User-service request with subtype and target-user rules |
+| `DFCT` | Client | Defect lifecycle with severity and SLA behavior |
+| `REQ` | Client | Request lifecycle with client-side acceptance where configured |
+
+Examples of internal subtypes include `FIREWALL`, `NETWORK`, `APPLICATION`,
+`HARDWARE`, `NEW`, `MODIFY`, and `DELETE`.
+
+Ticket types, subtypes, dynamic fields, role grants, routing rules, workflow
+states, and transitions are configuration data. Administrators can change this
+configuration without adding a physical database column for every form field.
+
+## Authentication and security
+
+Current security controls include:
+
+- Signed JWT authentication in an HttpOnly cookie.
+- CSRF protection for browser mutations.
+- Secure-cookie support for HTTPS deployments.
+- First-login password change for administrator-created users.
+- PostgreSQL-backed login rate limiting.
+- Role and fixed-permission checks.
+- Party and organization isolation.
+- Backend validation of workflow and relationship rules.
+- Request correlation IDs in structured backend logs.
+- Ticket and configuration audit records.
+- Browser security headers, including CSP, frame denial, no-sniff, referrer
+  policy, and permissions policy.
+
+Production hardening is not complete. The open work and verification gates are
+tracked in
+[`specs/004-production-readiness-hardening/tasks.md`](specs/004-production-readiness-hardening/tasks.md).
 
 ## Database migrations
 
-Flyway owns the schema; Hibernate validates it and never creates tables.
-Production migrations are under `backend/src/main/resources/db/migration`.
-Demo V8 is under `db/demo-migration` and is added only by the `demo` profile.
-The service-request workflow migrations are additive: V16-V21 add subtype
-forms, routing, parent-ticket metadata, type activation/capability, and the
-TASI/USR/DFCT/REQ workflow seeds. The migration rehearsal and rollback plan are
-documented in
-[`specs/002-service-request-workflows/migration-strategy.md`](specs/002-service-request-workflows/migration-strategy.md).
+Flyway owns the PostgreSQL schema. Hibernate uses `ddl-auto=validate` and does
+not create or alter production tables.
 
-Do not edit an applied migration on a persistent environment. This project
-removed an early development-only credential from V1 during release hardening,
-so databases created before that change must be rebuilt once:
+Migration files are under:
+
+```text
+backend/src/main/resources/db/migration
+```
+
+`B40__baseline.sql` is the complete baseline used for a new empty database.
+Flyway treats it as the replacement for V1 through V40 on a fresh database.
+Existing databases retain their recorded V-file history and apply later
+migrations normally. The current migration after the baseline is
+`V41__harden_team_authorization.sql`.
+
+The historical `V*.sql` files must remain unchanged because existing local,
+test, Neon, and Cloud Run-connected databases store their checksums in
+`flyway_schema_history`.
+
+To reset only a disposable local database:
 
 ```bash
 docker compose down -v
 docker compose up -d postgres
 ```
 
-This deletes local container data. Do not use it against an environment whose
-data must be retained.
+This permanently deletes the local Docker volume. Never run it against data
+that must be retained.
 
-## Tests and release checks
+## Tests
+
+Backend tests:
 
 ```bash
-cd backend && ./mvnw test
-cd frontend && npm test
-cd frontend && npm run build
-cd frontend && npm run test:e2e
+cd backend
+./mvnw test
 ```
 
-Backend integration tests use Testcontainers and therefore require access to a
-running Docker daemon. Release verification and tenant-isolation coverage are
-described in `docs/release-verification.md`.
+The integration suite uses Testcontainers and requires access to a running
+Docker daemon.
+
+Frontend unit tests:
+
+```bash
+cd frontend
+npm test
+```
+
+Production build and TypeScript validation:
+
+```bash
+cd frontend
+npm run build
+```
+
+Browser tests:
+
+```bash
+cd frontend
+npm run test:e2e
+```
+
+The complete release gate is not yet fully green. In particular, the current
+`npm run lint` script still uses the removed `next lint` command and is
+scheduled for replacement in Phase 5. Do not describe the application as
+production-ready until the verification tasks in specification 004 pass.
+
+## Deployment
+
+The current deployment guide is
+[`docs/free-internet-deployment.md`](docs/free-internet-deployment.md).
+
+### Backend: Cloud Run
+
+Required production configuration includes:
+
+```text
+DATABASE_URL=jdbc:postgresql://<neon-host>/<database>?sslmode=require
+DATABASE_USERNAME=<database-user>
+DATABASE_PASSWORD=<database-password>
+JWT_SECRET=<long-random-secret>
+COOKIE_SECURE=true
+APP_CORS_ALLOWED_ORIGINS=https://<vercel-domain>
+ATTACHMENT_STORAGE_DIRECTORY=/tmp/ticketflow1-attachments
+APP_API_DOCS_ENABLED=false
+```
+
+Use Google Secret Manager or another secret store for real credentials.
+
+### Frontend: Vercel
+
+Use `frontend` as the Vercel root directory. The supported API configurations
+are:
+
+```text
+NEXT_PUBLIC_API_BASE_URL=https://<cloud-run-domain>/api
+```
+
+or same-origin `/api` with:
+
+```text
+NEXT_PUBLIC_API_BASE_URL=/api
+BACKEND_HOST=<cloud-run-hostname>
+```
+
+Cloud Run CORS configuration must include the exact Vercel frontend origin.
+
+### Database: Neon
+
+Cloud Run connects to Neon through the PostgreSQL JDBC URL and explicit
+username/password variables. Flyway applies pending migrations when the backend
+starts.
+
+## Important attachment limitation
+
+Attachment metadata is stored in PostgreSQL, but attachment content is
+currently stored on the backend filesystem. Cloud Run's filesystem is
+temporary, so attachment files can disappear when an instance restarts or is
+replaced.
+
+This was intentionally left unchanged while using limited free cloud storage.
+Do not promise durable attachments until an object-storage implementation and
+backfill are completed.
 
 ## Troubleshooting
 
-- **Flyway checksum mismatch:** rebuild the disposable local database as shown
-  above. Never use `flyway repair` to conceal an unexplained production drift.
-- **Port already in use:** change `POSTGRES_PORT`, `SERVER_PORT`, or the
-  frontend dev port and keep `NEXT_PUBLIC_API_BASE_URL` aligned.
-- **401 after startup:** the default profile intentionally has no accounts.
-  Use an operationally provisioned account or recreate a local database with
-  the demo profile.
-- **403 on browser mutations:** confirm the frontend and API origins match the
-  configured CORS origin and that cookies are enabled; the client sends the
-  CSRF cookie value as `X-XSRF-TOKEN`.
-- **Integration tests cannot find Docker:** start Docker and ensure the current
-  user can access its socket.
-- **Frontend cannot reach the API:** verify `NEXT_PUBLIC_API_BASE_URL` and open
-  the browser network panel for CORS or cookie errors.
+- **Docker permission denied:** ensure Docker is running and the current user
+  belongs to the `docker` group, then sign out and back in.
+- **Flyway checksum mismatch:** identify the changed migration. Never use
+  `flyway repair` to hide an unexplained difference.
+- **Backend cannot connect locally:** confirm PostgreSQL is available on port
+  `5433` and the database values match `.env`.
+- **Frontend cannot reach the API:** verify `frontend/.env.local`, restart the
+  Next.js process, and inspect the browser network response.
+- **403 on a mutation:** confirm the user has the required permission, cookies
+  are enabled, the frontend origin is allowed, and the CSRF cookie/header pair
+  is present.
+- **Login requires a password change:** this is expected for a newly created
+  user with a temporary password.
+- **Swagger returns 404:** set `APP_API_DOCS_ENABLED=true` only in a trusted
+  local environment.
 
-## Additional documentation
+## Documentation
 
-- [`docs/demo-script.md`](docs/demo-script.md) — presentation walkthrough for the service-request workflows
-- [`docs/presentation-guide.md`](docs/presentation-guide.md) — concise explanation for presenting the project
-- [`docs/technical-deep-dive.md`](docs/technical-deep-dive.md) — deeper architecture and code walkthrough
-- [`specs/002-service-request-workflows/contracts`](specs/002-service-request-workflows/contracts) — service workflow API contracts
-- [`specs/001-ticketing-mvp/tasks.md`](specs/001-ticketing-mvp/tasks.md) — task source of truth
-- [`specs/001-ticketing-mvp/quickstart.md`](specs/001-ticketing-mvp/quickstart.md) — validation flows
-- [`docs/database-er.md`](docs/database-er.md) — database model
-- [`docs/02-product-requirements-and-build-brief.md`](docs/02-product-requirements-and-build-brief.md) — product brief
+- [`docs/ticketflow1-presentation.pptx`](docs/ticketflow1-presentation.pptx) —
+  short Slovenian project presentation.
+- [`docs/ticketflow1-presentation-notes.md`](docs/ticketflow1-presentation-notes.md) —
+  presenter notes.
+- [`docs/demo-script.md`](docs/demo-script.md) — suggested live demo.
+- [`docs/complete-codebase-guide.md`](docs/complete-codebase-guide.md) —
+  detailed codebase walkthrough.
+- [`docs/technical-deep-dive.md`](docs/technical-deep-dive.md) — architecture
+  and implementation details.
+- [`docs/database-er.md`](docs/database-er.md) — database model.
+- [`docs/free-internet-deployment.md`](docs/free-internet-deployment.md) —
+  Vercel, Cloud Run, and Neon deployment.
+- [`docs/release-verification.md`](docs/release-verification.md) — verification
+  evidence and remaining release checks.
+
+## Current known limitations
+
+- Attachment files are not durable on Cloud Run.
+- PostgreSQL edit leases and durable cross-instance realtime events are still
+  planned in specification 004.
+- Authentication authority refresh and the complete CI release gate are still
+  planned.
+- Health currently uses one compatibility endpoint; separate liveness and
+  readiness endpoints are planned.
+- Some deployment and deep-dive documents still contain historical Render-era
+  details and should be treated as background until they are refreshed.
